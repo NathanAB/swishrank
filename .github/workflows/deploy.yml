@@ -1,0 +1,52 @@
+# Astro's GitHub Pages workflow (https://docs.astro.build/en/guides/deploy/github/), plus a daily run
+# that pulls the night's scores from ESPN and commits them before building.
+name: Refresh scores and deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 10:00 UTC is 6 AM Eastern in summer time and 5 AM in winter, after the last West Coast game ends.
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Test the Elo math
+        run: npm test
+      - name: Fetch this season's games from ESPN
+        run: npm run fetch
+      - name: Commit new scores
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/games
+          git diff --cached --quiet || { git commit -m "Update scores" && git push; }
+      - name: Install, build, and upload the site
+        uses: withastro/action@v6
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
