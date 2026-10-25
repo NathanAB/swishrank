@@ -1,0 +1,151 @@
+---
+// Final games, two lines each (away, then home): the teams, the score, each side's pre-game win chance
+// and each side's rating change as displayed, with a bar on the winner's line as long as the points it
+// took, so the night's big swings are seen before they are read.
+import type { Abbr, Result } from "../lib/elo.ts";
+import { outcome, swing, type Line } from "../lib/facts.ts";
+import { pct, shortDay, signed } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import { city, team, type SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  /** The games, in the order to show them (facts.ts bySwing for biggest swing first). */
+  results: readonly Result[];
+  /** The list's accessible name, such as "Last night's games". */
+  label: string;
+  /** Add a date column. */
+  dated?: boolean;
+  /** A second line under the date, such as "Game 3"; needs `dated`. */
+  detail?: (r: Result) => string | null;
+  /** Points that fill the bar's track. Defaults to the larger of 24 and the list's biggest swing. */
+  scale?: number;
+  /** The team whose name carries the selection line on load. */
+  selected?: Abbr;
+  /**
+   * Show only the whole games that fit the height the page gives the list, for a card that must end level
+   * with its neighbour. The page turns it on per breakpoint with --fit-contain: size and Panel's `fill`.
+   */
+  fit?: boolean;
+  /** The sentence shown when there are no games. */
+  empty?: string;
+}
+
+const { season, results, label, dated = false, detail, selected, fit = false, empty = "No games yet." } = Astro.props;
+const scale = Astro.props.scale ?? Math.max(24, ...results.map(swing));
+const rows = results.map((r) => {
+  const o = outcome(r);
+  const g = r.game;
+  const where = g.neutral ? "Neutral site" : `At ${city(season, g.home)}`;
+  return {
+    r, o,
+    title: g.note ? `${g.note}. ${where}` : where,
+    sub: detail?.(r) ?? null,
+    bar: Math.min(100, (o.winner.change / scale) * 100),
+  };
+});
+const at = (r: Result) => (r.game.neutral ? "vs" : "at");
+const teamHref = (abbr: Abbr) => href({ kind: "team", season, abbr });
+const lines = (o: ReturnType<typeof outcome>): [Line, Line] => [o.away, o.home];
+---
+
+{rows.length === 0 ? (
+  <p class="empty">{empty}</p>
+) : (
+  <div class:list={["games", { dated, fit }]} role="table" aria-label={label}>
+    <div class="hds">
+      {(rows.length > 1 ? [true, false] : [true]).map((first) => {
+        const role = first ? "columnheader" : undefined;
+        return (
+          <div class="hd" role={first ? "row" : undefined} aria-hidden={first ? undefined : "true"}>
+            {dated && <span role={role}>Date</span>}
+            <span role={role}>Game</span>
+            <span role={role} class="r">Score</span>
+            <span role={role} class="r" title="Win chance before tip-off">Chance</span>
+            <span role={role} class="r">Change</span>
+          </div>
+        );
+      })}
+    </div>
+    <div class="fit-rows" role="rowgroup">
+      {rows.map(({ r, o, title, sub, bar }) => (
+        <div class="game" role="row" title={title}>
+          {dated && (
+            <div class="when" role="cell">
+              <span>{shortDay(r.day)}</span>
+              {sub && <span>{sub}</span>}
+            </div>
+          )}
+          <div class="who" role="cell">
+            {lines(o).map((l) => (
+              <span class:list={{ win: l.won }}>
+                {l.side === "h" && `${at(r)} `}
+                <a class:list={["nm", { sel: l.abbr === selected }]} data-team={l.abbr} href={teamHref(l.abbr)}>{team(season, l.abbr).short}</a>
+              </span>
+            ))}
+          </div>
+          <div class="sc num" role="cell">
+            {lines(o).map((l) => <span class:list={{ win: l.won }}>{l.score}</span>)}
+          </div>
+          <div class="pc num" role="cell">
+            {lines(o).map((l) => <span>{pct(l.chance)}</span>)}
+          </div>
+          <div class="chg num" role="cell">
+            {lines(o).map((l) => (
+              <span class:list={["swing", { win: l.won }]}>
+                {l.won ? <i style={`width: ${bar.toFixed(1)}%`} /> : <i class="none" />}
+                <b>{signed(l.change)}</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+<style>
+  .empty { padding: 4px 0 8px; color: var(--muted); }
+  .games { --cols: minmax(0, 1fr) 36px 40px 96px; --row: 41px; }
+  .games:not(.fit) { container-type: inline-size; }
+  .games.dated { --cols: 48px minmax(0, 1fr) 36px 40px 96px; }
+  .hds, .fit-rows { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: var(--gap); }
+  .hd, .game { display: grid; grid-template-columns: var(--cols); column-gap: 10px; }
+  .hd { height: 32px; align-items: center; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .hd + .hd { display: none; }
+  .r { text-align: right; }
+  .game { height: var(--row); padding: 3px 0; align-items: start; }
+  /* Rules go between rows, so a list cut short by `fit` ends on its last shown row with no rule under it. */
+  .game + .game { border-top: 1px solid var(--rule); }
+  .game > div { display: grid; line-height: 17px; min-width: 0; }
+  .game span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .when { color: var(--muted); font-size: var(--fs-small); }
+  .who { color: var(--muted); }
+  .who .win { color: var(--text); font-weight: 500; }
+  .nm { position: relative; }
+  .nm::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: transparent; }
+  .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .nm.hov::after { background: var(--control); }
+  .nm.sel::after { background: var(--accent); }
+  .sc, .pc { text-align: right; color: var(--muted); }
+  .sc .win { color: var(--text); font-weight: 500; }
+  .swing { display: grid; grid-template-columns: minmax(0, 1fr) 30px; column-gap: 6px; align-items: center; color: var(--muted); }
+  .swing b { font-weight: 400; text-align: right; }
+  .swing.win b { color: var(--text); font-weight: 500; }
+  .swing i { display: block; height: 6px; background: var(--bar); border-radius: 0 3px 3px 0; justify-self: start; }
+  .swing i.none { background: none; }
+
+  /* A wide list sets two games across, read left to right, rather than leave a band of nothing between
+     the names and the figures: each half then has the columns a list gets in a 432px card. */
+  @container (min-width: 680px) {
+    .games:not(.dated) > .hds, .games:not(.dated) > .fit-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .games:not(.dated) .hd + .hd { display: grid; }
+    .games:not(.dated) .game:nth-child(2) { border-top: 0; }
+  }
+
+  @media (max-width: 640px) {
+    .games { --cols: minmax(0, 1fr) 30px 36px 80px; }
+    .games.dated { --cols: 44px minmax(0, 1fr) 30px 36px 72px; }
+    .hd, .game { column-gap: 8px; }
+  }
+</style>

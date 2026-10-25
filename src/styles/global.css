@@ -1,0 +1,106 @@
+/* Tokens from the data-terminal prototype: a true neutral palette, Public Sans, and basketball-leather
+   orange as the one accent. The accent marks a selection (a 1px line as wide as its label) and the
+   selected team's data; everything else is ink and greys. Light follows the system's light mode with
+   its own values, not an inversion of dark. Grid at 1440: a 1200 column, 744 + 24 + 432 = 1200. */
+:root {
+  color-scheme: light dark;
+  --ground: #ffffff;
+  --surface: #f6f6f7;
+  --raised: #ececee;
+  --border: #e4e4e7;
+  --rule: #e6e6e9;
+  --control: #c9cacf;
+  --text: #111113;
+  --muted: #5a5c63;
+  --accent: #e06c1b;
+  --grid: #e1e1e5;
+  --line-other: #a9abb2;
+  --bar: #85878e;
+  --panel-edge: 1px solid var(--border);
+  --shadow: none;
+
+  --font: var(--font-public-sans), system-ui, sans-serif;
+  --fs-title: 26px;
+  --fs-card: 16px;
+  --fs-kpi: 28px;
+  --fs-body: 14px;
+  --fs-small: 12px;
+
+  --col: 1200px;
+  --pad: 24px;
+  --gap: 24px;
+  --card-pad: 20px;
+  --radius-card: 6px;
+  --bar-height: 48px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #171719;
+    --surface: #131217;
+    --raised: #212023;
+    --border: #222224;
+    --rule: #1b1a1f;
+    --control: #3a3a3e;
+    --text: #ffffff;
+    --muted: #8a8c92;
+    --accent: #f08c3a;
+    --grid: #26252b;
+    --line-other: #5b5c63;
+    --bar: #727379;
+    /* Dark panels sit a step below the ground and lift on a soft shadow instead of a border. */
+    --panel-edge: 0;
+    --shadow: 0 12px 28px rgba(0, 0, 0, 0.2); /* taste-skill-ignore: the dealt data-terminal card shadow, dark only */
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --pad: 16px;
+    --gap: 16px;
+    --card-pad: 16px;
+    --fs-title: 22px;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font: var(--fs-body) / 20px var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+svg { display: block; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+/* Every figure in a column or a strip lines up digit for digit. */
+.num, table { font-variant-numeric: tabular-nums; }
+
+/* A list given `fit` (GameList, FixtureList) shows only the whole rows that fit the height its card is
+   given, so the card can end level with its neighbour. A page turns it on for a breakpoint by setting
+   --fit-contain: size and giving the list's Panel `fill`; the list then adds no height of its own and the
+   queries below drop each row that would not fit whole (32px header, 41px rows).
+   Without --fit-contain the list shows every row. Dropped rows are display: none, so they take no focus.
+   The rules name .fit as well so they outrank a component's scoped `display` on its rows, which comes later. */
+.fit { flex: 1 1 auto; min-height: 0; container-name: fit; container-type: var(--fit-contain, normal); }
+@container fit (height < 155px) { .fit > .fit-rows > :nth-child(n + 3) { display: none; } }
+@container fit (height < 196px) { .fit > .fit-rows > :nth-child(n + 4) { display: none; } }
+@container fit (height < 237px) { .fit > .fit-rows > :nth-child(n + 5) { display: none; } }
+@container fit (height < 278px) { .fit > .fit-rows > :nth-child(n + 6) { display: none; } }
+@container fit (height < 319px) { .fit > .fit-rows > :nth-child(n + 7) { display: none; } }
+@container fit (height < 360px) { .fit > .fit-rows > :nth-child(n + 8) { display: none; } }
+@container fit (height < 401px) { .fit > .fit-rows > :nth-child(n + 9) { display: none; } }
+@container fit (height < 442px) { .fit > .fit-rows > :nth-child(n + 10) { display: none; } }
+@container fit (height < 483px) { .fit > .fit-rows > :nth-child(n + 11) { display: none; } }
+@container fit (height < 524px) { .fit > .fit-rows > :nth-child(n + 12) { display: none; } }
+@container fit (height < 565px) { .fit > .fit-rows > :nth-child(n + 13) { display: none; } }
+@container fit (height < 606px) { .fit > .fit-rows > :nth-child(n + 14) { display: none; } }
+@container fit (height < 647px) { .fit > .fit-rows > :nth-child(n + 15) { display: none; } }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }

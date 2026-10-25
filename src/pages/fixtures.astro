@@ -1,0 +1,166 @@
+---
+// The current season's games in the week ahead, one card per US Eastern day. Each game reads away over home:
+// tip-off in ET, each team's rating now, each side's win chance on those ratings, and the spread on the
+// favourite's line. Pointing at a team marks its other games in the week.
+import Panel from "../components/Panel.astro";
+import Base from "../layouts/Base.astro";
+import { addDays, dayKey, ELO_PER_POINT, HCA, type Abbr } from "../lib/elo.ts";
+import { WEEK, closest, mostOneSided, nextDays, type Fixture, type FixtureLine } from "../lib/fixtures.ts";
+import { MINUS, int, longDay, pct, rating, tipTime, weekdayDay } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import { TODAY, currentSeason, team } from "../lib/season.ts";
+
+const season = currentSeason();
+const m = season.model;
+const days = nextDays(m, TODAY, WEEK);
+const all = days.flatMap((d) => d.fixtures);
+const selected = m.order[0];
+
+const short = (a: Abbr) => team(season, a).short;
+const relative = (day: string) => (day === TODAY ? "Today" : day === addDays(TODAY, 1) ? "Tomorrow" : null);
+const when = (day: string) => relative(day)?.toLowerCase() ?? `on ${longDay(day).split(",")[0]}`;
+const count = (n: number) => `${int(n)} ${n === 1 ? "game" : "games"}`;
+const spread = (points: number) => (points === 0 ? "Pick" : `${MINUS}${points.toFixed(1)}`);
+// ESPN writes "NBA Cup - Group Play"; the site separates parts with a middle dot.
+const note = ({ game: g }: Fixture) => {
+  const text = g.note?.replaceAll(" - ", " · ") ?? null;
+  return g.neutral ? (text ? `${text} · neutral site` : "Neutral site") : text;
+};
+
+// The finding under the title: which side the week's favourites are on, and how far they lean, from the
+// closest game to the most one-sided. { b } parts are figures set in ink.
+type Part = string | { b: string };
+const lean = (f: Fixture) => {
+  const [away, home] = f.lines;
+  const [fav, dog] = f.fav === "h" ? [home, away] : [away, home];
+  return { fav: short(fav.abbr), dog: short(dog.abbr), chance: pct(fav.chance), day: dayKey(f.game.t) };
+};
+const near = closest(all);
+const far = mostOneSided(all);
+let lede: Part[] | null = null;
+if (near && far) {
+  const a = lean(near);
+  const z = lean(far);
+  const road = all.filter((f) => f.fav === "a").length;
+  const side: Part[] = road === 0 || road === all.length
+    ? ["On current ratings all ", { b: int(all.length) }, ` ${road ? "road" : "home"} sides in the week ahead are favoured`]
+    : ["On current ratings the road side is favoured in ", { b: int(road) }, ` of the ${int(all.length)} games in the week ahead`];
+  lede = all.length === 1
+    ? [`On current ratings the one game in the week ahead has the ${a.fav} at `, { b: a.chance }, ` against the ${a.dog} ${when(a.day)}.`]
+    : a.chance === z.chance
+      ? [...side, ", each at ", { b: a.chance }, "."]
+      : a.day === z.day
+        ? [...side, `, from the ${a.fav} at `, { b: a.chance }, ` against the ${a.dog} to the ${z.fav} at `, { b: z.chance }, ` against the ${z.dog}, both ${when(a.day)}.`]
+        : [...side, `, from the ${a.fav} at `, { b: a.chance }, ` against the ${a.dog} ${when(a.day)} to the ${z.fav} at `, { b: z.chance }, ` against the ${z.dog} ${when(z.day)}.`];
+}
+
+const chanceTitle = `Win chance on current ratings, with ${HCA} rating points for home court`;
+const spreadTitle = `Points the favourite should win by: ${ELO_PER_POINT} rating points to a point, to the half point`;
+---
+
+<Base title={`${season.label} fixtures`} docTitle="Fixtures" route={{ kind: "fixtures" }}>
+  {lede && <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : <b>{p.b}</b>))}</Fragment>}
+
+  {all.length === 0 ? (
+    <Panel title="The week ahead" meta={`${weekdayDay(TODAY)} to ${weekdayDay(addDays(TODAY, WEEK - 1))}`}>
+      <p class="empty">No games in the week ahead.</p>
+    </Panel>
+  ) : (
+    <div class="days">
+      {days.map(({ day, fixtures }) => (
+        <Panel title={longDay(day)} meta={[relative(day), fixtures.length ? count(fixtures.length) : null].filter(Boolean).join(" · ")}>
+          {fixtures.length === 0 ? (
+            <p class="empty">No games.</p>
+          ) : (
+            <div class="list" role="table" aria-label={`Games on ${longDay(day)}`}>
+              <div class="hds">
+                {Array.from({ length: Math.min(fixtures.length, 3) }, (_, i) => {
+                  const role = i === 0 ? "columnheader" : undefined;
+                  return (
+                    <div class="hd" role={i === 0 ? "row" : undefined} aria-hidden={i === 0 ? undefined : "true"}>
+                      <span role={role}>Tip-off, ET</span>
+                      <span role={role}>Game</span>
+                      <span role={role} class="n">Rating</span>
+                      <span role={role} class="n" title={chanceTitle}>Chance</span>
+                      <span role={role} class="n" title={spreadTitle}>Spread</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div class="rows">
+                {fixtures.map((f) => {
+                  const said = note(f);
+                  const mark = (l: FixtureLine) => ({ fav: l.side === f.fav });
+                  return (
+                    <div class="g" role="row">
+                      <span role="cell" class="when num">{tipTime(f.game.t)}</span>
+                      <span role="cell" class="who">
+                        {f.lines.map((l) => (
+                          <span class:list={[mark(l), { sel: l.abbr === selected }]} data-team={l.abbr} data-pick>
+                            {l.side === "h" ? (f.game.neutral ? "vs " : "at ") : ""}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{short(l.abbr)}</a>
+                          </span>
+                        ))}
+                      </span>
+                      <span role="cell" class="n num">{f.lines.map((l) => <span>{rating(m.r[l.abbr])}</span>)}</span>
+                      <span role="cell" class="n num">{f.lines.map((l) => <span class:list={mark(l)}>{pct(l.chance)}</span>)}</span>
+                      <span role="cell" class="n num">{f.lines.map((l) => <span class:list={mark(l)}>{l.side === f.fav ? spread(f.spread) : ""}</span>)}</span>
+                      {said && <span role="cell" class="nt">{said}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </Panel>
+      ))}
+    </div>
+  )}
+</Base>
+
+<style>
+  .days { display: flex; flex-direction: column; gap: var(--gap); }
+  .empty { padding: 4px 0 8px; color: var(--muted); }
+
+  /* Up to three games across at 1440: (1200 − 2 × 20 − 2 × 24) / 3 ≈ 370 each, which leaves the name
+     column 126px against the 108 that "at Timberwolves" needs. Games read left to right in tip-off order. */
+  .list { --cols: 3; --line: 72px minmax(0, 1fr) 44px 48px 48px; --line-gap: 8px; }
+  .hds, .rows { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: var(--gap); }
+  .hd, .g { display: grid; grid-template-columns: var(--line); column-gap: var(--line-gap); }
+  .hd { height: 32px; align-items: center; font-size: var(--fs-small); line-height: 14px; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .n { text-align: right; }
+
+  .g { padding: 6px 0; align-content: start; line-height: 20px; color: var(--muted); }
+  .g:nth-child(n + 4) { border-top: 1px solid var(--rule); }
+  .g > * { display: grid; min-width: 0; }
+  /* One 20px row per team, so the underdog's empty spread still holds its line. */
+  .g > .who, .g > .n { grid-auto-rows: 20px; }
+  .g > * > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g .fav { color: var(--text); font-weight: 500; }
+  .g > .when { white-space: nowrap; }
+  .who > [data-pick] { cursor: pointer; }
+  .nt { grid-column: 2 / -1; font-size: var(--fs-small); line-height: 16px; padding-top: 2px; }
+
+  .nm { position: relative; }
+  .nm::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: transparent; }
+  .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .hov .nm::after { background: var(--control); }
+  .sel .nm::after { background: var(--accent); }
+
+  @media (max-width: 1239px) {
+    .list { --cols: 2; }
+    .hd:nth-child(3) { display: none; }
+    .g:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+  }
+  @media (max-width: 899px) {
+    .list { --cols: 1; }
+    .hd:nth-child(n + 2) { display: none; }
+    .g:nth-child(n + 2) { border-top: 1px solid var(--rule); }
+  }
+  /* A phone keeps "10:00 PM" on one line, as the home page's list does, and takes the room from the names. */
+  @media (max-width: 640px) {
+    .list { --line: 62px minmax(0, 1fr) 40px 42px 41px; --line-gap: 6px; }
+  }
+  @media (max-width: 389px) {
+    .list { --line-gap: 4px; }
+  }
+</style>

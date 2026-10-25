@@ -1,0 +1,195 @@
+---
+// Every team's daily rating from the 1500 they all start at, one team in the accent. The end of every
+// line is labelled with its abbreviation in two staggered columns with short leaders, so labels never
+// collide. The plot stretches with the card; the tick lane and the label lane keep a fixed size, and the
+// height is fixed too, so the label layout worked out here holds at every width.
+import { START, type Abbr } from "../lib/elo.ts";
+import { monthShort, ordinal, rating, shortDay } from "../lib/format.ts";
+import type { SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  /** The team drawn in the accent on load. */
+  selected: Abbr;
+  /** Plot height in px, the same at every width. */
+  height?: number;
+  /** A dated marker line with its label above the plot, such as the start of the playoffs. */
+  marker?: { day: string; label: string } | null;
+  /** Give the selected team's legend key only its name, on a page whose KPI strip already shows its figures. */
+  bareKey?: boolean;
+}
+
+const { season, selected, height: H = 300, marker = null, bareKey = false } = Astro.props;
+const m = season.model;
+const ser = m.series;
+const n = ser.length;
+
+// 3 to 5 round ticks that include 1500, with the top tick above the highest point.
+function scale(min: number, max: number) {
+  for (const step of [25, 50, 100, 150, 200, 250, 300, 500]) {
+    const lo = START - Math.ceil((START - min) / step) * step;
+    let hi = START + Math.ceil((max - START) / step) * step;
+    if (hi <= max) hi += step;
+    const ticks: number[] = [];
+    for (let v = lo; v <= hi; v += step) ticks.push(v);
+    if (ticks.length <= 5 || step === 500) return { lo, hi, ticks };
+  }
+  throw new Error("unreachable: the last step always returns");
+}
+
+const all = ser.flatMap((d) => m.abbrs.map((a) => d.r[a]));
+const { lo, hi, ticks } = scale(Math.min(START, ...all), Math.max(START, ...all));
+const PAD = 8;
+const y = (v: number) => PAD + ((H - 2 * PAD) * (hi - v)) / (hi - lo);
+const X = 1000; // the plot's viewBox width, stretched to the card
+const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
+const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
+const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
+const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === selected) - Number(q === selected));
+
+// x labels on one step that lands on the last day: month starts for a long season, days for a short one.
+const xLabels: { i: number; text: string }[] = [];
+if (n > 60) {
+  const firsts = ser.flatMap((d, i) => (d.day.endsWith("-01") ? [i] : []));
+  const k = Math.ceil(firsts.length / 4);
+  firsts.forEach((i, j) => { if (j % k === 0) xLabels.push({ i, text: monthShort(ser[i].day.slice(0, 7)) }); });
+} else {
+  const k = Math.max(1, Math.ceil((n - 1) / 4));
+  for (let i = n - 1; i >= 1; i -= k) xLabels.unshift({ i, text: shortDay(ser[i].day) });
+}
+const markerAt = marker ? ser.findIndex((d) => d.day === marker.day) : -1;
+
+// The label lane: two columns, so neighbours in the order sit half a label apart. Each cluster of labels
+// that would overlap is spread around its mean and kept inside the plot's height.
+// A 12px capital is about 8px wide, so a column is the longest abbreviation plus 8px of air.
+const PITCH = 6, GAP = 22, COL = 8 + 8 * Math.max(...m.abbrs.map((a) => a.length)), LANE = GAP + 2 * COL;
+const last = ser[n - 1];
+const labels = m.order.map((a) => ({ a, y: last ? y(last.r[a]) : 0, ly: 0 }));
+type Cluster = { list: typeof labels; sum: number; top: number; bot: number };
+const place = (c: Cluster) => {
+  const span = (c.list.length - 1) * PITCH;
+  c.top = Math.min(Math.max(c.sum / c.list.length - span / 2, 6), H - 6 - span);
+  c.bot = c.top + span;
+};
+const clusters: Cluster[] = labels.map((l) => ({ list: [l], sum: l.y, top: 0, bot: 0 }));
+clusters.forEach(place);
+for (let merged = true; merged; ) {
+  merged = false;
+  for (let i = 0; i < clusters.length - 1; i++) {
+    if (clusters[i].bot + PITCH > clusters[i + 1].top + 0.01) {
+      const c: Cluster = { list: [...clusters[i].list, ...clusters[i + 1].list], sum: clusters[i].sum + clusters[i + 1].sum, top: 0, bot: 0 };
+      place(c);
+      clusters.splice(i, 2, c);
+      merged = true;
+      break;
+    }
+  }
+}
+for (const c of clusters) c.list.forEach((l, k) => (l.ly = c.top + k * PITCH));
+
+const standing = (a: Abbr) => `${m.order.filter((b) => m.rank[b] === m.rank[a]).length > 1 ? "tied " : ""}${ordinal(m.rank[a])}`;
+const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(ser[0].day)} to ${shortDay(ser[n - 1].day)}` : ""}, each starting at ${START}`;
+---
+
+{n < 2 ? (
+  <p class="empty">The chart starts after opening night, when every line leaves {START}.</p>
+) : (
+  <div class="chart">
+    <p class="legend" aria-live="polite">
+      {m.order.map((a) => {
+        const s = m.stats[a];
+        return (
+          <span class:list={["key", { sel: a === selected }]} data-team={a}>
+            <b>{m.data.teams[a].short}</b>
+            {!(bareKey && a === selected) && (
+              <Fragment>
+                {" "}<span class="fig num">{rating(m.r[a])}</span>{" "}
+                <span class="num">{standing(a)}<span class="range"> · high {rating(s.hi)} · low {rating(s.lo)}</span></span>
+              </Fragment>
+            )}
+          </span>
+        );
+      })}
+      <span class="key others">{m.abbrs.length - 1} others</span>
+    </p>
+    <div class="rc" role="img" aria-label={label} style={`--h: ${H}px; --lane: ${LANE}px`}>
+      {marker && markerAt >= 0 && <span class="mark-label" style={`left: ${pct(markerAt)}`}>{marker.label}</span>}
+      <svg class="ticks" width="40" height={H} viewBox={`0 0 40 ${H}`}>
+        {ticks.map((t) => <text class:list={{ ref: t === START }} x="32" y={y(t) + 4} text-anchor="end">{t}</text>)}
+      </svg>
+      <svg class="plot" viewBox={`0 0 ${X} ${H}`} preserveAspectRatio="none" height={H}>
+        {ticks.map((t) => <path class:list={["grid", { ref: t === START }]} d={`M0,${y(t)}H${X}`} />)}
+        {markerAt >= 0 && <path class="marker" d={`M${x(markerAt).toFixed(1)},0V${H}`} />}
+        <g>
+          {drawOrder.map((a) => (
+            <polyline class:list={["line", { sel: a === selected }]} data-team={a} data-raise points={points(a)} />
+          ))}
+        </g>
+      </svg>
+      <svg class="lane" width={LANE} height={H} viewBox={`0 0 ${LANE} ${H}`}>
+        {labels.map((l, k) => {
+          const lx = GAP + (k % 2) * COL;
+          return (
+            <g>
+              <path class:list={["leader", { sel: l.a === selected }]} data-team={l.a} d={`M2,${l.y.toFixed(1)}L6,${l.y.toFixed(1)}L${GAP - 5},${l.ly.toFixed(1)}L${lx - 3},${l.ly.toFixed(1)}`} />
+              <text class:list={["lab", { sel: l.a === selected }]} data-team={l.a} data-pick x={lx} y={(l.ly + 4).toFixed(1)}>
+                <title>{m.data.teams[l.a].name}, {rating(m.r[l.a])}</title>{l.a}
+              </text>
+            </g>
+          );
+        })}
+        {labels.map((l) => <circle class:list={["end", { sel: l.a === selected }]} data-team={l.a} cx="0" cy={l.y.toFixed(1)} r="4" />)}
+      </svg>
+      <div class="xs">
+        {xLabels.map((l) => (
+          <span class:list={{ first: l.i === 0, last: l.i === n - 1 }} style={`left: ${pct(l.i)}`}>{l.text}</span>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+
+<style>
+  .empty { padding: 8px 0 12px; color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 8px; color: var(--muted); }
+  .key { display: none; align-items: baseline; gap: 8px; }
+  .key.sel, .key.others { display: inline-flex; }
+  .key::before { content: ""; width: 14px; height: 2px; align-self: center; background: var(--line-other); }
+  .key.sel::before { background: var(--accent); }
+  .key b { color: var(--text); font-weight: 600; }
+  .fig { color: var(--text); font-size: 20px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; }
+
+  .rc { display: grid; grid-template-columns: 40px minmax(0, 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
+  .mark-label {
+    grid-row: 1; grid-column: 2; position: relative; justify-self: start; transform: translateX(calc(-100% - 4px));
+    font-size: 11px; line-height: 16px; color: var(--muted); white-space: nowrap;
+  }
+  .ticks { grid-row: 2; grid-column: 1; overflow: visible; }
+  .plot { grid-row: 2; grid-column: 2; width: 100%; overflow: visible; }
+  .lane { grid-row: 2; grid-column: 3; overflow: visible; }
+  .xs { grid-row: 3; grid-column: 2; position: relative; }
+  .xs span { position: absolute; top: 4px; transform: translateX(-50%); font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap; }
+  .xs .first { transform: none; }
+  .xs .last { transform: translateX(-100%); }
+
+  text { font: 12px var(--font); font-variant-numeric: tabular-nums; fill: var(--muted); }
+  .ticks .ref { fill: var(--text); }
+  .plot path, .plot polyline { fill: none; vector-effect: non-scaling-stroke; }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .grid.ref { stroke: var(--muted); stroke-opacity: 0.7; stroke-dasharray: 3 3; }
+  .marker { stroke: var(--muted); stroke-width: 1; }
+  .line { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; stroke-linejoin: round; }
+  .line.hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 1.5; }
+  .line.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
+  .leader { fill: none; stroke: var(--line-other); stroke-opacity: 0.6; stroke-width: 1; }
+  .leader.sel { stroke: var(--accent); stroke-opacity: 1; }
+  .lab { cursor: pointer; }
+  .lab.hov { fill: var(--text); }
+  .lab.sel { fill: var(--text); font-weight: 600; }
+  .end { display: none; fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+  .end.sel { display: inline; }
+
+  @media (max-width: 640px) {
+    .range { display: none; }
+  }
+</style>

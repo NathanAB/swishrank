@@ -1,0 +1,159 @@
+---
+// The shell every page shares: the top bar (mark, wordmark, nav, freshness), the title row (the page's
+// h1, its one-sentence lede and the season switch) and the footer. Pages fill the default slot.
+import { Font } from "astro:assets";
+import "../styles/global.css";
+import { int, shortDay, stamp, weekdayDay } from "../lib/format.ts";
+import { href, withBase, type Route } from "../lib/routes.ts";
+import { BUILT_AT, currentSeason, routeSeason, seasonSwitch, type SeasonView } from "../lib/season.ts";
+
+interface Props {
+  /** The page's one h1. */
+  title: string;
+  /** The document title before " · NBA Elo Ratings"; defaults to `title`. */
+  docTitle?: string;
+  /** The meta description; defaults to the site's. */
+  description?: string;
+  /** Which page this is: it decides the active nav item, the season and the season switch's targets. */
+  route: Route;
+}
+
+const { title, docTitle = title, description = "Season-only Elo ratings for all 30 NBA teams. Every team starts the season at 1500.", route } = Astro.props;
+
+const season = routeSeason(route) ?? currentSeason();
+const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
+  { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
+  { label: "Results", kinds: ["results"], to: (s) => ({ kind: "results", season: s }) },
+  { label: "Fixtures", kinds: ["fixtures"], to: () => ({ kind: "fixtures" }) },
+  { label: "Teams", kinds: ["teams", "team"], to: (s) => ({ kind: "teams", season: s }) },
+  { label: "About", kinds: ["about"], to: () => ({ kind: "about" }) },
+];
+const switcher = route.kind === "about" ? [] : seasonSwitch(route);
+const pulled = stamp(BUILT_AT);
+const asOf = season.model.asOf;
+const freshness = season.current
+  ? asOf ? `Scores through ${weekdayDay(asOf)} · pulled ${pulled}` : `No games yet · pulled ${pulled}`
+  : `${season.label} final · ${int(season.model.results.length)} games`;
+const home = href({ kind: "home", season: currentSeason() });
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>{docTitle === "NBA Elo Ratings" ? docTitle : `${docTitle} · NBA Elo Ratings`}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href={withBase("/favicon.svg")} />
+    <Font cssVariable="--font-public-sans" preload />
+  </head>
+  <body>
+    <header class="bar">
+      <div class="bar-in">
+        <a class="brand" href={home} aria-label="NBA Elo Ratings, home">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path d="M1.75 10h16.5M10 1.75v16.5M4.6 3.9c2.4 3.3 2.4 8.9 0 12.2M15.4 3.9c-2.4 3.3-2.4 8.9 0 12.2" fill="none" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+          <span>NBA Elo<span class="rest"> Ratings</span></span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          {NAV.map((item) => (
+            <a href={href(item.to(season))} aria-current={item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
+          ))}
+        </nav>
+        <p class="stamp">{freshness}</p>
+      </div>
+    </header>
+
+    <main class="canvas">
+      <div class="title-row">
+        <div class="title">
+          <h1>{title}</h1>
+          {Astro.slots.has("lede") && <p class="lede"><slot name="lede" /></p>}
+        </div>
+        {switcher.length > 1 && (
+          <nav class="seasons" aria-label="Season">
+            <span class="label">Season</span>
+            {switcher.map((s) => (
+              <a href={s.href} aria-current={s.active ? "page" : undefined}>{s.season.label}</a>
+            ))}
+          </nav>
+        )}
+      </div>
+      <slot />
+    </main>
+
+    <footer class="foot">
+      <div class="foot-in">
+        <p>
+          Scores from <a href="https://www.espn.com/nba/scoreboard">ESPN</a>, last pulled {pulled}.
+          {season.current && asOf ? ` Games through ${shortDay(asOf)}.` : ""}
+        </p>
+        <p>Every team starts each season at 1500 and nothing carries over. <a href={href({ kind: "about" })}>How the ratings work</a></p>
+      </div>
+    </footer>
+    <script>
+      import "../scripts/highlight.ts";
+    </script>
+  </body>
+</html>
+
+<style>
+  .bar { border-bottom: 1px solid var(--border); background: var(--ground); }
+  .bar-in {
+    max-width: calc(var(--col) + 2 * var(--pad)); height: var(--bar-height); margin: 0 auto; padding: 0 var(--pad);
+    display: flex; align-items: center; gap: 32px;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; }
+  .brand svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
+  .nav { display: flex; gap: 24px; height: 100%; }
+  .nav a { position: relative; display: flex; align-items: center; color: var(--muted); transition: color 150ms ease; }
+  .nav a:hover { color: var(--text); }
+  .nav a[aria-current="page"] { color: var(--text); }
+  .nav a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
+  .stamp { margin-left: auto; color: var(--muted); font-size: var(--fs-small); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .canvas { max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 32px var(--pad) 48px; }
+  .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: var(--gap); }
+  .title { min-width: 0; }
+  h1 { font-size: var(--fs-title); line-height: 32px; font-weight: 700; letter-spacing: -0.015em; }
+  .lede { margin-top: 6px; max-width: 72ch; font-size: 15px; line-height: 22px; color: var(--muted); }
+  .lede :global(b) { color: var(--text); font-weight: 500; }
+
+  .seasons { display: flex; align-items: flex-end; gap: 20px; flex: none; border-bottom: 1px solid var(--border); }
+  .seasons .label { color: var(--muted); padding-bottom: 7px; }
+  .seasons a { position: relative; display: block; padding: 6px 0 7px; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; transition: color 150ms ease; }
+  .seasons a:hover { color: var(--text); }
+  .seasons a[aria-current="page"] { color: var(--text); }
+  .seasons a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
+
+  .foot { border-top: 1px solid var(--border); color: var(--muted); }
+  .foot-in {
+    max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 20px var(--pad) 32px;
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px;
+  }
+  .foot a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+
+  @media (max-width: 899px) {
+    .stamp { display: none; }
+  }
+  /* A phone keeps the product's short name beside the mark and the four season pages; About, a fifth, is
+     in the footer of every page. */
+  @media (max-width: 640px) {
+    .bar-in { gap: 16px; }
+    .brand .rest { display: none; }
+    .nav { gap: 14px; }
+    .nav a:last-child { display: none; }
+    .canvas { padding-top: 20px; }
+    h1 { line-height: 28px; }
+    .title-row { flex-direction: column; align-items: stretch; gap: 16px; }
+    /* 44px tall targets on a phone */
+    .seasons a { padding: 12px 0 11px; }
+    .seasons .label { padding-bottom: 12px; }
+  }
+  @media (max-width: 374px) {
+    .bar-in, .nav { gap: 12px; }
+  }
+</style>

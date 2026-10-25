@@ -1,0 +1,96 @@
+---
+// Games still to play, two lines each (away, then home): tip-off in US Eastern, each team with its rating
+// now, and each side's win chance from today's ratings, the favourite in ink.
+import { dayKey, gap, winProb, type Abbr, type Game } from "../lib/elo.ts";
+import { pct, rating, shortDay, tipTime } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import { city, team, type SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  /** The games, in tip-off order. */
+  games: readonly Game[];
+  /** The list's accessible name, such as "Tonight's games". */
+  label: string;
+  /** Put the date above each tip-off time, for a list that spans several days. */
+  dated?: boolean;
+  /** The team whose name carries the selection line on load. */
+  selected?: Abbr;
+  /** As GameList's `fit`: only the whole games that fit the height the page gives the list. */
+  fit?: boolean;
+  /** The sentence shown when there are no games. */
+  empty?: string;
+}
+
+const { season, games, label, dated = false, selected, fit = false, empty = "No games scheduled." } = Astro.props;
+const m = season.model;
+const rows = games.map((g) => {
+  const p = winProb(gap(g, m.r));
+  const where = g.neutral ? "Neutral site" : `At ${city(season, g.home)}`;
+  return {
+    g,
+    title: g.note ? `${g.note}. ${where}` : where,
+    lines: [
+      { abbr: g.away, prefix: "", chance: 1 - p, fav: p < 0.5 },
+      { abbr: g.home, prefix: g.neutral ? "vs " : "at ", chance: p, fav: p >= 0.5 },
+    ],
+  };
+});
+---
+
+{rows.length === 0 ? (
+  <p class="empty">{empty}</p>
+) : (
+  <div class:list={["fix", { fit }]} role="table" aria-label={label}>
+    <div class="hd" role="row">
+      <span role="columnheader">Tip-off, ET</span>
+      <span role="columnheader">Game and rating</span>
+      <span role="columnheader" class="r">Win chance</span>
+    </div>
+    <div class="fit-rows" role="rowgroup">
+      {rows.map(({ g, title, lines }) => (
+        <div class="fx" role="row" title={title}>
+          <div class="when num" role="cell">
+            {dated && <span>{shortDay(dayKey(g.t))}</span>}
+            <span>{tipTime(g.t)}</span>
+          </div>
+          <div class="who" role="cell">
+            {lines.map((l) => (
+              <span class:list={{ fav: l.fav }}>
+                {l.prefix}<a class:list={["nm", { sel: l.abbr === selected }]} data-team={l.abbr} href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a>
+                <span class="rt num">{rating(m.r[l.abbr])}</span>
+              </span>
+            ))}
+          </div>
+          <div class="pc num" role="cell">
+            {lines.map((l) => <span class:list={{ fav: l.fav }}>{pct(l.chance)}</span>)}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+<style>
+  .empty { padding: 4px 0 8px; color: var(--muted); }
+  .fix { --row: 41px; }
+  .hd, .fx { display: grid; grid-template-columns: 64px minmax(0, 1fr) 72px; column-gap: 10px; }
+  .hd { height: 32px; align-items: center; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .r { text-align: right; }
+  .fx { height: var(--row); padding: 3px 0; align-items: start; }
+  /* Rules go between rows, so a list cut short by `fit` ends on its last shown row with no rule under it. */
+  .fx + .fx { border-top: 1px solid var(--rule); }
+  .fx > div { display: grid; line-height: 17px; min-width: 0; }
+  .fx span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .when { color: var(--muted); }
+  .who { color: var(--muted); }
+  .who .fav { color: var(--text); font-weight: 500; }
+  .rt { margin-left: 6px; color: var(--muted); font-weight: 400; }
+  .nm { position: relative; }
+  .nm::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: transparent; }
+  .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .nm.hov::after { background: var(--control); }
+  .nm.sel::after { background: var(--accent); }
+  .pc { text-align: right; color: var(--muted); }
+  .pc .fav { color: var(--text); font-weight: 500; }
+</style>

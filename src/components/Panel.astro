@@ -1,0 +1,44 @@
+---
+// A card: a titled section on the surface tone. Every block on a page sits in one. Other attributes
+// (class, data-*) land on the section, so a page can place the card with its own scoped classes.
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends Omit<HTMLAttributes<"section">, "title"> {
+  /** The card's h2. */
+  title: string;
+  /** Grey context after the title: the day, the period, a count. */
+  meta?: string;
+  /** One link at the header's right end, such as "All results". */
+  link?: { href: string; label: string };
+  /** Grow to fill a flex column, so the last card in a column ends level with its neighbour. */
+  fill?: boolean;
+  /** The h2's id, for aria-labelledby; defaults to one made from the title. */
+  headingId?: string;
+}
+
+const { title, meta, link, fill = false, headingId: hid, class: cls, ...rest } = Astro.props;
+const headingId = hid ?? `h-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+---
+
+<section {...rest} class:list={["panel", cls, { fill }]} aria-labelledby={headingId}>
+  <header class="head">
+    <h2 id={headingId}>{title}</h2>
+    {meta && <p class="meta">{meta}</p>}
+    {link && <a class="link" href={link.href}>{link.label}</a>}
+  </header>
+  <div class="body"><slot /></div>
+</section>
+
+<style>
+  .panel {
+    min-width: 0; padding: 16px var(--card-pad) 12px;
+    background: var(--surface); border: var(--panel-edge); box-shadow: var(--shadow); border-radius: var(--radius-card);
+  }
+  .head { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
+  .meta { min-width: 0; color: var(--muted); }
+  .link { margin-left: auto; font-weight: 500; white-space: nowrap; }
+  .link:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .fill { flex: 1 1 auto; display: flex; flex-direction: column; }
+  .fill > .body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+</style>

@@ -1,0 +1,23 @@
+---
+// A month of results before the newest one, such as /2025-26/results/2026-03/. The newest month is the index.
+import ResultsPage from "../../../components/ResultsPage.astro";
+import { months } from "../../../lib/results.ts";
+import { allSeasons, seasonParam, type SeasonView } from "../../../lib/season.ts";
+
+export function getStaticPaths() {
+  return allSeasons().flatMap((season) =>
+    months(season.model)
+      .slice(0, -1)
+      .map((month) => ({ params: { season: seasonParam(season), month: month.key }, props: { season, month: month.key } })),
+  );
+}
+
+interface Props {
+  season: SeasonView;
+  month: string;
+}
+
+const { season, month } = Astro.props;
+---
+
+<ResultsPage season={season} month={month} />

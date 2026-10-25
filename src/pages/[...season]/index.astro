@@ -1,0 +1,187 @@
+---
+// A season's home: who is best right now, and who moved on the latest game day. / is the current
+// season, /<id>/ every other one.
+import FixtureList from "../../components/FixtureList.astro";
+import GameList from "../../components/GameList.astro";
+import KpiStrip, { type Kpi } from "../../components/KpiStrip.astro";
+import LeagueTable from "../../components/LeagueTable.astro";
+import Panel from "../../components/Panel.astro";
+import RatingChart from "../../components/RatingChart.astro";
+import Base from "../../layouts/Base.astro";
+import { addDays, dayKey, START, type Abbr } from "../../lib/elo.ts";
+import { biggestSwing, bySwing, leaders, outcome, playoffsStart, status, swing, underdogWins, upsets, widestGap } from "../../lib/facts.ts";
+import { WEEK } from "../../lib/fixtures.ts";
+import { DASH, int, ordinal, rating, record, shortDay, weekdayDay } from "../../lib/format.ts";
+import { href } from "../../lib/routes.ts";
+import { TODAY, openingDay, seasonPaths, theTeam, winPhrase, type SeasonView } from "../../lib/season.ts";
+
+export function getStaticPaths() {
+  return seasonPaths();
+}
+
+interface Props {
+  season: SeasonView;
+}
+
+const { season } = Astro.props;
+const m = season.model;
+const st = status(m, openingDay(season));
+const lead = m.order[0];
+const bottom = m.order[m.order.length - 1];
+const top = leaders(m);
+const R = (a: Abbr) => rating(m.r[a]);
+const count = (n: number, noun: string) => `${int(n)} ${noun}${n === 1 ? "" : "s"}`;
+const theTeams = (abbrs: Abbr[]) => abbrs.map((a) => theTeam(season, a)).join(" and ");
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const resultsLink = { href: href({ kind: "results", season }), label: "All results" };
+
+// The finding under the title, one sentence built from the same values the blocks below show. Strings
+// are plain text, { b } parts are the figures set in ink and { keep } parts never break across lines.
+type Part = string | { b: string } | { keep: string };
+let lede: Part[];
+let latest: { title: string; meta: string };
+if (st.kind === "finished") {
+  const f = st.finals;
+  const series = record(f.wins, f.losses);
+  const who = top.length > 1 ? `${theTeams(top)} finished level at ` : `${theTeam(season, lead)} finished top at `;
+  const after = ` after ${count(m.results.length, "game")}`;
+  lede = f.champion === lead && top.length === 1
+    ? [cap(who), { b: R(lead) }, `${after} and beat ${theTeam(season, f.runnerUp)} `, { keep: series }, " in the Finals."]
+    : [cap(who), { b: R(lead) }, `${after}, and ${theTeam(season, f.champion)} won the Finals `, { keep: series }, ` over ${theTeam(season, f.runnerUp)}.`];
+  latest = { title: "The Finals", meta: `${m.data.teams[f.champion].short} won ${series}` };
+} else if (st.kind === "playing") {
+  const o = outcome(bySwing(st.games)[0]);
+  const { winner: w, loser: l } = o;
+  const yesterday = addDays(TODAY, -1);
+  const when = st.day === TODAY ? "today's biggest swing" : st.day === yesterday ? "last night's biggest swing" : `the biggest swing on ${weekdayDay(st.day)}`;
+  const leading = top.length > 1 ? `${theTeams(top)} share the lead at ` : `${theTeam(season, lead)} lead at `;
+  lede = [
+    `After ${count(m.results.length, "game")}, ${leading}`, { b: R(lead) }, `, and ${when} was `, { b: int(w.change) },
+    ` ${w.change === 1 ? "point" : "points"} to ${theTeam(season, w.abbr)} for a `, { keep: record(w.score, l.score) }, ` ${winPhrase(season, o)}.`,
+  ];
+  latest = {
+    title: st.day === TODAY ? "Today" : st.day === yesterday ? "Last night" : "Latest results",
+    meta: `${weekdayDay(st.day)} · ${count(st.games.length, "game")}`,
+  };
+} else {
+  lede = [`Every team starts at ${START}${st.opens ? `, and the season opens ${weekdayDay(st.opens)}.` : "."}`];
+  latest = { title: "Latest results", meta: "" };
+}
+
+const first = m.results[0]?.day;
+const big = biggestSwing(m);
+const kpis: Kpi[] = [
+  { label: "Games counted", value: int(m.results.length), caption: first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : "No games yet" },
+  { label: "Top to bottom", value: int(Math.round(m.r[lead]) - Math.round(m.r[bottom])), unit: "pts", caption: `${lead} ${R(lead)} to ${bottom} ${R(bottom)}` },
+  { label: "Underdog wins", value: int(underdogWins(m)), unit: `of ${int(m.results.length)}`, caption: "Under 50% to win at tip" },
+  big
+    ? { label: "Biggest swing", value: int(swing(big)), unit: "pts", caption: `${big.game.away} ${big.game.neutral ? "vs" : "at"} ${big.game.home}, ${shortDay(big.day)}` }
+    : { label: "Biggest swing", value: DASH, caption: "No games yet" },
+];
+
+const gap = widestGap(m);
+const tableMeta = m.asOf
+  ? `As of ${weekdayDay(m.asOf)} · all started at ${START}${gap && gap.points > 0 ? ` · widest gap ${gap.points} pts, ${ordinal(m.rank[gap.upper])} to ${ordinal(m.rank[gap.lower])}` : ""}`
+  : `Before opening night · all at ${START}`;
+
+const days = m.series.length - 1;
+const chart = st.kind === "finished"
+  ? { title: "The season", meta: first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : "" }
+  : { title: "Season so far", meta: first ? `${count(days, "day")} since ${shortDay(first)}` : "" };
+const playoffs = playoffsStart(m);
+
+// The third card: the next game day's fixtures in the week ahead, the season's upsets once it is over.
+const nextDay = m.upcoming.map((g) => dayKey(g.t)).filter((d) => d >= TODAY && d < addDays(TODAY, WEEK)).sort()[0] ?? null;
+const nextGames = nextDay ? m.upcoming.filter((g) => dayKey(g.t) === nextDay) : [];
+const showFixtures = st.kind !== "finished" && season.current;
+---
+
+<Base title={`${season.label} ratings`} route={{ kind: "home", season }}>
+  <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : "b" in p ? <b>{p.b}</b> : <span class="keep">{p.keep}</span>))}</Fragment>
+
+  <div class="grid">
+    <div class="main">
+      <KpiStrip class="kpis" items={kpis} label="The season in numbers" />
+      <Panel class="table" title="League table" meta={tableMeta}>
+        <LeagueTable season={season} selected={lead} />
+      </Panel>
+    </div>
+
+    <div class="rail">
+      <Panel class="latest" title={latest.title} meta={latest.meta} link={resultsLink}>
+        {st.kind === "finished" ? (
+          <GameList
+            season={season}
+            results={st.finals.games}
+            label="The Finals, game by game"
+            dated
+            detail={(r) => r.game.note?.replace("NBA Finals - ", "") ?? null}
+            selected={lead}
+          />
+        ) : (
+          <GameList
+            season={season}
+            results={st.kind === "playing" ? bySwing(st.games) : []}
+            label={`${latest.title}, biggest swing first`}
+            selected={lead}
+            empty={st.kind === "preseason" && st.opens ? `No games yet. The season opens ${weekdayDay(st.opens)}.` : "No games yet."}
+          />
+        )}
+      </Panel>
+
+      <Panel class="chart" title={chart.title} meta={chart.meta}>
+        <RatingChart season={season} selected={lead} marker={playoffs ? { day: playoffs, label: `Playoffs from ${shortDay(playoffs)}` } : null} />
+      </Panel>
+
+      {showFixtures ? (
+        <Panel
+          class="next"
+          fill
+          title={nextDay === TODAY ? "Tonight" : "Next up"}
+          meta={nextDay ? `${weekdayDay(nextDay)} · ${count(nextGames.length, "game")}` : ""}
+          link={{ href: href({ kind: "fixtures" }), label: "All fixtures" }}
+        >
+          <FixtureList season={season} games={nextGames} label="The next day's games" selected={lead} fit empty="No games in the next seven days." />
+        </Panel>
+      ) : (
+        <Panel class="next" fill title="Biggest upsets" meta="by pre-game chance" link={resultsLink}>
+          <GameList season={season} results={upsets(m.results, 10)} label="The season's biggest upsets" dated selected={lead} fit empty="No upsets yet." />
+        </Panel>
+      )}
+    </div>
+  </div>
+</Base>
+
+<style>
+  /* 744 + 24 + 432 = 1200 at 1440; the KPI strip is 4 x 186 = 744. */
+  .keep { white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: minmax(0, 744fr) minmax(0, 432fr); gap: var(--gap); }
+  .main, .rail { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+  /* The rail ends level with the table: its last card takes what height is left and shows the whole
+     games that fit it, never fewer than two. */
+  .grid { --fit-contain: size; }
+  .next { min-height: 200px; }
+
+  /* Tablet: the latest games and the next card share the top row, then the strip, the table and the chart. */
+  @media (max-width: 1239px) {
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .main, .rail { display: contents; }
+    .latest { order: 1; }
+    .next { order: 2; }
+    .kpis { order: 3; grid-column: 1 / -1; }
+    .table { order: 4; grid-column: 1 / -1; }
+    .chart { order: 5; grid-column: 1 / -1; }
+  }
+
+  /* Below 900 two lists side by side would cut team names, so everything stacks: the latest games
+     straight under the title, then the table, and every list shows all its rows. */
+  @media (max-width: 899px) {
+    .grid { grid-template-columns: minmax(0, 1fr); --fit-contain: normal; }
+    .next { min-height: 0; }
+    .latest { order: 1; }
+    .table { order: 2; }
+    .chart { order: 3; }
+    .next { order: 4; }
+    .kpis { order: 5; }
+  }
+</style>

@@ -1,0 +1,171 @@
+---
+// Every team in a season by conference, in rating order within each: where a team stands in the race that
+// seeds the playoffs, which the home page's one league table does not show. /teams/ is the current season,
+// /<id>/teams/ every other one.
+import Panel from "../../../components/Panel.astro";
+import Base from "../../../layouts/Base.astro";
+import { START, type Abbr } from "../../../lib/elo.ts";
+import { int, rating, record, signed, weekdayDay } from "../../../lib/format.ts";
+import { href } from "../../../lib/routes.ts";
+import { openingDay, seasonPaths, theTeam, type SeasonView } from "../../../lib/season.ts";
+import { byConference, type Conference } from "../../../lib/teams.ts";
+
+export function getStaticPaths() {
+  return seasonPaths();
+}
+
+interface Props {
+  season: SeasonView;
+}
+
+const { season } = Astro.props;
+const m = season.model;
+const shown = (a: Abbr) => Math.round(m.r[a]);
+const NAMES: Record<Conference, string> = { East: "Eastern Conference", West: "Western Conference" };
+
+// Averages and leads come from the ratings as displayed, so they agree with the rows.
+const groups = byConference(m).map(({ conference, teams }) => {
+  const best = shown(teams[0]);
+  return {
+    conference,
+    teams,
+    top: teams.filter((a) => shown(a) === best),
+    best,
+    mean: Math.round(teams.reduce((sum, a) => sum + shown(a), 0) / teams.length),
+  };
+});
+// Both conferences' bars share one scale: the team furthest from 1500 fills 45% of the track, so the
+// longest bar stops short of the cell's edge and of the rating beside it.
+const reach = Math.max(1, ...m.abbrs.map((a) => Math.abs(shown(a) - START)));
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const names = (abbrs: Abbr[]) => abbrs.map((a) => theTeam(season, a)).join(" and ");
+type Part = string | { b: string };
+const past = !season.current;
+const ranked = groups.flatMap((g) => (g.conference ? [{ ...g, conference: g.conference }] : []));
+let lede: Part[];
+if (!m.asOf) {
+  const opens = openingDay(season);
+  lede = [`All ${int(m.abbrs.length)} teams start at `, { b: String(START) }, opens ? `, and the season opens ${weekdayDay(opens)}.` : "."];
+} else if (ranked.length === 2) {
+  const [first, second] = [...ranked].sort((x, y) => y.best - x.best);
+  const lead = (g: (typeof ranked)[number]) =>
+    `${names(g.top)} ${g.top.length > 1 ? (past ? "shared the top of" : "share the top of") : past ? "finished top of" : "top"} the ${g.conference} at `;
+  const [strong, weak] = [...ranked].sort((x, y) => y.mean - x.mean);
+  lede = [
+    cap(lead(first)), { b: String(first.best) }, ` and ${lead(second)}`, { b: String(second.best) },
+    `; ${strong.conference} teams ${past ? "averaged" : "average"} `, { b: String(strong.mean) }, ` to the ${weak.conference}'s `, { b: String(weak.mean) }, ".",
+  ];
+} else {
+  lede = [`All ${int(m.abbrs.length)} teams, in rating order.`];
+}
+---
+
+<Base
+  title={`${season.label} teams`}
+  docTitle={`Teams ${season.label}`}
+  description={`All ${m.abbrs.length} NBA teams' ${season.label} Elo ratings by conference.`}
+  route={{ kind: "teams", season }}
+>
+  <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : <b>{p.b}</b>))}</Fragment>
+
+  <div class="confs">
+    {groups.map((g) => (
+      <Panel class:list={["conf", { other: g.conference === null }]} title={g.conference ? NAMES[g.conference] : "Other teams"} meta={`Teams ${past ? "averaged" : "average"} ${g.mean}`}>
+        <table>
+          <thead>
+            <tr>
+              <th class="num rank" scope="col"><abbr title="League rank">#</abbr></th>
+              <th scope="col">Team<span class="sub"> · W–L</span></th>
+              <th class="num wl" scope="col">W–L</th>
+              <th class="num" scope="col">Rating</th>
+              <th class="dev" scope="col">From {START}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {g.teams.map((a) => {
+              const s = m.stats[a];
+              const d = shown(a) - START;
+              return (
+                <tr>
+                  <td class="num rank">{m.rank[a]}</td>
+                  <td class="team">
+                    <a class="name" href={href({ kind: "team", season, abbr: a })}>{m.data.teams[a].name}</a>
+                    <span class="sub">{record(s.W, s.L)}</span>
+                  </td>
+                  <td class="num wl">{record(s.W, s.L)}</td>
+                  <td class="num rating">{rating(m.r[a])}</td>
+                  <td class="dev">
+                    <span class="vh">{signed(d)}</span>
+                    {d !== 0 && <i class={d > 0 ? "up" : "down"} style={`width: ${((Math.abs(d) / reach) * 45).toFixed(2)}%`} />}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Panel>
+    ))}
+  </div>
+</Base>
+
+<style>
+  /* 588 + 24 + 588 = 1200 at 1440. */
+  .confs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); align-items: start; }
+  .other { grid-column: 1 / -1; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    height: 36px; padding: 0 8px; font-size: var(--fs-small); font-weight: 400; color: var(--muted);
+    text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+  th abbr { text-decoration: none; }
+  td { height: 36px; padding: 0 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; color: var(--muted); }
+  tbody tr:last-child td { border-bottom: 0; }
+  th:first-child, td:first-child { padding-left: 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+  .num { text-align: right; }
+  .rank { width: 28px; }
+  .wl { width: 64px; }
+  td.rating { width: 64px; color: var(--text); font-weight: 600; }
+
+  /* The whole row is the link to the team's page. */
+  tbody tr { position: relative; }
+  td.team { color: var(--text); }
+  .name { font-weight: 500; }
+  .name::before { content: ""; position: absolute; inset: 0; z-index: 1; }
+  tbody tr:hover .name { text-decoration: underline; text-underline-offset: 3px; }
+  .sub { display: none; }
+
+  /* Rating from the 1500 every team starts at (and the league averages): a centre line, the bar out to one side. */
+  .dev { position: relative; width: 132px; padding: 0; }
+  th.dev { text-align: center; }
+  td.dev::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--grid); }
+  .dev i { position: absolute; top: 50%; height: 6px; margin-top: -3px; background: var(--bar); }
+  .dev .up { left: calc(50% + 1px); border-radius: 0 3px 3px 0; }
+  .dev .down { right: 50%; border-radius: 3px 0 0 3px; }
+  .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* Narrower than the full canvas, each row takes two lines: the name over its record. */
+  @media (max-width: 1239px) {
+    table { table-layout: fixed; }
+    .wl { display: none; }
+    td { height: 48px; }
+    td.team { overflow: hidden; text-overflow: ellipsis; }
+    td.team, td.rating { line-height: 18px; }
+    .name { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .sub { display: block; color: var(--muted); font-size: var(--fs-small); line-height: 18px; }
+    th .sub { display: inline; font-size: inherit; }
+    .rank { width: 32px; }
+    td.rating, th.num:not(.rank) { width: 52px; }
+    .dev { width: 96px; }
+  }
+  @media (max-width: 899px) {
+    .confs { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .rank { width: 26px; }
+    .dev { width: 72px; }
+    th, td { padding: 0 4px; }
+  }
+</style>

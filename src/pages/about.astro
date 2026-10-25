@@ -1,0 +1,291 @@
+---
+// How the ratings work, for fans: the fresh start at 1500, one real game worked through step by step,
+// what a rating gap and a margin are worth, which games count, and where the scores come from. Every
+// figure comes from elo.ts, so the page cannot disagree with the ratings it explains.
+import Panel from "../components/Panel.astro";
+import Base from "../layouts/Base.astro";
+import { ELO_PER_POINT, HCA, K, START, winProb } from "../lib/elo.ts";
+import { int, MINUS, pct, rating, signed, stamp, weekdayDay } from "../lib/format.ts";
+import { gapRow, stageCounts, winWorth, worked, type Step } from "../lib/method.ts";
+import { href } from "../lib/routes.ts";
+import { allSeasons, BUILT_AT, team } from "../lib/season.ts";
+
+const seasons = allSeasons();
+// The worked game is the first of the newest season that has one: an opener, so both teams start level.
+const season = seasons.find((s) => s.model.results.length > 0) ?? null;
+const ex = season ? worked(season.model.results[0]) : null;
+const finished = seasons.find((s) => !s.current) ?? null;
+const counted = finished ? stageCounts(finished.model) : [];
+
+const signedTo = (n: number, digits: number) => `${n < 0 ? MINUS : "+"}${Math.abs(n).toFixed(digits)}`;
+const signedPct = (p: number) => `${p < 0 ? MINUS : "+"}${pct(Math.abs(p))}`;
+const withRow = (base: number[], extra: number | null) => [...new Set(extra === null ? base : [...base, extra])].sort((a, b) => a - b);
+
+// The ledger: one row per step, each team's figure in its own column, multiplying down to the points moved.
+type Row = { label: string; why: string; away: string; home: string; key?: boolean };
+let ledger: { meta: string; teams: { name: string; href: string }[]; rows: Row[] } | null = null;
+let matchup = "";
+if (season && ex) {
+  const short = (s: Step) => team(season, s.abbr).short;
+  const { home, away, winner: w, loser: l } = ex;
+  const fav = home.chance >= away.chance ? home : away;
+  const mult = ex.multiplier.toFixed(2);
+  const as = ex.gap === 0 ? "between level teams" : w === fav ? "as the favourite" : "as the underdog";
+  matchup = `${short(away)} ${ex.result.game.neutral ? "vs" : "at"} ${short(home)}`;
+  ledger = {
+    meta: `${matchup} · ${weekdayDay(ex.result.day)}, the first game of ${season.label}`,
+    teams: [away, home].map((s) => ({ name: short(s), href: href({ kind: "team", season, abbr: s.abbr }) })),
+    rows: [
+      {
+        label: "Rating before",
+        why: `The season's first game, so both teams started at ${START}.`,
+        away: rating(away.before), home: rating(home.before),
+      },
+      {
+        label: "Home court",
+        why: ex.result.game.neutral
+          ? `A neutral site, so neither team got the ${HCA}-point home edge.`
+          : `The ${short(home)} were at home, worth ${HCA} points for this game only.`,
+        away: away.edge ? `+${away.edge}` : "0", home: home.edge ? `+${home.edge}` : "0",
+      },
+      {
+        label: "Win chance",
+        why: ex.gap === 0
+          ? `Level ratings made it an even game, ${pct(0.5)} each.`
+          : `The ${int(Math.abs(ex.gap))}-point gap made the ${short(fav)} ${pct(fav.chance)} favourites, or ${ex.spread} points on the spread.`,
+        away: pct(away.chance), home: pct(home.chance),
+      },
+      {
+        label: "Final score",
+        why: `The ${short(w)} won by ${ex.margin}.`,
+        away: String(away.score), home: String(home.score),
+      },
+      {
+        label: "Surprise",
+        why: `A win scores ${pct(1)} and a loss ${pct(0)}, less the team's chance. An upset scores high.`,
+        away: signedPct(away.surprise), home: signedPct(home.surprise),
+      },
+      {
+        label: "Margin multiplier",
+        why: `For winning by ${ex.margin} ${as}. Wider wins raise it, each extra point by a little less, and an upset raises it too.`,
+        away: `× ${mult}`, home: `× ${mult}`,
+      },
+      {
+        label: "K",
+        why: "The same for every game. It sets how far one game can move a rating.",
+        away: `× ${K}`, home: `× ${K}`,
+      },
+      {
+        label: "Points moved",
+        why: `${K} × ${mult} × ${pct(w.surprise)} is ${w.moved.toFixed(2)} points, taken from the ${short(l)} and given to the ${short(w)}.`,
+        away: signedTo(away.moved, 2), home: signedTo(home.moved, 2),
+      },
+      {
+        label: "Rating after",
+        why: `Rounded from ${w.rating.toFixed(2)} for the ${short(w)} and ${l.rating.toFixed(2)} for the ${short(l)}. The site lists the game as ${signed(w.change)} and ${signed(l.change)}.`,
+        away: rating(away.rating), home: rating(home.rating), key: true,
+      },
+    ],
+  };
+}
+
+// The two reference tables, each with the worked game's own row added and labelled.
+const gaps = withRow([0, 50, 100, 150, 200, 300], ex ? Math.abs(ex.gap) : null).map(gapRow);
+const margins = withRow([1, 5, 10, 20, 30], ex?.margin ?? null).map(winWorth);
+const isExample = { gap: (g: number) => ex !== null && Math.abs(ex.gap) === g, margin: (m: number) => ex?.margin === m };
+const total = counted.reduce((n, c) => n + c.games, 0);
+
+const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirtyeight.com/features/how-we-calculate-nba-elo-ratings/";
+---
+
+<Base
+  title="How the ratings work"
+  description={`Every NBA team starts each season at ${START}, and each game moves points from the loser to the winner, after FiveThirtyEight's NBA Elo.`}
+  route={{ kind: "about" }}
+>
+  <Fragment slot="lede">Every team starts the season at <b>{START}</b>, and each game moves points from the loser to the winner, more for a wide margin or an upset.</Fragment>
+
+  <div class="grid">
+    <div class="main">
+      <Panel class="fresh" title={`Why every team starts at ${START}`}>
+        <div class="prose">
+          <p>Nothing carries over from last season. Rosters change over the summer through trades, the draft and free agency, so last season's rating would describe a different team.</p>
+          <p>FiveThirtyEight kept three-quarters of a team's rating from one season to the next. This site keeps none of it, so a rating says only how a team has played this season. The cost is that early ratings rest on a few games each.</p>
+          <p>{START} is also the league average, and it stays the average all season, because every point one team gains, another loses.</p>
+        </div>
+      </Panel>
+
+      {ledger && (
+        <Panel class="ledger" title="One game, step by step" meta={ledger.meta}>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Step</th>
+                {ledger.teams.map((t) => <th class="num" scope="col"><a href={t.href}>{t.name}</a></th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.rows.map((r, i) => (
+                <Fragment>
+                  <tr class:list={["step", { key: r.key }]}>
+                    <th scope="row" aria-describedby={`why-${i}`}>{r.label}</th>
+                    <td class="num">{r.away}</td>
+                    <td class="num">{r.home}</td>
+                  </tr>
+                  <tr class="why"><td colspan="3" id={`why-${i}`}><span>{r.why}</span></td></tr>
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+
+
+      <Panel class="sources" fill title="Sources">
+        <div class="prose">
+          <p>The method is FiveThirtyEight's NBA Elo, as Nate Silver and Reuben Fischer-Baum set it out in <a href={methodLink}>How We Calculate NBA Elo Ratings</a> (2015). K, the home edge, the margin multiplier and the {ELO_PER_POINT} points to a point of spread all come from it. The one change is the fresh start each season.</p>
+          <p>Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN's scoreboard</a>. Every morning, after the last West Coast game has finished, the site pulls the whole season again, rebuilds every rating from the first game and republishes. A score ESPN corrects is fixed at the next pull. The last pull was {stamp(BUILT_AT)}.</p>
+        </div>
+      </Panel>
+    </div>
+
+    <div class="rail">
+      <Panel class="gaps" title="What a rating gap means">
+        <p class="note">The favourite's chance to win, and its edge on the spread at {ELO_PER_POINT} rating points to a point. Home court is part of the gap, {HCA} points to the home team and none at a neutral site.</p>
+        <table class="ref">
+          <thead>
+            <tr><th scope="col">Gap</th><th class="num" scope="col">Win chance</th><th class="num" scope="col">Spread</th></tr>
+          </thead>
+          <tbody>
+            {gaps.map((g) => (
+              <tr>
+                <th scope="row">
+                  <span class:list={["fig", { sel: isExample.gap(g.points) }]}>{int(g.points)}</span>
+                  {isExample.gap(g.points) && <span class="tag">{matchup}</span>}
+                </th>
+                <td class="num">{pct(g.chance)}</td>
+                <td class="num">{g.spread.toFixed(1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Panel>
+
+      <Panel class="worth" title="What a win is worth">
+        <p class="note">Points the winner gains when both teams start at {START}. On a neutral floor they are level, and at home the home team is a {pct(winProb(HCA))} favourite.</p>
+        <table class="ref">
+          <thead>
+            <tr>
+              <th scope="col">Won by</th>
+              <th class="num" scope="col">Neutral</th>
+              <th class="num" scope="col">Home win</th>
+              <th class="num" scope="col">Road win</th>
+            </tr>
+          </thead>
+          <tbody>
+            {margins.map((m) => (
+              <tr>
+                <th scope="row">
+                  <span class:list={["fig", { sel: isExample.margin(m.margin) }]}>{m.margin}</span>
+                  {isExample.margin(m.margin) && <span class="tag">{matchup}</span>}
+                </th>
+                <td class="num">{signed(m.neutral)}</td>
+                <td class="num">{signed(m.home)}</td>
+                <td class="num">{signed(m.road)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Panel>
+
+
+      <Panel class="counts" fill title="Which games count">
+        <div class="prose">
+          <p>The regular season, the play-in, the playoffs and the NBA Cup final all count. Cup games before the final are regular-season games anyway. The NBA leaves the final out of its standings, but it is a real game between two teams, so it counts here.</p>
+          <p>Preseason games and the All-Star Game do not count. A postponed game counts on the day it is made up.</p>
+        </div>
+        {finished && counted.length > 0 && (
+          <table class="kv">
+            <caption>Counted in {finished.label}</caption>
+            <tbody>
+              {counted.map((c) => (
+                <tr><th scope="row">{c.stage}</th><td class="num">{int(c.games)}</td></tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr><th scope="row">All games</th><td class="num">{int(total)}</td></tr>
+            </tfoot>
+          </table>
+        )}
+      </Panel>
+    </div>
+  </div>
+</Base>
+
+<style>
+  /* 744 + 24 + 432 = 1200 at 1440, the home page's split; the rail keeps 360 for its four-column table.
+     The columns balance by their content, and each one's last card takes up the rest so both end level. */
+  .grid { display: grid; grid-template-columns: minmax(0, 744fr) minmax(360px, 432fr); gap: var(--gap); }
+  .main, .rail { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+
+  .prose p { max-width: 68ch; line-height: 22px; }
+  .prose p + p { margin-top: 10px; }
+  .prose a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
+  .prose a:hover { text-decoration-color: currentColor; }
+  .note { color: var(--muted); margin-bottom: 4px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 0 8px; text-align: left; font-weight: 400; }
+  th:first-child { padding-left: 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+  thead th { height: 36px; font-size: var(--fs-small); color: var(--muted); white-space: nowrap; border-bottom: 1px solid var(--border); }
+  tbody th, tbody td { border-bottom: 1px solid var(--rule); }
+  tbody tr:last-child > * { border-bottom: 0; }
+  .num { text-align: right; white-space: nowrap; }
+
+  /* the ledger */
+  .ledger thead th.num { width: 84px; }
+  .ledger thead a { color: var(--text); font-weight: 500; }
+  .ledger thead a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  /* Each step is two rows: the step and its figures, then the sentence that explains them across the
+     full width, so a phone keeps the sentence readable beside two figure columns. */
+  .ledger tr.step > * { padding-top: 10px; line-height: 20px; border-bottom: 0; }
+  .ledger tr.step th { font-weight: 500; }
+  .ledger tr.key td { font-weight: 600; }
+  /* Sentences inside a table keep proportional figures; only the columns line up digit for digit. */
+  .ledger tr.why td { padding: 2px 0 10px; color: var(--muted); line-height: 20px; font-variant-numeric: normal; }
+  .ledger tr.why span { display: block; max-width: 64ch; }
+
+  /* the reference tables */
+  .ref tbody th, .ref tbody td { height: 36px; }
+  .ref thead th.num { width: 84px; }
+  /* 64px figure columns leave the label column room for its tag at the rail's narrowest, 360. */
+  .worth .ref thead th.num { width: 64px; }
+  .ref tbody th { white-space: nowrap; }
+  .fig { position: relative; display: inline-block; font-variant-numeric: tabular-nums; }
+  .fig.sel::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px; background: var(--accent); }
+  .tag { margin-left: 10px; color: var(--muted); font-size: var(--fs-small); white-space: nowrap; }
+
+  /* the counts */
+  .kv { margin-top: 12px; }
+  .kv caption { text-align: left; height: 32px; line-height: 32px; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); }
+  .kv tbody th, .kv tbody td { height: 32px; }
+  .kv tfoot th, .kv tfoot td { height: 36px; border-top: 1px solid var(--border); font-weight: 600; }
+
+  /* Below 900 the columns stack into one reading order: the fresh start, the game, the two tables, then
+     which games count and the sources. */
+  @media (max-width: 899px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .main, .rail { display: contents; }
+    .fresh { order: 1; }
+    .ledger { order: 2; }
+    .gaps { order: 3; }
+    .worth { order: 4; }
+    .counts { order: 5; }
+    .sources { order: 6; }
+  }
+  @media (max-width: 640px) {
+    .ledger thead th.num, .ref thead th.num { width: 64px; }
+    th, td { padding: 0 4px; }
+  }
+</style>

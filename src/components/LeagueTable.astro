@@ -1,0 +1,200 @@
+---
+// The league table with its ladder. The ladder is one rating scale down the table's left edge: each
+// team is a dot at its true rating, joined by a curve to its row, so ties bunch and the gaps between
+// tiers open up. It is drawn in row units and stretched over the rows, so it fits the desktop's
+// one-line rows and the phone's two-line rows without measuring anything in the browser.
+import { START, type Abbr } from "../lib/elo.ts";
+import { dayChanges, widestGap } from "../lib/facts.ts";
+import { DASH, perGame, rating, record, shortDay, signed, weekdayDay } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import type { SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  /** The team highlighted on load; defaults to the top of the table. */
+  selected?: Abbr;
+}
+
+const { season } = Astro.props;
+const m = season.model;
+const selected = Astro.props.selected ?? m.order[0];
+// The latest game day's changes get their own column, headed by its date: for a finished season, its last game.
+const changeDay = m.asOf;
+const changes = changeDay ? dayChanges(m, changeDay) : null;
+const changeLabel = changeDay ? shortDay(changeDay) : "";
+
+const shown = Object.fromEntries(m.order.map((a) => [a, Math.round(m.r[a])]));
+const vals = m.order.map((a) => shown[a]);
+const hi = Math.max(...vals);
+const lo = Math.min(...vals);
+const n = m.order.length;
+// Fractions of the body's height: row i's centre, and a rating's place on a scale from the first row's
+// centre (the top rating) to the last row's (the bottom one).
+const rowY = (i: number) => (i + 0.5) / n;
+const valY = (v: number) => (hi === lo ? 0.5 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
+const Y = 1000; // the ladder's viewBox height
+const f = (x: number) => (x * Y).toFixed(1);
+
+// Round values to label on the scale, counted from 1500 so every gap between them is the same step. At most
+// six steps across the range keeps them over 150px apart on the desktop's 960px body.
+const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 6) ?? 500;
+const marks: number[] = [];
+for (let v = START - Math.floor((START - lo) / step) * step; v <= hi; v += step) marks.push(v);
+
+// The widest gap is a bar on the axis with its size beside it in the tick lane, centred on the longest stretch
+// of the bar that stays 14px clear of every tick (the bar's middle when no stretch does).
+const gap = widestGap(m);
+const gapBar = gap && gap.points > 0 ? { top: valY(shown[gap.upper]), bottom: valY(shown[gap.lower]), text: `${gap.points} pts` } : null;
+const CLEAR = 14 / 960;
+let clear: [number, number][] = gapBar ? [[gapBar.top, gapBar.bottom]] : [];
+for (const t of marks.map(valY)) {
+  clear = clear.flatMap(([a, b]): [number, number][] => {
+    if (t + CLEAR <= a || t - CLEAR >= b) return [[a, b]];
+    const parts: [number, number][] = [[a, t - CLEAR], [t + CLEAR, b]];
+    return parts.filter(([x, y]) => y > x);
+  });
+}
+const longest = clear.sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
+const gapLabelY = gapBar && (longest ? (longest[0] + longest[1]) / 2 : (gapBar.top + gapBar.bottom) / 2);
+
+const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }));
+// The highlighted curve is drawn last so it sits on top.
+curves.sort((x, y) => Number(x.a === selected) - Number(y.a === selected));
+---
+
+<div class="lt">
+  <table>
+    <thead>
+      <tr>
+        <th class="lad" scope="col"><span class="lad-label">Rating to scale</span></th>
+        <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
+        <th class="team" scope="col">Team<span class="sub"> · W–L · avg · PPG for–against</span></th>
+        <th class="num" scope="col">Rating</th>
+        {changeDay && <th class="num opt" scope="col" title={`Rating change on ${weekdayDay(changeDay)}`}>{changeLabel}</th>}
+        <th class="num opt" scope="col" title="Average of each day's closing rating since opening night">Season avg</th>
+        <th class="num opt" scope="col">W–L</th>
+        <th class="num opt" scope="col" title="Points scored per game">PPG</th>
+        <th class="num opt" scope="col" title="Points allowed per game">Opp PPG</th>
+      </tr>
+    </thead>
+    <tbody>
+      {m.order.map((a, i) => {
+        const s = m.stats[a];
+        const c = changes?.get(a);
+        const name = m.data.teams[a].name;
+        const ppg = `${perGame(s.F, s.T)}–${perGame(s.Ag, s.T)}`;
+        return (
+          <tr data-team={a} data-pick class:list={{ sel: a === selected }}>
+            {i === 0 && (
+              <td class="lad" rowspan={n} aria-hidden="true">
+                <div class="lad-in">
+                  {marks.map((v) => (
+                    <span class:list={["tick", { start: v === START }]} style={`top: ${(valY(v) * 100).toFixed(2)}%`}>{v}</span>
+                  ))}
+                  {gapBar && gapLabelY !== null && <span class="tick gap-label" style={`top: ${(gapLabelY * 100).toFixed(2)}%`}>{gapBar.text}</span>}
+                  <svg viewBox={`0 0 100 ${Y}`} preserveAspectRatio="none">
+                    <path class="axis" d={`M0,${f(valY(hi))}V${f(valY(lo))}`} />
+                    {gapBar && <path class="gap" d={`M0,${f(gapBar.top)}V${f(gapBar.bottom)}`} />}
+                    {curves.map((c) => (
+                      <path class:list={["lead", { sel: c.a === selected }]} data-team={c.a} data-raise d={`M0,${f(c.from)}C50,${f(c.from)} 50,${f(c.to)} 100,${f(c.to)}`} />
+                    ))}
+                  </svg>
+                  {curves.map((c) => (
+                    <i class:list={["dot", { sel: c.a === selected }]} data-team={c.a} style={`top: ${(c.from * 100).toFixed(2)}%`} />
+                  ))}
+                </div>
+              </td>
+            )}
+            <td class="num rank">{m.rank[a]}</td>
+            <td class="team">
+              <a class="name" href={href({ kind: "team", season, abbr: a })}>{name}</a>
+              <span class="sub">{record(s.W, s.L)} · {rating(m.avg[a])} · {ppg}</span>
+            </td>
+            <td class="num rating">
+              {rating(m.r[a])}
+              {changes && <span class="sub">{c === undefined ? DASH : `${signed(c)} ${changeLabel}`}</span>}
+            </td>
+            {changes && <td class:list={["num opt", { quiet: !c }]}>{c === undefined ? DASH : signed(c)}</td>}
+            <td class="num opt">{rating(m.avg[a])}</td>
+            <td class="num opt">{record(s.W, s.L)}</td>
+            <td class="num opt">{perGame(s.F, s.T)}</td>
+            <td class="num opt">{perGame(s.Ag, s.T)}</td>
+          </tr>
+        );
+      })}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .lt { --row: 32px; --lad: 124px; --axis: 38px; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    height: 36px; padding: 0 8px; font-size: var(--fs-small); font-weight: 400; color: var(--muted);
+    text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+  th abbr { text-decoration: none; }
+  td { height: var(--row); padding: 0 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; color: var(--muted); }
+  tbody tr:last-child td { border-bottom: 0; }
+  .num { text-align: right; }
+  th:last-child, td:last-child { padding-right: 0; }
+  .rank { width: 32px; }
+  td.team { color: var(--text); }
+  .name { position: relative; display: inline-block; font-weight: 500; line-height: calc(var(--row) - 1px); }
+  .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
+  .name:hover { text-decoration: underline; text-underline-offset: 3px; }
+  tbody tr { cursor: pointer; }
+  tr:hover .name::after, tr.hov .name::after { background: var(--control); }
+  tr.sel .name::after { background: var(--accent); }
+  tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  td.rating { color: var(--text); font-weight: 600; }
+  td.quiet { color: var(--muted); }
+  td.opt:not(.quiet) { color: var(--text); }
+  .sub { display: none; }
+
+  /* the ladder */
+  .lad { width: var(--lad); padding: 0; }
+  th.lad { padding-right: 8px; }
+  td.lad { position: relative; border-bottom: 0; }
+  .lad-in { position: absolute; inset: 0; }
+  .lad svg { position: absolute; top: 0; bottom: 0; left: var(--axis); width: calc(100% - var(--axis)); height: 100%; overflow: visible; }
+  .lad path { fill: none; vector-effect: non-scaling-stroke; }
+  .axis { stroke: var(--grid); stroke-width: 1; }
+  .gap { stroke: var(--text); stroke-width: 2; }
+  .lead { stroke: var(--line-other); stroke-opacity: 0.7; stroke-width: 1; transition: stroke 120ms ease; }
+  .lead.hov { stroke: var(--text); stroke-opacity: 1; }
+  .lead.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
+  .tick {
+    position: absolute; right: calc(100% - var(--axis) + 8px); transform: translateY(-50%);
+    font-size: 11px; line-height: 12px; color: var(--muted);
+  }
+  .tick.start { color: var(--text); font-weight: 500; }
+  .gap-label { white-space: nowrap; }
+  .dot {
+    position: absolute; left: var(--axis); width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+    background: var(--bar); box-shadow: 0 0 0 1.5px var(--surface);
+  }
+  .dot.hov { background: var(--text); }
+  .dot.sel { width: 8px; height: 8px; margin: -4px 0 0 -4px; background: var(--accent); box-shadow: 0 0 0 2px var(--surface); z-index: 1; }
+
+  /* Phone: one two-line row per team, with the other figures on the second line. */
+  @media (max-width: 640px) {
+    .lt { --row: 48px; --lad: 46px; --axis: 28px; }
+    /* The curves stop short of the rank, which sits flush against the ladder on a phone. */
+    .lad svg { width: calc(100% - var(--axis) - 5px); }
+    table { table-layout: fixed; }
+    th, td { padding: 0 4px; }
+    th.lad { font-size: 0; }
+    th.rank { width: 22px; padding: 0 2px; }
+    td.rank { padding: 0 2px; }
+    th.num:not(.opt):not(.rank) { width: 76px; }
+    th.num:not(.opt):not(.rank), td.rating { padding-right: 0; }
+    .opt { display: none; }
+    td.team { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    td.team, td.rating { line-height: 18px; }
+    .name { display: block; line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
+    .name::after { bottom: -2px; }
+    .sub { display: block; color: var(--muted); font-size: 13px; line-height: 17px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+    th .sub { display: inline; font-size: inherit; }
+  }
+</style>

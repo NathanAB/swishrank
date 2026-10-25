@@ -1,0 +1,17 @@
+---
+// A season's results index, /results/ for the current season and /<id>/results/ for the rest: its newest month.
+import ResultsPage from "../../../components/ResultsPage.astro";
+import { seasonPaths, type SeasonView } from "../../../lib/season.ts";
+
+export function getStaticPaths() {
+  return seasonPaths();
+}
+
+interface Props {
+  season: SeasonView;
+}
+
+const { season } = Astro.props;
+---
+
+<ResultsPage season={season} />

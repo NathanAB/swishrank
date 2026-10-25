@@ -1,43 +1,33 @@
-# Astro Starter Kit: Minimal
+# NBA Elo Ratings
+
+Season-only Elo ratings for the 30 NBA teams: https://nathanab.github.io/nba-elo/
+
+Every team starts each season at 1500 and nothing carries over from last year. After each game the winner takes points from the loser, using FiveThirtyEight's NBA formula (K = 20, 100 points for home court, a margin-of-victory multiplier). The site has the league table, results, the week's fixtures with win chances, a page per team, and the same views for last season.
+
+## How it updates
+
+A GitHub Action ([deploy.yml](.github/workflows/deploy.yml)) runs every morning at 10:00 UTC. It pulls the season's games from ESPN's public scoreboard, commits them to `src/data/games/` when they change, rebuilds the site and deploys it to GitHub Pages. It also runs on every push to `main`.
+
+## Run it locally
 
 ```sh
-npm create astro@latest -- --template minimal
+npm install
+npm run fetch   # pull the current season from ESPN
+npm test        # Elo math and page logic
+npm run dev     # http://localhost:4321/nba-elo/
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+`npm run fetch 2025-26` re-pulls a finished season.
 
-## 🚀 Project Structure
+## Where things live
 
-Inside of your Astro project, you'll see the following folders and files:
+- `src/lib/elo.ts` is the rating model. Everything else reads from what it computes.
+- `src/data/seasons.json` lists the seasons. The one without an `end` date is the current season and lives at the site root; older seasons live under their id, such as `/2025-26/`.
+- `scripts/fetch-season.mjs` turns ESPN's scoreboard into `src/data/games/<season>.json`.
+- `src/pages/` holds the routes, and `src/components/` the table, chart and game lists they share.
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
+## Each new season
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
-
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
-
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+1. Give the finished season an `end` date in `src/data/seasons.json` and add the new season with its opening-night `start` date at the top.
+2. Run `npm run fetch` and push.
+3. GitHub pauses scheduled workflows in a public repo after 60 days without activity, which can happen over the summer. If the morning refresh has stopped, turn it back on with `gh workflow enable deploy.yml`.
