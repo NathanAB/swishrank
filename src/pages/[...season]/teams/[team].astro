@@ -1,7 +1,6 @@
 ---
-// One team's season: where it stands, how its rating moved against the other 29, every game it played and,
-// in the current season, the games it has next. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/
-// every other one.
+// One team's season: where it stands, how its rating moved against the other 29, every game it played and
+// the games it has next. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/ every other one.
 import KpiStrip, { type Kpi } from "../../../components/KpiStrip.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
@@ -10,7 +9,7 @@ import { addDays, dayKey, gap, START, winProb, type Abbr, type Game } from "../.
 import { finals, playoffsStart } from "../../../lib/facts.ts";
 import { int, monthName, ordinal, pct, rating, record, shortDay, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
 import { href } from "../../../lib/routes.ts";
-import { TODAY, team, teamPaths, theTeam, type SeasonView } from "../../../lib/season.ts";
+import { TODAY, noGamesAhead, team, teamPaths, theTeam, type SeasonView } from "../../../lib/season.ts";
 import { firstAt, nextGames, stage, tally, teamGames, type TeamGame, type Venue, type WinLoss } from "../../../lib/teams.ts";
 
 export function getStaticPaths() {
@@ -60,8 +59,7 @@ const kpis: Kpi[] = [
 ];
 
 // The games in the week ahead, each with the win chance today's ratings give this team.
-const upcoming = season.current ? nextGames(m, abbr, TODAY) : [];
-const fixtures = upcoming.map((g: Game) => {
+const fixtures = nextGames(m, abbr, TODAY).map((g: Game) => {
   const home = g.home === abbr;
   const p = winProb(gap(g, m.r));
   const venue: Venue = g.neutral ? "neutral" : home ? "home" : "away";
@@ -97,9 +95,6 @@ for (const g of [...games].reverse()) {
 }
 
 const first = m.results[0]?.day;
-const chart = season.current
-  ? { title: "Season so far", meta: first ? `${count(m.series.length - 1, "day")} since ${shortDay(first)}` : "" }
-  : { title: "The season", meta: first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : "" };
 const playoffs = playoffsStart(m);
 const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
 // Early in a season the two columns come out within a row or two of each other, so they end level: the plot
@@ -123,41 +118,39 @@ const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
 
   <div class:list={["grid", { level }]}>
     <div class="main">
-      {season.current && (
-        <Panel
-          class="next"
-          title="Next games"
-          meta={fixtures.length ? `Through ${shortDay(fixtures[fixtures.length - 1].day)}` : ""}
-          link={{ href: href({ kind: "fixtures" }), label: "All fixtures" }}
-        >
-          {fixtures.length === 0 ? (
-            <p class="empty">No games in the next seven days.</p>
-          ) : (
-            <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
-              <div class="hd" role="row">
-                <span role="columnheader">Date</span>
-                <span role="columnheader">Opponent</span>
-                <span role="columnheader" class="r">Their rating</span>
-                <span role="columnheader" class="r">Tip-off, ET</span>
-                <span role="columnheader" class="r" title="From today's ratings">Win chance</span>
-              </div>
-              {fixtures.map((x) => (
-                <div class="row" role="row">
-                  <span role="cell" class="when">{weekdayDay(x.day)}</span>
-                  <span role="cell" class="who" data-team={x.opp} data-pick>
-                    {prep(x.venue)} <a class="nm" data-team={x.opp} href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
-                    {x.tag && <span class="tag">{x.tag}</span>}
-                    <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)} · rated {rating(m.r[x.opp])}{x.tag ? ` · ${x.tag}` : ""}</span>
-                  </span>
-                  <span role="cell" class="r num opt">{rating(m.r[x.opp])}</span>
-                  <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
-                  <span role="cell" class:list={["r num chance", { fav: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
-                </div>
-              ))}
+      <Panel
+        class="next"
+        title="Next games"
+        meta={fixtures.length ? `Through ${shortDay(fixtures[fixtures.length - 1].day)}` : ""}
+        link={{ href: href({ kind: "fixtures", season }), label: "All fixtures" }}
+      >
+        {fixtures.length === 0 ? (
+          <p class="empty">{noGamesAhead(season)}</p>
+        ) : (
+          <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
+            <div class="hd" role="row">
+              <span role="columnheader">Date</span>
+              <span role="columnheader">Opponent</span>
+              <span role="columnheader" class="r">Their rating</span>
+              <span role="columnheader" class="r">Tip-off, ET</span>
+              <span role="columnheader" class="r" title="From today's ratings">Win chance</span>
             </div>
-          )}
-        </Panel>
-      )}
+            {fixtures.map((x) => (
+              <div class="row" role="row">
+                <span role="cell" class="when">{weekdayDay(x.day)}</span>
+                <span role="cell" class="who" data-team={x.opp}>
+                  {prep(x.venue)} <a class="nm" data-team={x.opp} data-preview href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
+                  {x.tag && <span class="tag">{x.tag}</span>}
+                  <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)} · rated {rating(m.r[x.opp])}{x.tag ? ` · ${x.tag}` : ""}</span>
+                </span>
+                <span role="cell" class="r num opt">{rating(m.r[x.opp])}</span>
+                <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
+                <span role="cell" class:list={["r num chance", { fav: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
 
       <Panel class="log" fill={level} title="Game log" meta={games.length ? `${count(games.length, "game")} · newest first` : ""}>
         {games.length === 0 ? (
@@ -183,8 +176,8 @@ const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
                   {mo.games.map((g) => (
                     <div class="row" role="row">
                       <span role="cell" class="when num">{shortDay(g.result.day)}</span>
-                      <span role="cell" class="who" data-team={g.them.abbr} data-pick>
-                        {prep(g.venue)} <a class="nm" data-team={g.them.abbr} href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
+                      <span role="cell" class="who" data-team={g.them.abbr}>
+                        {prep(g.venue)} <a class="nm" data-team={g.them.abbr} data-preview href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
                         {g.stage.label && <span class="tag">{g.stage.label}</span>}
                         <span class="sub">{shortDay(g.result.day)}{g.stage.label ? ` · ${g.stage.label}` : ""}</span>
                       </span>
@@ -210,7 +203,13 @@ const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
     </div>
 
     <div class="rail">
-      <Panel class="chart" fill={level} title={chart.title} meta={chart.meta}>
+      <Panel
+        class="chart"
+        fill={level}
+        title="Rating history"
+        meta={first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : ""}
+        link={{ href: href({ kind: "graph", season, abbr }), label: "Full graph" }}
+      >
         <RatingChart season={season} selected={abbr} bareKey height={plotHeight} marker={playoffs ? { day: playoffs, label: `Playoffs from ${shortDay(playoffs)}` } : null} />
       </Panel>
     </div>

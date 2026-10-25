@@ -109,16 +109,3 @@ export function finals(model: Season): Finals | null {
 
 /** The first day of the playoffs proper (play-in games come before it), if they have started. */
 export const playoffsStart = (model: Season) => model.results.find((r) => /1st Round/.test(r.game.note ?? ""))?.day ?? null;
-
-/** Where a season stands, which decides what its home page says. */
-export type Status =
-  | { kind: "preseason"; opens: string | null }
-  | { kind: "playing"; day: string; games: Result[] }
-  | { kind: "finished"; finals: Finals };
-
-export function status(model: Season, opens: string | null): Status {
-  const done = finals(model);
-  if (done) return { kind: "finished", finals: done };
-  if (!model.asOf) return { kind: "preseason", opens };
-  return { kind: "playing", day: model.asOf, games: gamesOn(model, model.asOf) };
-}

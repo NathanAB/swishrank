@@ -2,7 +2,7 @@
 
 Season-only Elo ratings for the 30 NBA teams: https://nathanab.github.io/nba-elo/
 
-Every team starts each season at 1500 and nothing carries over from last year. After each game the winner takes points from the loser, using FiveThirtyEight's NBA formula (K = 20, 100 points for home court, a margin-of-victory multiplier). The site has the league table, results, the week's fixtures with win chances, a page per team, and the same views for last season.
+Every team starts each season at 1500 and nothing carries over from last year. After each game the winner takes points from the loser, using FiveThirtyEight's NBA formula (K = 20, 100 points for home court, a margin-of-victory multiplier). The site has the league table, results, the week's fixtures with win chances, a page per team, a full-size graph of every team's rating by day, and the same views for last season.
 
 ## How it updates
 

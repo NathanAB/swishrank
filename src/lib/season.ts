@@ -105,17 +105,9 @@ export const teamPaths = () =>
     season.model.abbrs.map((abbr) => ({ params: { season: seasonParam(season), team: teamSlug(abbr) }, props: { season, abbr } })),
   );
 
-/** The season a page shows: fixtures are always the current season's; the about page has none. */
-export function routeSeason(route: Route): SeasonView | null {
-  switch (route.kind) {
-    case "about":
-      return null;
-    case "fixtures":
-      return currentSeason();
-    default:
-      return allSeasons().find((s) => s.id === route.season.id) ?? null;
-  }
-}
+/** The season a page shows; the about page has none. */
+export const routeSeason = (route: Route): SeasonView | null =>
+  route.kind === "about" ? null : (allSeasons().find((s) => s.id === route.season.id) ?? null);
 
 /** The season switch for a page: one link per season to the same page in that season. */
 export const seasonSwitch = (route: Route) =>
@@ -141,6 +133,10 @@ export const winPhrase = (season: SeasonView, { result, winner, loser }: Outcome
   result.game.neutral ? `win over ${theTeam(season, loser.abbr)}`
   : winner.side === "h" ? `home win over ${theTeam(season, loser.abbr)}`
   : `win at ${city(season, result.game.home)}`;
+
+/** What a list of games still to play says when it has none. */
+export const noGamesAhead = (season: SeasonView) =>
+  season.current ? "No games in the next seven days." : `The ${season.label} season is over.`;
 
 /** The US Eastern day of a season's first game in the data, or null when it has none. */
 export const openingDay = (season: SeasonView) => {

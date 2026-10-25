@@ -1,20 +1,28 @@
 ---
-// The current season's games in the week ahead, one card per US Eastern day. Each game reads away over home:
-// tip-off in ET, each team's rating now, each side's win chance on those ratings, and the spread on the
-// favourite's line. Pointing at a team marks its other games in the week.
-import Panel from "../components/Panel.astro";
-import Base from "../layouts/Base.astro";
-import { addDays, dayKey, ELO_PER_POINT, HCA, type Abbr } from "../lib/elo.ts";
-import { WEEK, closest, mostOneSided, nextDays, type Fixture, type FixtureLine } from "../lib/fixtures.ts";
-import { MINUS, int, longDay, pct, rating, tipTime, weekdayDay } from "../lib/format.ts";
-import { href } from "../lib/routes.ts";
-import { TODAY, currentSeason, team } from "../lib/season.ts";
+// A season's games in the week ahead, one card per US Eastern day: /fixtures/ for the current season and
+// /<id>/fixtures/ for the rest, which have none left. Each game reads away over home: tip-off in ET, each
+// team's rating now, each side's win chance on those ratings, and the spread on the favourite's line.
+// Pointing at a team marks its other games in the week.
+import Panel from "../../components/Panel.astro";
+import Base from "../../layouts/Base.astro";
+import { addDays, dayKey, ELO_PER_POINT, HCA, type Abbr } from "../../lib/elo.ts";
+import { WEEK, closest, mostOneSided, nextDays, type Fixture, type FixtureLine } from "../../lib/fixtures.ts";
+import { MINUS, int, longDay, pct, rating, tipTime, weekdayDay } from "../../lib/format.ts";
+import { href } from "../../lib/routes.ts";
+import { TODAY, noGamesAhead, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
 
-const season = currentSeason();
+export function getStaticPaths() {
+  return seasonPaths();
+}
+
+interface Props {
+  season: SeasonView;
+}
+
+const { season } = Astro.props;
 const m = season.model;
 const days = nextDays(m, TODAY, WEEK);
 const all = days.flatMap((d) => d.fixtures);
-const selected = m.order[0];
 
 const short = (a: Abbr) => team(season, a).short;
 const relative = (day: string) => (day === TODAY ? "Today" : day === addDays(TODAY, 1) ? "Tomorrow" : null);
@@ -28,7 +36,8 @@ const note = ({ game: g }: Fixture) => {
 };
 
 // The finding under the title: which side the week's favourites are on, and how far they lean, from the
-// closest game to the most one-sided. { b } parts are figures set in ink.
+// closest game to the most one-sided; with no games ahead, when the latest were. { b } parts are figures set
+// in ink.
 type Part = string | { b: string };
 const lean = (f: Fixture) => {
   const [away, home] = f.lines;
@@ -37,7 +46,7 @@ const lean = (f: Fixture) => {
 };
 const near = closest(all);
 const far = mostOneSided(all);
-let lede: Part[] | null = null;
+let lede: Part[] = [`No games are scheduled in the week ahead${m.asOf ? `, and the latest were on ${weekdayDay(m.asOf)}` : ""}.`];
 if (near && far) {
   const a = lean(near);
   const z = lean(far);
@@ -58,12 +67,12 @@ const chanceTitle = `Win chance on current ratings, with ${HCA} rating points fo
 const spreadTitle = `Points the favourite should win by: ${ELO_PER_POINT} rating points to a point, to the half point`;
 ---
 
-<Base title={`${season.label} fixtures`} docTitle="Fixtures" route={{ kind: "fixtures" }}>
-  {lede && <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : <b>{p.b}</b>))}</Fragment>}
+<Base title={`${season.label} fixtures`} docTitle={`Fixtures ${season.label}`} route={{ kind: "fixtures", season }}>
+  <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : <b>{p.b}</b>))}</Fragment>
 
   {all.length === 0 ? (
     <Panel title="The week ahead" meta={`${weekdayDay(TODAY)} to ${weekdayDay(addDays(TODAY, WEEK - 1))}`}>
-      <p class="empty">No games in the week ahead.</p>
+      <p class="empty">{noGamesAhead(season)}</p>
     </Panel>
   ) : (
     <div class="days">
@@ -96,8 +105,8 @@ const spreadTitle = `Points the favourite should win by: ${ELO_PER_POINT} rating
                       <span role="cell" class="when num">{tipTime(f.game.t)}</span>
                       <span role="cell" class="who">
                         {f.lines.map((l) => (
-                          <span class:list={[mark(l), { sel: l.abbr === selected }]} data-team={l.abbr} data-pick>
-                            {l.side === "h" ? (f.game.neutral ? "vs " : "at ") : ""}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{short(l.abbr)}</a>
+                          <span class:list={mark(l)} data-team={l.abbr}>
+                            {l.side === "h" ? (f.game.neutral ? "vs " : "at ") : ""}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })} data-team={l.abbr} data-preview>{short(l.abbr)}</a>
                           </span>
                         ))}
                       </span>
@@ -137,14 +146,12 @@ const spreadTitle = `Points the favourite should win by: ${ELO_PER_POINT} rating
   .g > * > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .g .fav { color: var(--text); font-weight: 500; }
   .g > .when { white-space: nowrap; }
-  .who > [data-pick] { cursor: pointer; }
   .nt { grid-column: 2 / -1; font-size: var(--fs-small); line-height: 16px; padding-top: 2px; }
 
   .nm { position: relative; }
   .nm::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: transparent; }
   .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
   .hov .nm::after { background: var(--control); }
-  .sel .nm::after { background: var(--accent); }
 
   @media (max-width: 1239px) {
     .list { --cols: 2; }

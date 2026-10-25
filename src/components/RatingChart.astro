@@ -1,10 +1,13 @@
 ---
-// Every team's daily rating from the 1500 they all start at, one team in the accent. The end of every
-// line is labelled with its abbreviation in two staggered columns with short leaders, so labels never
+// Every team's daily rating from the 1500 they all start at. The picked team is drawn in the accent and named
+// in the legend, the name linking to its page; a reader picks another by its line or its end label. The end of
+// every line is labelled with its abbreviation in two staggered columns with short leaders, so labels never
 // collide. The plot stretches with the card; the tick lane and the label lane keep a fixed size, and the
-// height is fixed too, so the label layout worked out here holds at every width.
+// height is fixed too, so the label layout worked out here holds at every width. Given a narrowest width per
+// day, a long season scrolls sideways inside the chart instead of squeezing its days together.
 import { START, type Abbr } from "../lib/elo.ts";
 import { monthShort, ordinal, rating, shortDay } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
 
 interface Props {
@@ -17,9 +20,14 @@ interface Props {
   marker?: { day: string; label: string } | null;
   /** Give the selected team's legend key only its name, on a page whose KPI strip already shows its figures. */
   bareKey?: boolean;
+  /**
+   * The plot's narrowest width per day in px. Below it the chart scrolls sideways inside itself, opening on
+   * the latest days, with the rating ticks held at its left edge. Leave it out to fit the plot to any width.
+   */
+  minDayWidth?: number;
 }
 
-const { season, selected, height: H = 300, marker = null, bareKey = false } = Astro.props;
+const { season, selected, height: H = 300, marker = null, bareKey = false, minDayWidth = 0 } = Astro.props;
 const m = season.model;
 const ser = m.series;
 const n = ser.length;
@@ -44,7 +52,7 @@ const y = (v: number) => PAD + ((H - 2 * PAD) * (hi - v)) / (hi - lo);
 const X = 1000; // the plot's viewBox width, stretched to the card
 const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
 const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
-const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
+const points = (a: Abbr, digits = 1) => ser.map((d, i) => `${x(i).toFixed(digits)},${y(d.r[a]).toFixed(digits)}`).join(" ");
 const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === selected) - Number(q === selected));
 
 // x labels on one step that lands on the last day: month starts for a long season, days for a short one.
@@ -89,6 +97,7 @@ for (const c of clusters) c.list.forEach((l, k) => (l.ly = c.top + k * PITCH));
 
 const standing = (a: Abbr) => `${m.order.filter((b) => m.rank[b] === m.rank[a]).length > 1 ? "tied " : ""}${ordinal(m.rank[a])}`;
 const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(ser[0].day)} to ${shortDay(ser[n - 1].day)}` : ""}, each starting at ${START}`;
+const scroll = minDayWidth > 0;
 ---
 
 {n < 2 ? (
@@ -100,7 +109,7 @@ const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(se
         const s = m.stats[a];
         return (
           <span class:list={["key", { sel: a === selected }]} data-team={a}>
-            <b>{m.data.teams[a].short}</b>
+            <a class="nm" href={href({ kind: "team", season, abbr: a })}>{m.data.teams[a].short}</a>
             {!(bareKey && a === selected) && (
               <Fragment>
                 {" "}<span class="fig num">{rating(m.r[a])}</span>{" "}
@@ -112,7 +121,14 @@ const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(se
       })}
       <span class="key others">{m.abbrs.length - 1} others</span>
     </p>
-    <div class="rc" role="img" aria-label={label} style={`--h: ${H}px; --lane: ${LANE}px`}>
+    <div
+      class:list={["rc", { scroll }]}
+      role="img"
+      aria-label={label}
+      tabindex={scroll ? "0" : undefined}
+      data-scroll-end={scroll ? "" : undefined}
+      style={`--h: ${H}px; --lane: ${LANE}px${scroll ? `; --plot-min: ${(n - 1) * minDayWidth}px` : ""}`}
+    >
       {marker && markerAt >= 0 && <span class="mark-label" style={`left: ${pct(markerAt)}`}>{marker.label}</span>}
       <svg class="ticks" width="40" height={H} viewBox={`0 0 40 ${H}`}>
         {ticks.map((t) => <text class:list={{ ref: t === START }} x="32" y={y(t) + 4} text-anchor="end">{t}</text>)}
@@ -125,6 +141,8 @@ const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(se
             <polyline class:list={["line", { sel: a === selected }]} data-team={a} data-raise points={points(a)} />
           ))}
         </g>
+        {/* An unseen band along each line to point at; whole units are close enough for it. */}
+        <g>{drawOrder.map((a) => <polyline class="hit" data-team={a} data-pick points={points(a, 0)} />)}</g>
       </svg>
       <svg class="lane" width={LANE} height={H} viewBox={`0 0 ${LANE} ${H}`}>
         {labels.map((l, k) => {
@@ -149,6 +167,10 @@ const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(se
   </div>
 )}
 
+<script>
+  for (const el of document.querySelectorAll("[data-scroll-end]")) el.scrollLeft = el.scrollWidth;
+</script>
+
 <style>
   .empty { padding: 8px 0 12px; color: var(--muted); }
   .legend { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 8px; color: var(--muted); }
@@ -156,10 +178,16 @@ const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(se
   .key.sel, .key.others { display: inline-flex; }
   .key::before { content: ""; width: 14px; height: 2px; align-self: center; background: var(--line-other); }
   .key.sel::before { background: var(--accent); }
-  .key b { color: var(--text); font-weight: 600; }
+  .key .nm { color: var(--text); font-weight: 600; }
+  .key .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
   .fig { color: var(--text); font-size: 20px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; }
 
-  .rc { display: grid; grid-template-columns: 40px minmax(0, 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
+  .rc { display: grid; grid-template-columns: 40px minmax(var(--plot-min, 0px), 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
+  /* Scrolling, the tick lane stays at the left edge over a cover down to the dates, so the lines and the
+     dates pass under it. */
+  .rc.scroll { overflow: auto hidden; }
+  .rc.scroll::before { content: ""; grid-area: 2 / 1 / 4 / 2; position: sticky; left: 0; z-index: 1; background: var(--surface); }
+  .rc.scroll .ticks { position: sticky; left: 0; z-index: 2; }
   .mark-label {
     grid-row: 1; grid-column: 2; position: relative; justify-self: start; transform: translateX(calc(-100% - 4px));
     font-size: 11px; line-height: 16px; color: var(--muted); white-space: nowrap;
@@ -181,6 +209,7 @@ const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(se
   .line { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; stroke-linejoin: round; }
   .line.hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 1.5; }
   .line.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
+  .hit { stroke: transparent; stroke-width: 12; stroke-linejoin: round; pointer-events: stroke; cursor: pointer; }
   .leader { fill: none; stroke: var(--line-other); stroke-opacity: 0.6; stroke-width: 1; }
   .leader.sel { stroke: var(--accent); stroke-opacity: 1; }
   .lab { cursor: pointer; }

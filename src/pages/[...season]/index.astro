@@ -9,11 +9,11 @@ import Panel from "../../components/Panel.astro";
 import RatingChart from "../../components/RatingChart.astro";
 import Base from "../../layouts/Base.astro";
 import { addDays, dayKey, START, type Abbr } from "../../lib/elo.ts";
-import { biggestSwing, bySwing, leaders, outcome, playoffsStart, status, swing, underdogWins, upsets, widestGap } from "../../lib/facts.ts";
+import { biggestSwing, bySwing, gamesOn, leaders, outcome, playoffsStart, swing, underdogWins, widestGap } from "../../lib/facts.ts";
 import { WEEK } from "../../lib/fixtures.ts";
 import { DASH, int, ordinal, rating, record, shortDay, weekdayDay } from "../../lib/format.ts";
 import { href } from "../../lib/routes.ts";
-import { TODAY, openingDay, seasonPaths, theTeam, winPhrase, type SeasonView } from "../../lib/season.ts";
+import { TODAY, noGamesAhead, openingDay, seasonPaths, theTeam, winPhrase, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
   return seasonPaths();
@@ -25,47 +25,44 @@ interface Props {
 
 const { season } = Astro.props;
 const m = season.model;
-const st = status(m, openingDay(season));
 const lead = m.order[0];
 const bottom = m.order[m.order.length - 1];
 const top = leaders(m);
 const R = (a: Abbr) => rating(m.r[a]);
 const count = (n: number, noun: string) => `${int(n)} ${noun}${n === 1 ? "" : "s"}`;
 const theTeams = (abbrs: Abbr[]) => abbrs.map((a) => theTeam(season, a)).join(" and ");
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const resultsLink = { href: href({ kind: "results", season }), label: "All results" };
 
-// The finding under the title, one sentence built from the same values the blocks below show. Strings
-// are plain text, { b } parts are the figures set in ink and { keep } parts never break across lines.
+// The latest game day's games, biggest swing first: last night's while a season is being played, the last
+// day of a finished one.
+const yesterday = addDays(TODAY, -1);
+const latestDay = m.asOf;
+const latestGames = latestDay ? bySwing(gamesOn(m, latestDay)) : [];
+const latest = {
+  title: latestDay === yesterday ? "Last night" : "Latest games",
+  meta: latestDay ? `${weekdayDay(latestDay)} · ${count(latestGames.length, "game")}` : "",
+};
+const opens = openingDay(season);
+
+// The finding under the title, one sentence built from the same values the blocks below show: who leads, and
+// the latest game day's biggest swing. Strings are plain text, { b } parts are the figures set in ink and
+// { keep } parts never break across lines.
 type Part = string | { b: string } | { keep: string };
+const headline = latestGames.at(0);
 let lede: Part[];
-let latest: { title: string; meta: string };
-if (st.kind === "finished") {
-  const f = st.finals;
-  const series = record(f.wins, f.losses);
-  const who = top.length > 1 ? `${theTeams(top)} finished level at ` : `${theTeam(season, lead)} finished top at `;
-  const after = ` after ${count(m.results.length, "game")}`;
-  lede = f.champion === lead && top.length === 1
-    ? [cap(who), { b: R(lead) }, `${after} and beat ${theTeam(season, f.runnerUp)} `, { keep: series }, " in the Finals."]
-    : [cap(who), { b: R(lead) }, `${after}, and ${theTeam(season, f.champion)} won the Finals `, { keep: series }, ` over ${theTeam(season, f.runnerUp)}.`];
-  latest = { title: "The Finals", meta: `${m.data.teams[f.champion].short} won ${series}` };
-} else if (st.kind === "playing") {
-  const o = outcome(bySwing(st.games)[0]);
+if (latestDay && headline) {
+  const o = outcome(headline);
   const { winner: w, loser: l } = o;
-  const yesterday = addDays(TODAY, -1);
-  const when = st.day === TODAY ? "today's biggest swing" : st.day === yesterday ? "last night's biggest swing" : `the biggest swing on ${weekdayDay(st.day)}`;
-  const leading = top.length > 1 ? `${theTeams(top)} share the lead at ` : `${theTeam(season, lead)} lead at `;
+  const when = latestDay === yesterday ? "last night's biggest swing" : `the biggest swing on ${weekdayDay(latestDay)}`;
+  const leading = top.length > 1
+    ? `${theTeams(top)} ${season.current ? "share the lead" : "finished level"} at `
+    : `${theTeam(season, lead)} ${season.current ? "lead" : "finished top"} at `;
   lede = [
     `After ${count(m.results.length, "game")}, ${leading}`, { b: R(lead) }, `, and ${when} was `, { b: int(w.change) },
     ` ${w.change === 1 ? "point" : "points"} to ${theTeam(season, w.abbr)} for a `, { keep: record(w.score, l.score) }, ` ${winPhrase(season, o)}.`,
   ];
-  latest = {
-    title: st.day === TODAY ? "Today" : st.day === yesterday ? "Last night" : "Latest results",
-    meta: `${weekdayDay(st.day)} · ${count(st.games.length, "game")}`,
-  };
 } else {
-  lede = [`Every team starts at ${START}${st.opens ? `, and the season opens ${weekdayDay(st.opens)}.` : "."}`];
-  latest = { title: "Latest results", meta: "" };
+  lede = [`Every team starts at ${START}${opens ? `, and the season opens ${weekdayDay(opens)}.` : "."}`];
 }
 
 const first = m.results[0]?.day;
@@ -84,16 +81,11 @@ const tableMeta = m.asOf
   ? `As of ${weekdayDay(m.asOf)} · all started at ${START}${gap && gap.points > 0 ? ` · widest gap ${gap.points} pts, ${ordinal(m.rank[gap.upper])} to ${ordinal(m.rank[gap.lower])}` : ""}`
   : `Before opening night · all at ${START}`;
 
-const days = m.series.length - 1;
-const chart = st.kind === "finished"
-  ? { title: "The season", meta: first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : "" }
-  : { title: "Season so far", meta: first ? `${count(days, "day")} since ${shortDay(first)}` : "" };
 const playoffs = playoffsStart(m);
 
-// The third card: the next game day's fixtures in the week ahead, the season's upsets once it is over.
+// The third card: the next game day's fixtures in the week ahead.
 const nextDay = m.upcoming.map((g) => dayKey(g.t)).filter((d) => d >= TODAY && d < addDays(TODAY, WEEK)).sort()[0] ?? null;
 const nextGames = nextDay ? m.upcoming.filter((g) => dayKey(g.t) === nextDay) : [];
-const showFixtures = st.kind !== "finished" && season.current;
 ---
 
 <Base title={`${season.label} ratings`} route={{ kind: "home", season }}>
@@ -109,45 +101,33 @@ const showFixtures = st.kind !== "finished" && season.current;
 
     <div class="rail">
       <Panel class="latest" title={latest.title} meta={latest.meta} link={resultsLink}>
-        {st.kind === "finished" ? (
-          <GameList
-            season={season}
-            results={st.finals.games}
-            label="The Finals, game by game"
-            dated
-            detail={(r) => r.game.note?.replace("NBA Finals - ", "") ?? null}
-            selected={lead}
-          />
-        ) : (
-          <GameList
-            season={season}
-            results={st.kind === "playing" ? bySwing(st.games) : []}
-            label={`${latest.title}, biggest swing first`}
-            selected={lead}
-            empty={st.kind === "preseason" && st.opens ? `No games yet. The season opens ${weekdayDay(st.opens)}.` : "No games yet."}
-          />
-        )}
+        <GameList
+          season={season}
+          results={latestGames}
+          label={`${latest.title}, biggest swing first`}
+          selected={lead}
+          empty={opens ? `No games yet. The season opens ${weekdayDay(opens)}.` : "No games yet."}
+        />
       </Panel>
 
-      <Panel class="chart" title={chart.title} meta={chart.meta}>
+      <Panel
+        class="chart"
+        title="Rating history"
+        meta={first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : ""}
+        link={{ href: href({ kind: "graph", season }), label: "Full graph" }}
+      >
         <RatingChart season={season} selected={lead} marker={playoffs ? { day: playoffs, label: `Playoffs from ${shortDay(playoffs)}` } : null} />
       </Panel>
 
-      {showFixtures ? (
-        <Panel
-          class="next"
-          fill
-          title={nextDay === TODAY ? "Tonight" : "Next up"}
-          meta={nextDay ? `${weekdayDay(nextDay)} · ${count(nextGames.length, "game")}` : ""}
-          link={{ href: href({ kind: "fixtures" }), label: "All fixtures" }}
-        >
-          <FixtureList season={season} games={nextGames} label="The next day's games" selected={lead} fit empty="No games in the next seven days." />
-        </Panel>
-      ) : (
-        <Panel class="next" fill title="Biggest upsets" meta="by pre-game chance" link={resultsLink}>
-          <GameList season={season} results={upsets(m.results, 10)} label="The season's biggest upsets" dated selected={lead} fit empty="No upsets yet." />
-        </Panel>
-      )}
+      <Panel
+        class="next"
+        fill
+        title={nextDay === TODAY ? "Tonight" : "Next up"}
+        meta={nextDay ? `${weekdayDay(nextDay)} · ${count(nextGames.length, "game")}` : ""}
+        link={{ href: href({ kind: "fixtures", season }), label: "All fixtures" }}
+      >
+        <FixtureList season={season} games={nextGames} label="The next day's games" selected={lead} fit empty={noGamesAhead(season)} />
+      </Panel>
     </div>
   </div>
 </Base>

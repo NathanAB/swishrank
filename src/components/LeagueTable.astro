@@ -11,13 +11,12 @@ import type { SeasonView } from "../lib/season.ts";
 
 interface Props {
   season: SeasonView;
-  /** The team highlighted on load; defaults to the top of the table. */
+  /** The team highlighted on load, on a page with a rating chart that draws it too; none when left out. */
   selected?: Abbr;
 }
 
-const { season } = Astro.props;
+const { season, selected } = Astro.props;
 const m = season.model;
-const selected = Astro.props.selected ?? m.order[0];
 // The latest game day's changes get their own column, headed by its date: for a finished season, its last game.
 const changeDay = m.asOf;
 const changes = changeDay ? dayChanges(m, changeDay) : null;
@@ -84,7 +83,7 @@ curves.sort((x, y) => Number(x.a === selected) - Number(y.a === selected));
         const name = m.data.teams[a].name;
         const ppg = `${perGame(s.F, s.T)}–${perGame(s.Ag, s.T)}`;
         return (
-          <tr data-team={a} data-pick class:list={{ sel: a === selected }}>
+          <tr data-team={a} class:list={{ sel: a === selected }}>
             {i === 0 && (
               <td class="lad" rowspan={n} aria-hidden="true">
                 <div class="lad-in">
@@ -107,7 +106,7 @@ curves.sort((x, y) => Number(x.a === selected) - Number(y.a === selected));
             )}
             <td class="num rank">{m.rank[a]}</td>
             <td class="team">
-              <a class="name" href={href({ kind: "team", season, abbr: a })}>{name}</a>
+              <a class="go" href={href({ kind: "team", season, abbr: a })} data-team={a} data-preview><span class="name">{name}</span></a>
               <span class="sub">{record(s.W, s.L)} · {rating(m.avg[a])} · {ppg}</span>
             </td>
             <td class="num rating">
@@ -140,13 +139,17 @@ curves.sort((x, y) => Number(x.a === selected) - Number(y.a === selected));
   th:last-child, td:last-child { padding-right: 0; }
   .rank { width: 32px; }
   td.team { color: var(--text); }
+  /* Each row is one link to the team's page: the name's link stretches over the row, all but the ladder.
+     Pointing at a row or focusing it previews the team in the ladder and the chart. */
+  tbody tr { position: relative; }
+  .go::before { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: var(--lad); z-index: 1; }
+  .go:focus-visible { outline: none; }
+  tr:has(.go:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
   .name { position: relative; display: inline-block; font-weight: 500; line-height: calc(var(--row) - 1px); }
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
-  .name:hover { text-decoration: underline; text-underline-offset: 3px; }
-  tbody tr { cursor: pointer; }
+  tr:hover .name { text-decoration: underline; text-underline-offset: 3px; }
   tr:hover .name::after, tr.hov .name::after { background: var(--control); }
   tr.sel .name::after { background: var(--accent); }
-  tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   td.rating { color: var(--text); font-weight: 600; }
   td.quiet { color: var(--muted); }
   td.opt:not(.quiet) { color: var(--text); }
@@ -192,7 +195,8 @@ curves.sort((x, y) => Number(x.a === selected) - Number(y.a === selected));
     .opt { display: none; }
     td.team { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
     td.team, td.rating { line-height: 18px; }
-    .name { display: block; line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
+    .go, .name { display: block; }
+    .name { line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
     .name::after { bottom: -2px; }
     .sub { display: block; color: var(--muted); font-size: 13px; line-height: 17px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
     th .sub { display: inline; font-size: inherit; }
