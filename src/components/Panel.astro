@@ -21,7 +21,7 @@ const headingId = hid ?? `h-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 const Heading = level === 1 ? "h1" : "h2";
 ---
 
-<section {...rest} class:list={["panel", cls]} aria-labelledby={headingId}>
+<section {...rest} class:list={["panel", { first: level === 1 }, cls]} aria-labelledby={headingId}>
   <header class="head">
     <Heading id={headingId}>{title}</Heading>
     {meta && <p class="meta">{meta}</p>}
@@ -36,6 +36,9 @@ const Heading = level === 1 ? "h1" : "h2";
     background: var(--surface); border: var(--panel-edge); box-shadow: var(--shadow); border-radius: var(--radius-card);
   }
   .head { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  /* The page's header row, with its h1 and controls, gets room to breathe above what it heads. */
+  .first { padding-top: 16px; }
+  .first > .head { margin-bottom: 16px; }
   h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
   h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
   .meta { min-width: 0; color: var(--muted); }
