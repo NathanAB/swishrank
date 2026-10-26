@@ -1,88 +1,43 @@
 ---
-// Games still to play, two lines each (away, then home): tip-off in US Eastern and each side's win chance
-// from today's ratings, the favourite in ink.
-import type { Fixture } from "../lib/fixtures.ts";
-import { pct, tipTime } from "../lib/format.ts";
+// One day's games still to play, two lines each (away, then home): tip-off in US Eastern on the first line,
+// and each side's win chance from today's ratings, the favourite in ink, whether home or away.
+import GameDay from "./GameDay.astro";
+import { heads } from "../lib/columns.ts";
+import type { FixtureDay } from "../lib/fixtures.ts";
+import { longDay, pct, tipTime, weekdayDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import { team, type SeasonView } from "../lib/season.ts";
 
 interface Props {
   season: SeasonView;
-  /** The games, in tip-off order. */
-  fixtures: readonly Fixture[];
-  /** The list's accessible name, such as "Tonight's games". */
-  label: string;
-  /** The sentence shown when there are no games. */
-  empty?: string;
-  /** Show the column headings; a list under another one with the same columns can leave them out. */
-  head?: boolean;
+  day: FixtureDay;
+  /** Label the columns: the first day of a section does. */
+  labels?: boolean;
 }
 
-const { season, fixtures, label, empty = "No games scheduled.", head = true } = Astro.props;
+const { season, day, labels = false } = Astro.props;
+const n = day.fixtures.length;
 ---
 
-{fixtures.length === 0 ? (
-  <p class="empty">{empty}</p>
-) : (
-  <div class="fix" role="table" aria-label={label}>
-    {head && (
-      <div class="hds">
-        {[0, 1, 2].map((i) => {
-          const role = i === 0 ? "columnheader" : undefined;
-          return (
-            <div class="hd" role={i === 0 ? "row" : undefined} aria-hidden={i === 0 ? undefined : "true"}>
-              <span role={role}>Tip-off, ET</span>
-              <span role={role}>Game</span>
-              <span role={role} class="r">Win chance</span>
-            </div>
-          );
-        })}
-      </div>
-    )}
-    <div class="rows" role="rowgroup">
-      {fixtures.map((f) => (
-        <div class="fx" role="row">
-          <div class="when num" role="cell">{tipTime(f.game.t)}</div>
-          <div class="who" role="cell">
-            {f.lines.map((l) => (
-              <span class:list={{ fav: l.side === f.fav }}>
-                {l.side === "h" && (f.game.neutral ? "vs " : "at ")}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a>
-              </span>
-            ))}
-          </div>
-          <div class="r num" role="cell">
-            {f.lines.map((l) => <span class:list={{ fav: l.side === f.fav }}>{pct(l.chance)}</span>)}
-          </div>
+<GameDay heading={weekdayDay(day.day)} label={`Games on ${longDay(day.day)}`} count={n} cols="72px minmax(0, 1fr) 72px" labels={labels ? ["Win chance"] : []}>
+  {day.fixtures.map((f, i) => (
+    <li class:list={["g", heads(i, n)]}>
+      {f.lines.map((l, k) => (
+        <div class:list={["ln", { fav: l.side === f.fav }]}>
+          <span class="when num">{k === 0 && tipTime(f.game.t)}</span>
+          <span class="who">{l.side === "h" && (f.game.neutral ? "vs " : "at ")}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a></span>
+          <span class="r num">{pct(l.chance)}</span>
         </div>
       ))}
-    </div>
-  </div>
-)}
+    </li>
+  ))}
+</GameDay>
 
 <style>
-  .empty { padding: 4px 0 8px; color: var(--muted); }
-  .fix { container-type: inline-size; --across: 1; }
-  .hds, .rows { display: grid; grid-template-columns: repeat(var(--across), minmax(0, 1fr)); column-gap: var(--gap); }
-  .hd, .fx { display: grid; grid-template-columns: 72px minmax(0, 1fr) 72px; column-gap: 10px; }
-  .hd { height: 32px; align-items: center; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .hd:nth-child(n + 2) { display: none; }
+  .ln { color: var(--muted); }
+  .ln span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .r { text-align: right; }
-  .fx { height: 41px; padding: 3px 0; align-items: start; }
-  .fx + .fx { border-top: 1px solid var(--rule); }
-  .fx > div { display: grid; line-height: 17px; min-width: 0; color: var(--muted); }
-  .fx span, .when { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .fx .fav { color: var(--text); font-weight: 500; }
+  .fav { color: var(--text); font-weight: 500; }
+  .fav .when { color: var(--muted); font-weight: 400; }
   .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
-
-  /* A wide card sets two or three games across, read left to right, as GameList does. */
-  @container (min-width: 680px) {
-    .rows, .hds { --across: 2; }
-    .hd:nth-child(2) { display: grid; }
-    .fx:nth-child(2) { border-top: 0; }
-  }
-  @container (min-width: 1040px) {
-    .rows, .hds { --across: 3; }
-    .hd:nth-child(3) { display: grid; }
-    .fx:nth-child(3) { border-top: 0; }
-  }
 </style>
