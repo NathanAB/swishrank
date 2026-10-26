@@ -1,9 +1,8 @@
 ---
-// One day's final games, two lines each (away, then home): the team, the score and its rating change as
-// displayed, the winner in ink.
+// One day's final games, one tile each: away over home, each with its score and, smaller and labelled, its
+// rating change as displayed. The winner is in ink.
 import GameDay from "./GameDay.astro";
-import { heads } from "../lib/columns.ts";
-import { outcome, type Line } from "../lib/facts.ts";
+import { outcome } from "../lib/facts.ts";
 import { longDay, signed, weekdayDay } from "../lib/format.ts";
 import type { Day } from "../lib/results.ts";
 import { href } from "../lib/routes.ts";
@@ -12,12 +11,10 @@ import { team, type SeasonView } from "../lib/season.ts";
 interface Props {
   season: SeasonView;
   day: Day;
-  /** Label the columns: the first day of a section does. */
-  labels?: boolean;
 }
 
-const { season, day, labels = false } = Astro.props;
-const games = day.results.map((r) => ({ r, lines: [outcome(r).away, outcome(r).home] as [Line, Line] }));
+const { season, day } = Astro.props;
+const games = day.results.map(outcome);
 
 const notes = day.results.map((r) => r.game.note);
 const meta = notes.every((n) => n !== null) && notes.length
@@ -25,14 +22,15 @@ const meta = notes.every((n) => n !== null) && notes.length
   : undefined;
 ---
 
-<GameDay heading={weekdayDay(day.day)} meta={meta} label={`Games on ${longDay(day.day)}`} count={games.length} cols="minmax(0, 1fr) 36px 48px" labels={labels ? ["Score", "Change"] : []}>
-  {games.map(({ r, lines }, i) => (
-    <li class:list={["g", heads(i, games.length)]}>
-      {lines.map((l) => (
+<GameDay heading={weekdayDay(day.day)} meta={meta} label={`Games on ${longDay(day.day)}`}>
+  {games.map((o) => (
+    <li class="g">
+      <p class="top"><span class="lab">Rating change</span></p>
+      {[o.away, o.home].map((l) => (
         <div class:list={["ln", { win: l.won }]}>
-          <span class="who">{l.side === "h" && (r.game.neutral ? "vs " : "at ")}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a></span>
-          <span class="n num">{l.score}</span>
-          <span class="n num">{signed(l.change)}</span>
+          <span class="who">{l.side === "h" && (o.result.game.neutral ? "vs " : "at ")}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a></span>
+          <span class="sc num">{l.score}</span>
+          <span class="ch num">{signed(l.change)}</span>
         </div>
       ))}
     </li>
@@ -40,9 +38,16 @@ const meta = notes.every((n) => n !== null) && notes.length
 </GameDay>
 
 <style>
-  .ln { color: var(--muted); }
-  .ln span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .n { text-align: right; }
+  /* Name, score and rating change on one grid, so the two lines' figures line up under the tile's label. */
+  .g { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 16px; }
+  .top, .ln { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; }
+  .top { min-height: 18px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
+  .lab { grid-column: 3; text-align: right; white-space: nowrap; }
+  .ln { color: var(--muted); line-height: 22px; }
+  .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc, .ch { text-align: right; }
+  .ch { font-size: var(--fs-small); }
   .win { color: var(--text); font-weight: 500; }
+  .win .ch { color: var(--muted); font-weight: 400; }
   .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
 </style>

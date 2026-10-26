@@ -1,10 +1,7 @@
 ---
-// One day of games on the games page: a heading row with the day (and, on a section's first day, the column
-// labels over the first column), then the games, which fill the card's columns down the first, then the
-// next (lib/columns.ts). Each game is an li of the "g" class with two lines (away, then home) of the "ln"
-// class, laid out on the `cols` grid; the caller marks the column heads with lib/columns.ts heads().
-import { rowVars } from "../lib/columns.ts";
-
+// One day of games on the games page: a heading row with the day, then the games as tiles in a grid that
+// fills the width it has, in tip-off order along each row. Each game is an li of the "g" class that labels
+// its own figures, so no column heading is shared between games.
 interface Props {
   /** The day as shown: "Sun, Oct 25". */
   heading: string;
@@ -12,48 +9,23 @@ interface Props {
   meta?: string;
   /** The list's accessible name. */
   label: string;
-  /** How many games the day has. */
-  count: number;
-  /** The grid each line of a game sits on. */
-  cols: string;
-  /** Labels over the trailing columns, shown on a section's first day only. */
-  labels?: readonly string[];
+  /** The first day of the week ahead, set larger: the games a reader most likely came for. */
+  lead?: boolean;
 }
 
-const { heading, meta, label, count, cols, labels = [] } = Astro.props;
+const { heading, meta, label, lead = false } = Astro.props;
 ---
 
-<section class="gday" aria-label={label} style={`--cols: ${cols}; ${rowVars(count)}`}>
-  <div class="dh">
-    <div class="ln">
-      <h3 style={`grid-column: 1 / ${labels.length ? -1 - labels.length : -1}`}>{heading}{meta && <span class="meta"> · {meta}</span>}</h3>
-      {labels.map((l) => <span class="lab" aria-hidden="true">{l}</span>)}
-    </div>
-  </div>
+<section class:list={["gday", { lead }]} aria-label={label}>
+  <h3>{heading}{meta && <span class="meta"> · {meta}</span>}</h3>
   <ol class="gs"><slot /></ol>
 </section>
 
 <style>
-  .gday { --across: 1; --rows: var(--r1); }
-  .gday + :global(.gday) { margin-top: 14px; }
-  .dh, .gs { display: grid; grid-template-columns: repeat(var(--across), minmax(0, 1fr)); column-gap: var(--gap); }
-  .dh { border-bottom: 1px solid var(--border); }
-  .gs { grid-template-rows: repeat(var(--rows), auto); grid-auto-flow: column; }
-  .gday :global(.ln) { display: grid; grid-template-columns: var(--cols); column-gap: 10px; align-items: baseline; min-width: 0; }
-  .dh .ln { height: 28px; align-items: center; }
-  h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); font-weight: 600; }
-  .meta { color: var(--muted); font-weight: 400; }
-  .lab { font-size: var(--fs-small); color: var(--muted); text-align: right; white-space: nowrap; }
-  .gs :global(.g) { padding: 4px 0; border-top: 1px solid var(--rule); line-height: 17px; }
-  .gs :global(.g:first-child) { border-top-color: transparent; }
-
-  @container games (min-width: 680px) {
-    .gday { --across: 2; --rows: var(--r2); }
-    .gs :global(.g.h2) { border-top-color: transparent; }
-  }
-  @container games (min-width: 1040px) {
-    .gday { --across: 3; --rows: var(--r3); }
-    .gs :global(.g.h2) { border-top-color: var(--rule); }
-    .gs :global(.g.h3) { border-top-color: transparent; }
-  }
+  .gday + :global(.gday) { margin-top: 16px; }
+  h3 { padding: 4px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); line-height: 20px; font-weight: 600; }
+  .lead h3 { font-size: var(--fs-card); line-height: 24px; }
+  .meta { color: var(--muted); font-size: var(--fs-body); font-weight: 400; }
+  .gs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 272px), 1fr)); gap: 8px; }
+  .gs :global(.g) { min-width: 0; padding: 8px 12px 10px; background: var(--ground); border-radius: 4px; }
 </style>

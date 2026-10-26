@@ -56,7 +56,7 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
           </nav>
         )}
       </div>
-      {days.length === 0 ? <p class="empty">No games yet.</p> : days.map((d, i) => <GameList season={season} day={d} labels={i === 0} />)}
+      {days.length === 0 ? <p class="empty">No games yet.</p> : days.map((d) => <GameList season={season} day={d} />)}
     </section>
 
     {ahead && (
@@ -65,14 +65,13 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
           <h2 id="ahead">Next {WEEK} days</h2>
           <p class="meta">Tip-off times ET</p>
         </div>
-        {ahead.length === 0 ? <p class="empty">{noGamesAhead(season)}</p> : ahead.map((d, i) => <FixtureList season={season} day={d} labels={i === 0} />)}
+        {ahead.length === 0 ? <p class="empty">{noGamesAhead(season)}</p> : ahead.map((d) => <FixtureList season={season} day={d} />)}
       </section>
     )}
   </Panel>
 </Base>
 
 <style>
-  .part { container: games / inline-size; }
   .part + .part { margin-top: 28px; }
   .part-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 4px; }
   h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
