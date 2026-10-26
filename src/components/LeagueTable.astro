@@ -204,7 +204,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .history { left: var(--tl); width: calc(100% - var(--tl) - var(--cv)); }
   .lad path, .lad polyline { fill: none; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--grid); stroke-width: 1; }
-  .lead { stroke: var(--line-other); stroke-width: 1; stroke-dasharray: 1 3; stroke-linecap: round; }
+  .lead { stroke: var(--line-other); stroke-width: 1.5; stroke-dasharray: 1 3.5; stroke-linecap: round; }
   .grid { stroke: var(--grid); stroke-width: 1; }
   .marker { stroke: var(--muted); stroke-width: 1; }
   /* 1.5px, not 1: a 1px line on a stretched plot falls between pixels and shimmers on a standard-density screen. */
@@ -231,8 +231,8 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .xs .mark-label { transform: translateX(calc(-100% - 4px)); }
   .stacked { margin-bottom: 16px; }
 
+  /* With the chart stacked above, the scale keeps its own width and the team column takes the rest. */
   @media (max-width: 999px) {
-    .lad { width: 100%; }
     .rail { left: var(--tl); width: calc(100% - var(--tl) - 5px); }
   }
   @media (min-width: 641px) and (max-width: 999px) {
