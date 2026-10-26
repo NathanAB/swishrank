@@ -1,6 +1,6 @@
 ---
 // The shell every page shares: the head with its canonical link and link-preview tags, the top bar (mark,
-// wordmark, nav, and the link to how the ratings work) and the footer. A page with a season carries its h1
+// wordmark and nav) and the footer. A page with a season carries its h1
 // and the season menu in its first card's header (Panel.astro, level 1) and says so with `ownHeading`; a
 // page without one, such as the about page, gets its h1 and optional lede from the shell. Pages fill the
 // default slot.
@@ -33,6 +33,7 @@ const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
   { label: "Games", kinds: ["games"], to: (s) => ({ kind: "games", season: s }) },
+  { label: "How it works", kinds: ["about"], to: () => ({ kind: "about" }) },
 ];
 const home = href({ kind: "home", season: currentSeason() });
 
@@ -77,7 +78,6 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
           {NAV.map((item) => (
             <a href={href(item.to(season))} aria-current={route && item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
           ))}
-          <a class="elo" href={href({ kind: "about" })} aria-current={route?.kind === "about" ? "page" : undefined}>What's Elo?</a>
         </nav>
       </div>
     </header>
@@ -107,7 +107,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
 <style>
   .bar { border-bottom: 1px solid var(--border); background: var(--ground); }
   .bar-in {
-    max-width: calc(var(--col) + 2 * var(--pad)); height: var(--bar-height); margin: 0 auto; padding: 0 var(--pad);
+    height: var(--bar-height); padding: 0 var(--pad);
     display: flex; align-items: center; gap: 32px;
   }
   .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; }
@@ -117,11 +117,10 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
   .nav { flex: 1 1 auto; display: flex; gap: 24px; height: calc(100% + 1px); margin-bottom: -1px; min-width: 0; overflow: auto hidden; scrollbar-width: none; }
   .nav a { position: relative; flex: none; display: flex; align-items: center; color: var(--muted); transition: color 150ms ease; }
   .nav a:hover { color: var(--text); }
-  .nav .elo { margin-left: auto; }
   .nav a[aria-current="page"] { color: var(--text); }
   .nav a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--accent); }
 
-  .canvas { max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 10px var(--pad) 48px; }
+  .canvas { padding: 10px var(--pad) 48px; }
   .title { min-width: 0; margin: 12px 0 var(--gap); }
   h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
   .lede { margin-top: 6px; max-width: 72ch; font-size: 15px; line-height: 22px; color: var(--muted); }
@@ -130,7 +129,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
 
   .foot { border-top: 1px solid var(--border); color: var(--muted); }
   .foot-in {
-    max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 20px var(--pad) 32px;
+    padding: 20px var(--pad) 32px;
     display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px;
   }
   .foot a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
