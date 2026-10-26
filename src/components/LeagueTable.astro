@@ -190,8 +190,9 @@ const playoffs = playoffsMark(m);
   .history { left: var(--tl); width: calc(100% - var(--tl) - var(--cv)); }
   .lad path, .lad polyline { fill: none; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--grid); stroke-width: 1; }
-  .lead { stroke: var(--tint-rest); stroke-width: 1; }
-  .lead.hov { stroke: var(--tint); stroke-width: 1.5; }
+  /* Leaders only point a dot to its row, so they read as pointers, not data: grey and dotted until previewed. */
+  .lead { stroke: var(--line-other); stroke-width: 1; stroke-dasharray: 1 3; stroke-linecap: round; }
+  .lead.hov { stroke: var(--tint); stroke-width: 1.5; stroke-dasharray: none; }
   .grid { stroke: var(--grid); stroke-width: 1; }
   .marker { stroke: var(--muted); stroke-width: 1; }
   .line { stroke: var(--tint-rest); stroke-width: 1; stroke-linejoin: round; }
