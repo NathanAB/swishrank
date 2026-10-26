@@ -16,8 +16,11 @@ export const signed = (n: number) => (n > 0 ? `+${int(n)}` : n < 0 ? `${MINUS}${
 /** A rating as the reader sees it everywhere: rounded to the point. */
 export const rating = (v: number) => String(Math.round(v));
 
+/** A probability in whole percent, as the reader sees it: 0.638 is 64. */
+export const percent = (p: number) => Math.round(p * 100);
+
 /** A probability as a whole percentage: 64%. */
-export const pct = (p: number) => `${Math.round(p * 100)}%`;
+export const pct = (p: number) => `${percent(p)}%`;
 
 export const ordinal = (n: number) => {
   const tens = n % 100;

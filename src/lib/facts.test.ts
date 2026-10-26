@@ -1,17 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compute, type Result } from "./elo.ts";
-import { outcome, ratingRange } from "./facts.ts";
+import { outcome, ratingRange, upset } from "./facts.ts";
 
-const result = (pre: number, shift: number): Result => ({
+const result = (pre: number, shift: number, p = 0.6): Result => ({
   game: { id: "1", t: "2026-10-20T23:00Z", home: "DET", away: "BOS", hs: 121, as: 113, final: true, neutral: false, note: null },
-  day: "2026-10-20", p: 0.6,
+  day: "2026-10-20", p,
   pre: { h: pre, a: 1500 }, post: { h: pre + shift, a: 1500 - shift },
 });
 
 test("a game's change is the gap between the displayed ratings, not the rounded move", () => {
   // 1500.4 shows as 1500 and 1505.8 as 1506: the reader sees +6, though the move rounds to 5.
   assert.equal(outcome(result(1500.4, 5.4)).winner.change, 6);
+});
+
+test("an upset is a win by the side whose pre-game chance shows under 50%", () => {
+  // The home side wins each game; p is its chance. 49.6% shows as 50%, so that winner was no underdog on the page.
+  assert.deepEqual([0.3, 0.494, 0.496, 0.6].map((p) => upset(outcome(result(1500, 5, p)))), [true, true, false, false]);
 });
 
 test("the rating range reaches the highs and lows a team held before today, so every day's line fits on it", () => {

@@ -1,6 +1,7 @@
 // Facts the pages show, derived from compute()'s season model. Every per-game change here is the
 // displayed one (shownChange), so a list and a table that show the same game agree.
 import { shownChange, type Abbr, type Result, type Season } from "./elo.ts";
+import { percent } from "./format.ts";
 
 export type Side = "h" | "a";
 
@@ -40,6 +41,9 @@ export function outcome(result: Result): Outcome {
   const away = line("a");
   return { result, home, away, winner: homeWon ? home : away, loser: homeWon ? away : home };
 }
+
+/** Whether the winner was the underdog: its pre-game chance shows under 50%, so a 49.6% winner shown at 50% is not. */
+export const upset = (o: Outcome) => percent(o.winner.chance) < 50;
 
 /**
  * The lowest and highest displayed rating any team has held this season, today included, so a scale over it
