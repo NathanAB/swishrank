@@ -30,7 +30,7 @@ const near = nearDay(day.day, TODAY);
         <p class="top num">{tipTime(f.game.t)}</p>
         <div class="teams">
           <span class:list={{ fav: f.fav === "a" }}>{name(away.abbr)}</span>
-          <span class:list={["home", { fav: f.fav === "h" }]}>{f.game.neutral ? "vs " : "at "}{name(home.abbr)}</span>
+          <span class:list={{ fav: f.fav === "h" }}>{f.game.neutral ? "vs " : "at "}{name(home.abbr)}</span>
         </div>
         <div class="odds">
           <span class:list={["num", { fav: f.fav === "a" }]}>{pct(away.chance)}</span>
@@ -47,10 +47,8 @@ const near = nearDay(day.day, TODAY);
 
 <style>
   .top { min-height: 18px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
-  .teams, .odds { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); }
-  .teams { line-height: 22px; }
+  .teams, .odds { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
   .teams > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .odds { line-height: 22px; }
   .odds .num { flex: none; width: 3.5ch; }
   .r { text-align: right; }
   .fav { color: var(--text); font-weight: 500; }
