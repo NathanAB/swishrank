@@ -205,6 +205,8 @@ const playoffs = playoffsMark(m);
   .ring { stroke: var(--surface); stroke-width: 9; }
   .pin { stroke: var(--tint-rest); stroke-width: 6; }
   .dot.hov .pin { stroke: var(--tint); }
+  /* While one team is previewed, the rest step back so its line can be followed. */
+  .lt:has(.hov) :is(.line, .lead, .dot):not(.hov) { opacity: 0.25; }
   .mark-label {
     position: absolute; bottom: 2px; left: calc(var(--tl) + (100% - var(--tl) - var(--cv)) * var(--at));
     transform: translateX(calc(-100% - 4px)); font-size: 11px; line-height: 16px;
