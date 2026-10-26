@@ -15,6 +15,7 @@
     "backtest": "node scripts/backtest.ts"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
     "astro": "^7.4.2",
     "satori": "^0.63.2",
     "sharp": "^0.35.5"
