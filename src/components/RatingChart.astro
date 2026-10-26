@@ -3,14 +3,16 @@
 // begin. Pointing anywhere on the plot previews the nearest line (lib/pick.ts). The end of every line is
 // labelled with its abbreviation in two staggered columns with short leaders, so labels never collide. Given
 // a `team`, a team's own page, the same lines are drawn with only that team's in the accent and labelled, by
-// its name, and pointing at the plot does nothing. The plot stretches with the card; the tick lane and the label lane keep
-// a fixed size, and the height is fixed too, so the label layout worked out here holds at every width. Given a
-// narrowest width per day, a long season scrolls sideways inside the chart instead of squeezing its days
-// together.
+// its name, and pointing at the plot does nothing. Otherwise each line and leader carries a faint tint of its
+// team's colour (lib/tint.ts), full strength while the team is previewed. The plot stretches with the card;
+// the tick lane and the label lane keep a fixed size, and the height is fixed too, so the label layout worked
+// out here holds at every width. Given a narrowest width per day, a long season scrolls sideways inside the
+// chart instead of squeezing its days together.
 import { dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START, type Abbr } from "../lib/elo.ts";
 import { shortDay } from "../lib/format.ts";
 import type { SeasonView } from "../lib/season.ts";
+import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
   season: SeasonView;
@@ -51,6 +53,7 @@ const X = 1000; // the plot's viewBox width, stretched to the card
 const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
 const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
 const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
+const tint = tintStyles(m.data.teams);
 const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === team) - Number(q === team));
 
 const xLabels = dateTicks(ser.map((d) => d.day));
@@ -96,7 +99,7 @@ const scroll = minDayWidth > 0;
 ) : (
   <div class="chart">
     <div
-      class:list={["rc", { scroll }]}
+      class:list={["rc", { scroll, tinted: !team }]}
       role="img"
       aria-label={label}
       tabindex={scroll ? "0" : undefined}
@@ -112,7 +115,7 @@ const scroll = minDayWidth > 0;
         {marker && <path class="marker" d={`M${x(marker.i).toFixed(1)},0V${H}`} />}
         <g>
           {drawOrder.map((a) => (
-            <polyline class:list={["line", { own: a === team }]} data-team={a} data-raise points={points(a)} />
+            <polyline class:list={["line", { own: a === team }]} data-team={a} data-raise style={tint[a]} points={points(a)} />
           ))}
         </g>
       </svg>
@@ -121,7 +124,7 @@ const scroll = minDayWidth > 0;
           const lx = GAP + (k % 2) * COL;
           return (
             <g>
-              <path class:list={["leader", { own: l.a === team }]} data-team={l.a} d={`M2,${l.y.toFixed(1)}L6,${l.y.toFixed(1)}L${GAP - 5},${l.ly.toFixed(1)}L${lx - 3},${l.ly.toFixed(1)}`} />
+              <path class:list={["leader", { own: l.a === team }]} data-team={l.a} style={tint[l.a]} d={`M2,${l.y.toFixed(1)}L6,${l.y.toFixed(1)}L${GAP - 5},${l.ly.toFixed(1)}L${lx - 3},${l.ly.toFixed(1)}`} />
               <text class:list={["lab", { own: l.a === team }]} data-team={l.a} x={lx} y={(l.ly + 4).toFixed(1)}>
                 {text(l.a)}
               </text>
@@ -175,6 +178,10 @@ const scroll = minDayWidth > 0;
   .line.own { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
   .leader { fill: none; stroke: var(--line-other); stroke-opacity: 0.6; stroke-width: 1; }
   .leader.own { stroke: var(--accent); stroke-opacity: 1; }
+  .tinted :is(.line, .leader) { stroke: var(--tint); stroke-opacity: var(--tint-rest); }
+  .tinted:has(.hov) :is(.line, .leader):not(.hov) { stroke-opacity: var(--tint-dim); }
+  .tinted .line.hov { stroke: var(--tint); stroke-opacity: 1; stroke-width: 1.75; }
+  .tinted .leader.hov { stroke-opacity: 1; }
   .lab.hov { fill: var(--text); }
   .lab.own { fill: var(--text); font-weight: 600; }
   .end { display: none; fill: var(--accent); stroke: var(--surface); stroke-width: 2; }

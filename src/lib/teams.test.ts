@@ -12,7 +12,7 @@ test("a team's next games are the games page's week: today and the six days afte
   const game = (id: string, t: string): Game => ({ id, t, home: "A", away: "B", hs: null, as: null, final: false, neutral: false, note: null });
   const model = compute({
     season: "2026-27",
-    teams: { A: { name: "A A", short: "A" }, B: { name: "B B", short: "B" } },
+    teams: { A: { name: "A A", short: "A", color: "000000", alternateColor: "ffffff" }, B: { name: "B B", short: "B", color: "000000", alternateColor: "ffffff" } },
     // 11:30 PM Eastern on the 31st is already November 1 in UTC; the next evening is the eighth day.
     games: [game("yesterday", "2026-10-24T23:00Z"), game("last", "2026-11-01T03:30Z"), game("first", "2026-10-25T23:00Z"), game("eighth", "2026-11-01T23:00Z")],
   });

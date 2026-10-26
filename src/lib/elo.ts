@@ -7,7 +7,8 @@ export const START = 1500;
 export const TZ = "America/New_York";
 
 export type Abbr = string;
-export type Team = { name: string; short: string };
+/** `color` and `alternateColor` are ESPN's team colours, as six hex digits without the "#". */
+export type Team = { name: string; short: string; color: string; alternateColor: string };
 export type Game = {
   id: string;
   t: string;

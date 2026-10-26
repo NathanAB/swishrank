@@ -47,13 +47,6 @@ export function teamGames(model: Season, abbr: Abbr): TeamGame[] {
   });
 }
 
-export type WinLoss = { w: number; l: number };
-
-export const tally = (games: readonly TeamGame[]): WinLoss => {
-  const w = games.filter((g) => g.us.won).length;
-  return { w, l: games.length - w };
-};
-
 /** The team's games in the week ahead (the games page's WEEK from `today`), in tip-off order. */
 export const nextGames = (model: Season, abbr: Abbr, today: string): Game[] => {
   const end = addDays(today, WEEK);

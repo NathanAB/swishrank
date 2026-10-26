@@ -5,12 +5,11 @@ import Base from "../layouts/Base.astro";
 import FixtureList from "./FixtureList.astro";
 import GameList from "./GameList.astro";
 import Panel from "./Panel.astro";
-import { bySwing, outcome } from "../lib/facts.ts";
 import { nextDays, WEEK } from "../lib/fixtures.ts";
 import { longDay, monthName, monthShort, weekdayDay } from "../lib/format.ts";
-import { gamesIn, monthRoute, months, type Day } from "../lib/results.ts";
+import { monthRoute, months, type Day } from "../lib/results.ts";
 import { href } from "../lib/routes.ts";
-import { TODAY, noGamesAhead, openingDay, theTeam, winPhrase, type SeasonView } from "../lib/season.ts";
+import { TODAY, noGamesAhead, type SeasonView } from "../lib/season.ts";
 
 interface Props {
   season: SeasonView;
@@ -35,18 +34,6 @@ function dayMeta(d: Day) {
   return (notes.length === 1 ? notes[0].split(" - ") : [...new Set(notes.map((n) => n.split(" - ")[0]))]).join(" · ");
 }
 
-let lede: string;
-if (month === undefined && !season.current) {
-  lede = noGamesAhead(season);
-} else if (shown) {
-  const o = outcome(bySwing(gamesIn(shown))[0]);
-  const soFar = season.current && shown === all.at(-1) ? " so far" : "";
-  lede = `${monthName(shown.key)}'s biggest swing${soFar} went to ${theTeam(season, o.winner.abbr)}, for a ${winPhrase(season, o)}.`;
-} else {
-  const opens = openingDay(season);
-  lede = opens ? `The season opens ${weekdayDay(opens)}.` : "No games yet.";
-}
-
 const title = `${season.label} games`;
 const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.key)), active: x === shown }));
 ---
@@ -57,8 +44,6 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
   route={{ kind: "games", season, month }}
   description={`Scores and Elo changes for every ${season.label} NBA game${season.current ? ", and the week ahead with win chances" : ""}.`}
 >
-  <Fragment slot="lede">{lede}</Fragment>
-
   {ahead && (
     <Panel class="ahead" title={`Next ${WEEK} days`}>
       {ahead.length === 0 ? (

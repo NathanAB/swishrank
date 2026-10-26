@@ -1,14 +1,11 @@
 ---
-// A season's home: the league table with every team's season drawn into it, under who is best right now.
+// A season's home: the league table with every team's season drawn into it.
 // / is the current season and /<id>/ every other one.
 import LeagueTable from "../../components/LeagueTable.astro";
 import Panel from "../../components/Panel.astro";
 import Base from "../../layouts/Base.astro";
-import { START, type Abbr } from "../../lib/elo.ts";
-import { leaders } from "../../lib/facts.ts";
-import { int, weekdayDay } from "../../lib/format.ts";
 import { href } from "../../lib/routes.ts";
-import { openingDay, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
+import { seasonPaths, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
   return seasonPaths();
@@ -19,19 +16,10 @@ interface Props {
 }
 
 const { season } = Astro.props;
-const m = season.model;
-const short = (a: Abbr) => team(season, a).short;
-const opens = openingDay(season);
-
-const top = leaders(m);
-const verb = season.current ? (top.length > 1 ? "share the lead" : "lead") : top.length > 1 ? "finished level on top" : "finished top";
-const lede = m.results.length
-  ? `The ${top.map(short).join(" and ")} ${verb} after ${int(m.results.length)} games.`
-  : `Every team starts at ${START}${opens ? `, and the season opens ${weekdayDay(opens)}` : ""}.`;
 ---
 
 <Base title={`${season.label} ratings`} route={{ kind: "home", season }}>
-  <Fragment slot="lede">{lede}{" "}<a class="what" href={href({ kind: "about" })}>What's Elo?</a></Fragment>
+  <Fragment slot="lede"><a class="what" href={href({ kind: "about" })}>What's Elo?</a></Fragment>
 
   <Panel title="League table">
     <LeagueTable season={season} />

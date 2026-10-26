@@ -36,7 +36,7 @@ function parse(events, teams) {
     if (!comp.competitors.every((c) => isFranchise(c.team))) continue;
     const side = {};
     for (const c of comp.competitors) {
-      teams[c.team.abbreviation] = { name: c.team.displayName, short: c.team.shortDisplayName };
+      teams[c.team.abbreviation] = { name: c.team.displayName, short: c.team.shortDisplayName, color: c.team.color, alternateColor: c.team.alternateColor };
       side[c.homeAway] = c;
     }
     const final = Boolean(status.completed);

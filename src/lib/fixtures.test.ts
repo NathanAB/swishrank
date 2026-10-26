@@ -10,7 +10,7 @@ const game = (id: string, t: string, away: string, home: string, more: Partial<G
 test("the week ahead is seven US Eastern days from today, in tip-off order, empty days kept", () => {
   const model = compute({
     season: "2026-27",
-    teams: { A: { name: "A A", short: "A" }, B: { name: "B B", short: "B" } },
+    teams: { A: { name: "A A", short: "A", color: "000000", alternateColor: "ffffff" }, B: { name: "B B", short: "B", color: "000000", alternateColor: "ffffff" } },
     games: [
       game("played", "2026-10-24T23:00Z", "A", "B", { hs: 100, as: 90, final: true }),
       game("stale", "2026-10-24T23:30Z", "A", "B"),

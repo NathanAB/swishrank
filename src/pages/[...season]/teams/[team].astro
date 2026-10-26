@@ -6,11 +6,10 @@ import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
 import Base from "../../../layouts/Base.astro";
 import { dayKey, gap, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
-import { finals } from "../../../lib/facts.ts";
 import { ordinal, pct, rating, record, shortDay, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
 import { href } from "../../../lib/routes.ts";
-import { TODAY, noGamesAhead, team, teamPaths, theTeam, type SeasonView } from "../../../lib/season.ts";
-import { nextGames, stage, tally, teamGames, type Venue } from "../../../lib/teams.ts";
+import { TODAY, noGamesAhead, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
+import { nextGames, stage, teamGames, type Venue } from "../../../lib/teams.ts";
 
 export function getStaticPaths() {
   return teamPaths();
@@ -43,20 +42,6 @@ const fixtures = nextGames(m, abbr, TODAY).map((g: Game) => {
   return { g, day: dayKey(g.t), venue, opp: home ? g.away : g.home, chance: home ? p : 1 - p, tag: stage(g.note).label };
 });
 
-// The finding under the name: the current run while the season is on, how it ended once it is over.
-const latest = games.at(-1);
-const run = latest ? games.length - 1 - games.findLastIndex((g) => g.us.won !== latest.us.won) : 0;
-const f = finals(m);
-const playoffs = games.filter((g) => g.stage.phase === "playoffs");
-let lede: string;
-if (!latest) lede = `The ${me.short} have not played yet.`;
-else if (season.current) lede = run === 1 ? `The ${me.short} ${latest.us.won ? "won" : "lost"} their last game.` : `The ${me.short} have ${latest.us.won ? "won" : "lost"} ${run} straight.`;
-else if (f?.champion === abbr) lede = `The ${me.short} won the Finals ${record(f.wins, f.losses)} over ${theTeam(season, f.runnerUp)}.`;
-else if (f?.runnerUp === abbr) lede = `The ${me.short} lost the Finals ${record(f.wins, f.losses)} to ${theTeam(season, f.champion)}.`;
-else if (playoffs.length) lede = `The ${me.short} went ${record(tally(playoffs).w, tally(playoffs).l)} in the playoffs.`;
-else if (games.some((g) => g.stage.phase === "play-in")) lede = `The ${me.short} went out in the play-in.`;
-else lede = `The ${me.short} missed the playoffs.`;
-
 const log = [...games].reverse();
 const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
 // Early in a season the two columns come out within a row or two of each other, so they end level: the plot
@@ -74,8 +59,6 @@ const plotHeight = level ? Math.max(240, 68 + 36 * rows) : 300;
   description={`${season.label} Elo rating, game log${season.current ? " and next games" : ""} for the ${me.name}.`}
   route={{ kind: "team", season, abbr }}
 >
-  <Fragment slot="lede">{lede}</Fragment>
-
   <KpiStrip class="kpis" items={kpis} label={`The ${me.short} in numbers`} />
 
   <div class:list={["grid", { level }]}>

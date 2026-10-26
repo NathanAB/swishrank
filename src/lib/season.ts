@@ -2,7 +2,6 @@
 // "end" is current and lives at the site root. Each season's games come from src/data/games/<id>.json.
 import list from "../data/seasons.json" with { type: "json" };
 import { compute, dayKey, type Abbr, type Game, type Season, type SeasonData, type Team } from "./elo.ts";
-import type { Outcome } from "./facts.ts";
 import { seasonLabel } from "./format.ts";
 import { months } from "./results.ts";
 import { href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
@@ -28,10 +27,13 @@ const GAME_FILES = import.meta.glob<unknown>("../data/games/*.json", { eager: tr
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isNumOrNull = (v: unknown): v is number | null => v === null || typeof v === "number";
 const isTextOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
+const isHex = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{6}$/i.test(v);
 
 function parseTeam(v: unknown, where: string): Team {
-  if (isRecord(v) && typeof v.name === "string" && typeof v.short === "string") return { name: v.name, short: v.short };
-  throw new Error(`${where}: a team needs a name and a short name`);
+  if (isRecord(v) && typeof v.name === "string" && typeof v.short === "string" && isHex(v.color) && isHex(v.alternateColor)) {
+    return { name: v.name, short: v.short, color: v.color, alternateColor: v.alternateColor };
+  }
+  throw new Error(`${where}: a team needs a name, a short name and two hex colours`);
 }
 
 function parseGame(v: unknown, where: string): Game {
@@ -126,27 +128,6 @@ export const seasonSwitch = (route: Route) =>
 
 export const team = (season: SeasonView, abbr: Abbr): Team => season.model.data.teams[abbr];
 
-/** "the Oklahoma City Thunder": a full name as it reads in a sentence. */
-export const theTeam = (season: SeasonView, abbr: Abbr) => `the ${team(season, abbr).name}`;
-
-/** The city part of a team's name: "Oklahoma City" for the Thunder, "LA" for the Clippers. */
-const city = (season: SeasonView, abbr: Abbr) => {
-  const t = team(season, abbr);
-  return t.name.slice(0, t.name.length - t.short.length).trim() || t.name;
-};
-
-/** How a game was won, worded to end a sentence: "home win over the Boston Celtics", "win at Charlotte". */
-export const winPhrase = (season: SeasonView, { result, winner, loser }: Outcome) =>
-  result.game.neutral ? `win over ${theTeam(season, loser.abbr)}`
-  : winner.side === "h" ? `home win over ${theTeam(season, loser.abbr)}`
-  : `win at ${city(season, result.game.home)}`;
-
 /** What a list of games still to play says when it has none. */
 export const noGamesAhead = (season: SeasonView) =>
   season.current ? "No games in the next seven days." : `The ${season.label} season is over.`;
-
-/** The US Eastern day of a season's first game in the data, or null when it has none. */
-export const openingDay = (season: SeasonView) => {
-  const first = season.model.data.games[0];
-  return first ? dayKey(first.t) : null;
-};

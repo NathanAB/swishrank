@@ -1,6 +1,7 @@
 /* Tokens from the data-terminal prototype: a true neutral palette, Public Sans, and basketball-leather
    orange as the one accent. The accent marks a selection (a 1px line as wide as its label) and a team
-   page's own team in its chart; everything else is ink and greys. Light follows the system's light mode with
+   page's own team in its chart; everything else is ink and greys, but for the home chart's lines, which
+   carry a faint tint of each team's colour. Light follows the system's light mode with
    its own values, not an inversion of dark. Grid at 1440: a 1200 column, 744 + 24 + 432 = 1200. */
 :root {
   color-scheme: light dark;
@@ -15,6 +16,9 @@
   --grid: #e1e1e5;
   --line-other: #a9abb2;
   --bar: #85878e;
+  /* How strongly the home chart draws each team's tint: at rest, and for the others while one is previewed. */
+  --tint-rest: 0.5;
+  --tint-dim: 0.25;
   --panel-edge: 1px solid var(--border);
   --shadow: none;
 
@@ -33,6 +37,9 @@
   --bar-height: 48px;
 }
 
+/* A team's line colour for this theme (lib/tint.ts), on whatever draws that team. */
+[data-team] { --tint: var(--tint-light); }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --ground: #171719;
@@ -46,11 +53,15 @@
     --grid: #26252b;
     --line-other: #5b5c63;
     --bar: #727379;
+    /* The dark theme's team colours run brighter against its surface, so they rest a step fainter. */
+    --tint-rest: 0.45;
     /* Dark panels sit a step below the ground and lift on a soft shadow instead of a border. */
     --panel-edge: 0;
     --shadow: 0 12px 28px rgba(0, 0, 0, 0.2); /* taste-skill-ignore: the dealt data-terminal card shadow, dark only */
   }
+  [data-team] { --tint: var(--tint-dark); }
 }
+
 
 @media (max-width: 640px) {
   :root {

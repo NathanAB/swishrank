@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compute, ranksOf, type SeasonData } from "./elo.ts";
 
-const teams = { BOS: { name: "Boston Celtics", short: "Celtics" }, DET: { name: "Detroit Pistons", short: "Pistons" } };
+const teams = { BOS: { name: "Boston Celtics", short: "Celtics", color: "000000", alternateColor: "ffffff" }, DET: { name: "Detroit Pistons", short: "Pistons", color: "000000", alternateColor: "ffffff" } };
 const game = (over: Partial<SeasonData["games"][number]>) => ({
   id: "1", t: "2026-10-20T23:00Z", home: "DET", away: "BOS", hs: 121, as: 113, final: true, neutral: false, note: null, ...over,
 });
