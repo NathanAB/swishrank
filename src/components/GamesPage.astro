@@ -1,7 +1,8 @@
 ---
-// One page of a season's games, in one card whose header is the page's. Results come first, newest day first:
-// on the index the game days of the latest week, on a month's page that month's. Then, on the index of the
-// season in progress, the week ahead. The month switch beside the results leads to every month's page.
+// One page of a season's games, in one card whose header is the page's. On the index of the season in progress
+// the week ahead comes first, then the results, side by side where the card is wide enough. The results run
+// newest day first: on the index the game days of the latest week, on a month's page that month's. The month
+// switch beside the results leads to every month's page.
 import Base from "../layouts/Base.astro";
 import FixtureList from "./FixtureList.astro";
 import GameList from "./GameList.astro";
@@ -29,6 +30,8 @@ const days = shown ? shown.days : recentDays(m, WEEK);
 
 // The week ahead, on the index of the season in progress; days without games are left out.
 const ahead = month === undefined && season.current ? nextDays(m, TODAY, WEEK).filter((d) => d.fixtures.length) : null;
+// Side by side only when both have games, so a week ahead with none never stands as a column of its own.
+const split = Boolean(ahead?.length) && days.length > 0;
 
 const title = `${season.label} games`;
 const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.key)), active: x === shown }));
@@ -44,35 +47,40 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
   <Panel level={1} title={title}>
     <SeasonMenu slot="aside" route={route} />
 
-    <section class="part" aria-labelledby="results">
-      <div class="part-head">
-        <h2 id="results">Results</h2>
-        <p class="meta">{shown ? monthName(shown.key) : `Last ${WEEK} days`}</p>
-        {switcher.length > 1 && (
-          <nav class="months" aria-label="Results by month">
-            {switcher.map((x) => (
-              <a href={x.href} aria-current={x.active ? "page" : undefined} aria-label={monthName(x.key)}>{monthShort(x.key)}</a>
-            ))}
-          </nav>
-        )}
-      </div>
-      {days.length === 0 ? <p class="empty">No games yet.</p> : days.map((d) => <GameList season={season} day={d} />)}
-    </section>
+    <div class:list={["parts", { split }]}>
+      {ahead && (
+        <section class="part" aria-labelledby="ahead">
+          <div class="part-head">
+            <h2 id="ahead">Next {WEEK} days</h2>
+            <p class="meta">Tip-off times ET, chances on today's ratings</p>
+          </div>
+          {ahead.length === 0 ? <p class="empty">{noGamesAhead(season)}</p> : ahead.map((d, i) => <FixtureList season={season} day={d} lead={i === 0} />)}
+        </section>
+      )}
 
-    {ahead && (
-      <section class="part" aria-labelledby="ahead">
+      <section class="part" aria-labelledby="results">
         <div class="part-head">
-          <h2 id="ahead">Next {WEEK} days</h2>
-          <p class="meta">Tip-off times ET</p>
+          <h2 id="results">Results</h2>
+          <p class="meta">{shown ? monthName(shown.key) : `Last ${WEEK} days`}</p>
+          {switcher.length > 1 && (
+            <nav class="months" aria-label="Results by month">
+              {switcher.map((x) => (
+                <a href={x.href} aria-current={x.active ? "page" : undefined} aria-label={monthName(x.key)}>{monthShort(x.key)}</a>
+              ))}
+            </nav>
+          )}
         </div>
-        {ahead.length === 0 ? <p class="empty">{noGamesAhead(season)}</p> : ahead.map((d) => <FixtureList season={season} day={d} />)}
+        {days.length === 0 ? <p class="empty">No games yet.</p> : days.map((d) => <GameList season={season} day={d} />)}
       </section>
-    )}
+    </div>
   </Panel>
 </Base>
 
 <style>
-  .part + .part { margin-top: 28px; }
+  /* A game tile's narrowest width, which GameDay.astro's grid reads. The week ahead and the results sit side by
+     side only where each can hold two tiles across. */
+  .parts { --tile: 272px; display: grid; row-gap: 28px; }
+  .split { grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(2 * var(--tile) + 8px)), 1fr)); column-gap: calc(2 * var(--gap)); }
   .part-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 4px; }
   h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
   .meta { color: var(--muted); }

@@ -24,8 +24,8 @@ const { heading, meta, label, lead = false } = Astro.props;
 <style>
   .gday + :global(.gday) { margin-top: 16px; }
   h3 { padding: 4px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); line-height: 20px; font-weight: 600; }
-  .lead h3 { font-size: var(--fs-card); line-height: 24px; }
+  .lead h3 { font-size: var(--fs-card); }
   .meta { color: var(--muted); font-size: var(--fs-body); font-weight: 400; }
-  .gs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 272px), 1fr)); gap: 8px; }
+  .gs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); gap: 8px; }
   .gs :global(.g) { min-width: 0; padding: 8px 12px 10px; background: var(--ground); border-radius: 4px; }
 </style>

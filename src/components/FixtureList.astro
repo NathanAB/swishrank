@@ -4,21 +4,24 @@
 // colour. The favourite's name and chance are in ink, whether home or away.
 import GameDay from "./GameDay.astro";
 import type { FixtureDay } from "../lib/fixtures.ts";
-import { longDay, pct, tipTime, weekdayDay } from "../lib/format.ts";
+import { longDay, nearDay, pct, tipTime, weekdayDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
-import { team, type SeasonView } from "../lib/season.ts";
+import { TODAY, team, type SeasonView } from "../lib/season.ts";
 import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
   season: SeasonView;
   day: FixtureDay;
+  /** The week ahead's first day, which stands out. */
+  lead?: boolean;
 }
 
-const { season, day } = Astro.props;
+const { season, day, lead = false } = Astro.props;
 const tint = tintStyles(season.model.data.teams);
+const near = nearDay(day.day, TODAY);
 ---
 
-<GameDay heading={weekdayDay(day.day)} label={`Games on ${longDay(day.day)}`}>
+<GameDay heading={near ?? weekdayDay(day.day)} meta={near ? weekdayDay(day.day) : undefined} label={`Games on ${longDay(day.day)}`} lead={lead}>
   {day.fixtures.map((f) => {
     const [away, home] = f.lines;
     const name = (abbr: string) => <a class="nm" href={href({ kind: "team", season, abbr })}>{team(season, abbr).short}</a>;

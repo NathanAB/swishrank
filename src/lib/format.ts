@@ -1,6 +1,6 @@
 // Display formatting. Day keys are US Eastern calendar days as YYYY-MM-DD (elo.ts dayKey), so they are
 // formatted as plain dates in UTC to stop the viewer's or the build machine's zone from shifting them.
-import { TZ } from "./elo.ts";
+import { addDays, TZ } from "./elo.ts";
 
 export const MINUS = "−";
 export const DASH = "—";
@@ -47,6 +47,9 @@ export const longDay = (day: string) => dayPart(day, { weekday: "long", month: "
 export const monthName = (month: string) => dayPart(`${month}-01`, { month: "long" });
 /** Jun, from a YYYY-MM month key, for axis labels */
 export const monthShort = (month: string) => dayPart(`${month}-01`, { month: "short" });
+
+/** What the week ahead calls a day near `today`: "Tonight" for today, "Tomorrow" for the next, null for a later one. */
+export const nearDay = (day: string, today: string) => (day === today ? "Tonight" : day === addDays(today, 1) ? "Tomorrow" : null);
 
 /** Tip-off time in US Eastern: 7:30 PM. */
 export const tipTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
