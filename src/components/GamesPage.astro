@@ -40,9 +40,11 @@ const ahead = month === undefined && season.current ? nextDays(m, TODAY, WEEK).f
 const split = Boolean(ahead?.length) && days.length > 0;
 
 const title = `${season.label} games`;
+// A month that comes round twice in one season, as October did in 2019-20, shows its year in the switch.
+const label = (key: string) => (all.some((x) => x.key !== key && x.key.slice(5) === key.slice(5)) ? `${monthShort(key)} ${key.slice(0, 4)}` : monthShort(key));
 const switcher = [
   ...(season.current ? [{ label: `Last ${WEEK} days`, name: `Last ${WEEK} days`, href: href({ kind: "games", season }), active: shown === null }] : []),
-  ...all.map((x) => ({ label: monthShort(x.key), name: monthName(x.key), href: href(monthRoute(season, x.key)), active: x === shown })),
+  ...all.map((x) => ({ label: label(x.key), name: monthName(x.key), href: href(monthRoute(season, x.key)), active: x === shown })),
 ];
 ---
 
@@ -51,7 +53,9 @@ const switcher = [
   docTitle={month ? `${title}, ${monthName(month)}` : title}
   route={route}
   ownHeading
-  description={`Scores and Elo changes for every ${season.label} NBA game${season.current ? ", and the next few days' games with win chances" : ""}.`}
+  description={month
+    ? `Scores and Elo changes for every ${season.label} NBA game played in ${monthName(month)}.`
+    : `Scores and Elo changes for every ${season.label} NBA game${season.current ? ", and the next few days' games with win chances" : ""}.`}
 >
   <Panel level={1} title={title}>
     <SeasonMenu slot="aside" route={route} />
