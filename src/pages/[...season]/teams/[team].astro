@@ -14,7 +14,7 @@ import { pct, rating, record, signed, tipTime, weekdayDay } from "../../../lib/f
 import { teamDescription } from "../../../lib/meta.ts";
 import { href, type Route } from "../../../lib/routes.ts";
 import { TODAY, noGamesAhead, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
-import { highLow, includesPostseason, nextGames, place, stage, teamGames, type Venue } from "../../../lib/teams.ts";
+import { highLow, nextGames, place, stage, teamGames, type Venue } from "../../../lib/teams.ts";
 
 export function getStaticPaths() {
   return teamPaths();
@@ -35,7 +35,7 @@ const prep = (v: Venue) => (v === "away" ? "at" : "vs");
 
 const kpis: Kpi[] = [
   { label: "Rating", value: rating(m.r[abbr]), unit: place(m, abbr) },
-  { label: includesPostseason(games.map((g) => g.result)) ? "Record incl. playoffs" : "Record", value: record(s.W, s.L) },
+  { label: "Record", value: record(s.W, s.L) },
   { label: "High / low", ...highLow(s) },
 ];
 

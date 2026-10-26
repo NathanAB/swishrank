@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { compute, type Game, type SeasonData } from "./elo.ts";
-import { conferenceOf, highLow, includesPostseason, nextGames, regularSeasonEnd, runEnds, stage, standings } from "./teams.ts";
+import { conferenceOf, highLow, nextGames, regularSeasonEnd, runEnds, stage, standings } from "./teams.ts";
 
 const dir = new URL("../data/games/", import.meta.url);
 const seasons: SeasonData[] = readdirSync(dir).map((f) => JSON.parse(readFileSync(new URL(f, dir), "utf8")));
@@ -55,12 +55,6 @@ test("a team's next games are the games page's week: today and the six days afte
   assert.deepEqual(nextGames(model, "A", "2026-10-25").map((g) => g.id), ["first", "last"]);
 });
 
-test("a record says it includes the postseason once a play-in or playoff game is among its games", () => {
-  const results = compute(seasons.find((s) => s.season === "2025-26")!).results;
-  assert.equal(includesPostseason(results), true);
-  assert.equal(includesPostseason(results.filter((r) => r.game.note === null)), false);
-  assert.equal(includesPostseason(results.filter((r) => /Play-In/.test(r.game.note ?? ""))), true);
-});
 
 test("the high and low say when one of them is just the 1500 every team starts at", () => {
   assert.deepEqual(highLow({ W: 70, L: 32, hi: 1807.2, lo: 1494.4 }), { value: "1807 / 1494" });

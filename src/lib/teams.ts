@@ -94,9 +94,6 @@ export function runEnds(model: Season): Record<Abbr, string | null> {
   return Object.fromEntries(model.abbrs.map((a) => [a, out.has(a) ? (last[a] ?? null) : null]));
 }
 
-/** Whether any of these games was a play-in or playoff game, so a won-lost record over them says so. */
-export const includesPostseason = (results: readonly Result[]) => results.some((r) => stage(r.game.note).phase !== "regular");
-
 /**
  * The high and low a team page shows. Every team starts at 1500, so a team that never fell below it has the
  * start for its low, and one that never rose above it the start for its high; the unit says so.
