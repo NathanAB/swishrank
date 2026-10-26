@@ -6,8 +6,11 @@ on:
   push:
     branches: [main]
   schedule:
-    # 10:00 UTC is 6 AM Eastern in summer time and 5 AM in winter, after the last West Coast game ends.
-    - cron: "0 10 * * *"
+    # After the last West Coast game ends (about 6 AM Eastern), with an afternoon retry because GitHub can
+    # delay or drop scheduled runs; minutes off the hour avoid its busiest time. A run with no new scores
+    # commits nothing.
+    - cron: "17 10 * * *"
+    - cron: "17 15 * * *"
   workflow_dispatch:
 
 permissions:
