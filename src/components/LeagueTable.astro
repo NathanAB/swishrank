@@ -35,6 +35,8 @@ const { order, rank } = standings(m, conference);
 const shown = Object.fromEntries(order.map((a) => [a, Math.round(m.r[a])]));
 const { lo, hi } = ratingRange(m);
 const n = order.length;
+// The longest nickname in the league, so the team column, and with it the chart, keeps one width in every view.
+const longest = Math.max(...m.abbrs.map((a) => m.data.teams[a].short.length));
 const tint = tintStyles(m.data.teams);
 // Px down the body on a wide screen: row i's centre, and a rating's place on a scale from the first row's
 // centre (the season's top rating) to the last row's (its bottom one).
@@ -67,7 +69,7 @@ const PLOT_MIN = 530, PLAYOFFS_LABEL = 112, MONTH_LABEL = 30, DAY_LABEL = 40;
 const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN), ser.length, playoffs, { mark: PLAYOFFS_LABEL / PLOT_MIN, tick: MONTH_LABEL / PLOT_MIN });
 ---
 
-<div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-wide: ${ROW_WIDE}px`}>
+<div class:list={["lt", { charted }]} style={`--rows: ${n}; --league: ${m.abbrs.length}; --row-wide: ${ROW_WIDE}px; --name: ${longest}ch`}>
   <div class="stacked"><RatingChart season={season} teams={order} height={400} /></div>
   <table>
     <thead>
@@ -162,7 +164,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
 <style>
   /* --tl is the tick lane on the scale's left and --cv the curves' lane on its right; the axis runs between
      them, and on a wide screen the chart's plot fills the space between the two. */
-  .lt { --row: var(--row-wide); --tl: 38px; --cv: 86px; }
+  /* A conference's rows are as much taller as it has fewer teams, so every view is the league's height and a
+     rating sits at the same place in each; switching All, East and West moves nothing. */
+  .lt { --row: calc(var(--row-wide) * var(--league) / var(--rows)); --tl: 38px; --cv: 86px; }
   table { width: 100%; border-collapse: collapse; }
   th {
     height: 18px; padding: 0 8px 2px; vertical-align: bottom; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted);
@@ -181,7 +185,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   tr:has(.go:focus-visible) > td:not(.lad) { --ring-l: 0 0; --ring-r: 0 0; box-shadow: inset var(--ring-l) var(--accent), inset var(--ring-r) var(--accent), inset 0 2px var(--accent), inset 0 -2px var(--accent); }
   tr:has(.go:focus-visible) > td.rank { --ring-l: 2px 0; }
   tr:has(.go:focus-visible) > td:last-child { --ring-r: -2px 0; }
-  .name { position: relative; display: inline-block; font-weight: 500; line-height: calc(var(--row) - 1px); }
+  .name { position: relative; display: inline-block; min-width: var(--name); font-weight: 500; line-height: calc(var(--row) - 1px); }
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
   .go:hover .name { text-decoration: underline; text-underline-offset: 3px; }
   .go:hover .name::after, tr.hov .name::after { background: var(--control); }
