@@ -9,6 +9,9 @@ import { place, standings, type Conference } from "./teams.ts";
 /** The site's name: the wordmark, every document title and every share image. */
 export const SITE_NAME = "SwishRank";
 
+/** A share image's size in px: the 1.91:1 that link previews show. */
+export const SHARE_SIZE = { width: 1200, height: 630 } as const;
+
 type Shown = Pick<SeasonView, "model" | "current" | "label">;
 
 /** "a", "a and b", "a, b and c" */

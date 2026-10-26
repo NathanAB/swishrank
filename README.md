@@ -27,6 +27,7 @@ npm run dev     # http://localhost:4321/nba-elo/
 - `src/data/seasons.json` lists the seasons. The one without an `end` date is the current season and lives at the site root; older seasons live under their id, such as `/2025-26/`.
 - `scripts/fetch-season.mjs` turns ESPN's scoreboard into `src/data/games/<season>.json`.
 - `src/pages/` holds the routes, and `src/components/` the table, chart and game lists they share.
+- `src/pages/share/` draws each season's and each team's link-preview picture at build time; `src/lib/meta.ts` holds the site's name and each page's title and description.
 
 ## Each new season
 

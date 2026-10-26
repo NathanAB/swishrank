@@ -15,6 +15,8 @@
     "backtest": "node scripts/backtest.ts"
   },
   "dependencies": {
-    "astro": "^7.4.2"
+    "astro": "^7.4.2",
+    "satori": "^0.63.2",
+    "sharp": "^0.35.5"
   }
 }

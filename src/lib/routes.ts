@@ -44,6 +44,48 @@ export function routePath(route: Route): string {
   }
 }
 
+/** A link preview's picture: a season's whole-league rating chart, or one team's line on it. */
+export type ShareImage = { kind: "season"; season: SeasonRef } | { kind: "team"; season: SeasonRef; abbr: string };
+
+/**
+ * The picture a page shares. A page without a season of its own, or with no route at all such as the
+ * not-found page, shares `current`'s, the season in progress.
+ */
+export function shareImage(route: Route | undefined, current: SeasonRef): ShareImage {
+  if (!route) return { kind: "season", season: current };
+  switch (route.kind) {
+    case "team":
+      return { kind: "team", season: route.season, abbr: route.abbr };
+    case "home":
+    case "games":
+      return { kind: "season", season: route.season };
+    case "seasons":
+    case "about":
+      return { kind: "season", season: current };
+    default: {
+      const _exhaustive: never = route;
+      return _exhaustive;
+    }
+  }
+}
+
+/** A share image's file name without .png, the param of src/pages/share/[image].png.ts: 2025-26 or 2025-26-okc. */
+export function shareName(image: ShareImage): string {
+  switch (image.kind) {
+    case "season":
+      return image.season.id;
+    case "team":
+      return `${image.season.id}-${teamSlug(image.abbr)}`;
+    default: {
+      const _exhaustive: never = image;
+      return _exhaustive;
+    }
+  }
+}
+
+/** A share image's path below the site base. */
+export const sharePath = (image: ShareImage) => `/share/${shareName(image)}.png`;
+
 /** A path under the site base, for files in public/ and for routePath(). */
 export const withBase = (path: string) => `${import.meta.env.BASE_URL.replace(/\/$/, "")}${path}`;
 
