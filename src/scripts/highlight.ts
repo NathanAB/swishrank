@@ -2,8 +2,8 @@
 // reader points at or focuses one. Every element that shows a team carries data-team. Two kinds of element
 // preview a team: a rating chart's plot (data-plot) previews the team whose line is nearest the pointer, and
 // an element that names a team (data-preview: a league table row's link, a dot on its scale) previews it
-// while pointed at or focused. A click on a link just follows it; a click on a plot opens the previewed
-// team's page. Every rating chart (data-chart) also reads out the day under the pointer: a thin line at that
+// while pointed at or focused. A click on a link just follows it; a click on a plot or a dot opens the
+// previewed team's page. Every rating chart (data-chart) also reads out the day under the pointer: a thin line at that
 // day and a box with the team's rating and rank, the nearest team's or, on a team's page, that team's
 // (data-own). On a touch screen a tap shows the readout and a second tap on the same team opens its page.
 import { ordinal } from "../lib/format.ts";
@@ -154,6 +154,12 @@ for (const [svg, c] of charts) {
     location.assign(to);
   });
 }
+
+// A dot on the league table's scale is no link, but a click opens its team's page, as its row does.
+document.addEventListener("click", (e) => {
+  const to = closestOf(e.target, "[data-preview][data-href]")?.dataset.href;
+  if (to) location.assign(to);
+});
 
 document.addEventListener("focusin", (e) => preview(closestOf(e.target, "[data-preview]")?.dataset.team ?? null));
 document.addEventListener("focusout", (e) => preview(closestOf(e.relatedTarget, "[data-preview]")?.dataset.team ?? null));

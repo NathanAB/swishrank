@@ -141,7 +141,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
                     ))}
                     <g>
                       {curves.map((c) => (
-                        <g class="dot" data-team={c.a} data-preview data-raise style={tint[c.a]}>
+                        <g class="dot" data-team={c.a} data-preview data-href={href({ kind: "team", season, abbr: c.a })} data-raise style={tint[c.a]}>
                           <path class="ring" d={`M0,${f(c.from)}h0`} />
                           <path class="pin" d={`M0,${f(c.from)}h0`} />
                         </g>
@@ -183,11 +183,14 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   .rank { width: 32px; }
   td.team { color: var(--text); }
   /* Each row is one link to the team's page: the name's link stretches over the row, under the scale's cell.
-     Pointing at a row or focusing it previews the team on the scale and the chart. */
+     Pointing at a row or focusing it previews the team on the scale and the chart. The focus ring goes round
+     the row's own cells, not through the scale and the chart. */
   tbody tr { position: relative; }
   .go::before { content: ""; position: absolute; inset: 0; z-index: 1; }
   .go:focus-visible { outline: none; }
-  tr:has(.go:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+  tr:has(.go:focus-visible) > td:not(.lad) { --ring-l: 0 0; --ring-r: 0 0; box-shadow: inset var(--ring-l) var(--accent), inset var(--ring-r) var(--accent), inset 0 2px var(--accent), inset 0 -2px var(--accent); }
+  tr:has(.go:focus-visible) > td.rank { --ring-l: 2px 0; }
+  tr:has(.go:focus-visible) > td:last-child { --ring-r: -2px 0; }
   .name { position: relative; display: inline-block; font-weight: 500; line-height: calc(var(--row) - 1px); }
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
   .go:hover .name { text-decoration: underline; text-underline-offset: 3px; }
@@ -227,6 +230,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
     font-size: 11px; line-height: 12px; color: var(--muted);
   }
   /* A dot is a round cap on a zero-length stroke, 6px across with a 1.5px ring of the surface, at any stretch. */
+  .dot { cursor: pointer; }
   .dot path { stroke-linecap: round; }
   .ring { stroke: var(--surface); stroke-width: 9; }
   .pin { stroke: var(--tint-rest); stroke-width: 6; }
@@ -269,6 +273,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
     td.rank { padding: 0 2px; }
     th.num:not(.opt):not(.rank), td.rating { padding-right: 0; }
     .opt { display: none; }
+    tr:has(.go:focus-visible) > td.rating { --ring-r: -2px 0; }
     td.team, td.rating { line-height: 18px; }
     .go, .name { display: block; }
     .name { line-height: 18px; }
