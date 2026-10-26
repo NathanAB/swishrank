@@ -24,8 +24,12 @@ const { season, month } = Astro.props;
 const m = season.model;
 const route: Route = { kind: "games", season, month };
 const all = months(m);
-const shown = month === undefined ? null : all.find((x) => x.key === month);
-if (month !== undefined && !shown) throw new Error(`${season.id} has no games in ${month}`);
+const picked = month === undefined ? undefined : all.find((x) => x.key === month);
+if (month !== undefined && !picked) throw new Error(`${season.id} has no games in ${month}`);
+// The index of the season in progress shows its last week; a finished season's index shows its last month.
+// Either way one item in the switch below is marked as the one shown.
+const latest = all.length ? all.reduce((a, b) => (b.key > a.key ? b : a)) : null;
+const shown = picked ?? (season.current ? null : latest);
 const days = shown ? shown.days : recentDays(m, WEEK);
 
 // The next few game days, on the index of the season in progress. A full week runs to about 50 games, which
@@ -36,7 +40,10 @@ const ahead = month === undefined && season.current ? nextDays(m, TODAY, WEEK).f
 const split = Boolean(ahead?.length) && days.length > 0;
 
 const title = `${season.label} games`;
-const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.key)), active: x === shown }));
+const switcher = [
+  ...(season.current ? [{ label: `Last ${WEEK} days`, name: `Last ${WEEK} days`, href: href({ kind: "games", season }), active: shown === null }] : []),
+  ...all.map((x) => ({ label: monthShort(x.key), name: monthName(x.key), href: href(monthRoute(season, x.key)), active: x === shown })),
+];
 ---
 
 <Base
@@ -63,11 +70,11 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
       <section class="part" aria-labelledby="results">
         <div class="part-head">
           <h2 id="results">Results</h2>
-          <p class="meta">{shown ? monthName(shown.key) : `Last ${WEEK} days`} · each team's rating change beside its score</p>
+          <p class="meta">Each team's rating change beside its score</p>
           {switcher.length > 1 && (
             <nav class="months" aria-label="Results by month">
               {switcher.map((x) => (
-                <a href={x.href} aria-current={x.active ? "page" : undefined} aria-label={monthName(x.key)}>{monthShort(x.key)}</a>
+                <a href={x.href} aria-current={x.active ? "page" : undefined} aria-label={x.name}>{x.label}</a>
               ))}
             </nav>
           )}
