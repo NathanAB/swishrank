@@ -5,7 +5,7 @@
 import type { Abbr, Team } from "./elo.ts";
 
 /** The chart's surface in each theme: --surface in styles/global.css. */
-export const SURFACE = { light: "f6f6f6", dark: "131313" } as const;
+export const SURFACE = { light: "ffffff", dark: "191919" } as const;
 export type Theme = keyof typeof SURFACE;
 /** Below this contrast against the surface a line can hardly be seen. */
 const MIN_CONTRAST = 1.5;

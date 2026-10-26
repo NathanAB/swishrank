@@ -2,29 +2,31 @@
    orange as the one accent. The accent marks the mark, a selection (a 1px line as wide as its label), focus
    and the about page's worked examples; everything else is ink and greys, but for the charts' lines, which
    carry each team's colour. Light follows the system's light mode with its own values, not an inversion of
-   dark. At 1440 the page is a 1200px column. */
+   dark. Every page but the ratings chart keeps to a 1200px column. */
 :root {
   color-scheme: light dark;
-  --ground: #ffffff;
-  --surface: #f6f6f6;
-  --border: #e5e5e5;
-  --rule: #e7e7e7;
-  --control: #cbcbcb;
+  /* Cards sit lighter than the page in both themes, edged by a border a step darker than either, so every
+     card reads as a raised surface. */
+  --ground: #f0f0f0;
+  --surface: #ffffff;
+  --border: #dcdcdc;
+  --rule: #ececec;
+  --control: #c4c4c4;
   --text: #111111;
-  --muted: #5d5d5d;
-  --accent: #e06c1b;
-  --grid: #e2e2e2;
-  --line-other: #ababab;
+  --muted: #5a5a5a;
+  --accent: #c2560c;
+  --grid: #e8e8e8;
+  --line-other: #a6a6a6;
   --bar: #888888;
   /* How much of a team's colour its line carries at rest, mixed into the grey of an ordinary line; a
      previewed team draws in its full colour. */
   --tint-mix: 45%;
   /* A switch's track, and the pill that raises its current option (components/Segmented.astro); the
-     season menu sits on the same track. */
-  --seg-track: #eaeaea;
+     season menu sits on the same track. The light pill is the card's white, so a shadow lifts it. */
+  --seg-track: #e4e4e4;
   --seg-pill: #ffffff;
+  --seg-lift: 0 1px 2px rgba(0, 0, 0, 0.14);
   --panel-edge: 1px solid var(--border);
-  --shadow: none;
 
   --font: var(--font-public-sans), system-ui, sans-serif;
   --fs-title: 22px;
@@ -34,9 +36,10 @@
   --fs-small: 12px;
 
   --col: 1200px;
-  --pad: 24px;
+  /* Gutters grow with the screen, so a wide page does not crowd its edges. */
+  --pad: clamp(24px, 1.5vw + 8px, 48px);
   --gap: 24px;
-  --card-pad: 20px;
+  --card-pad: clamp(20px, 1vw + 6px, 32px);
   --radius-card: 6px;
   --bar-height: 44px;
   /* A switch's or the season menu's height in a card's header; 44px touch targets on a phone. */
@@ -48,24 +51,22 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: #171717;
-    --surface: #131313;
-    --border: #222222;
-    --rule: #1c1c1c;
-    --control: #3b3b3b;
-    --text: #ffffff;
-    --muted: #8c8c8c;
+    --ground: #0c0c0c;
+    --surface: #191919;
+    --border: #2e2e2e;
+    --rule: #242424;
+    --control: #444444;
+    --text: #f5f5f5;
+    --muted: #999999;
     --accent: #f08c3a;
-    --grid: #272727;
-    --line-other: #5d5d5d;
+    --grid: #2a2a2a;
+    --line-other: #646464;
     --bar: #737373;
     /* The dark theme's grey line sits low against its surface, so it takes a little more of the team colour. */
     --tint-mix: 50%;
-    --seg-track: #232323;
-    --seg-pill: #3a3a3a;
-    /* Dark panels sit a step below the ground and lift on a soft shadow instead of a border. */
-    --panel-edge: 0;
-    --shadow: 0 12px 28px rgba(0, 0, 0, 0.2); /* taste-skill-ignore: the dealt data-terminal card shadow, dark only */
+    --seg-track: #262626;
+    --seg-pill: #454545;
+    --seg-lift: none;
   }
   [data-team] { --tint: var(--tint-dark); }
 }

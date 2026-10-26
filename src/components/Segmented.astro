@@ -27,7 +27,7 @@ const { label, options } = Astro.props;
     transition: color 150ms ease, background-color 150ms ease;
   }
   a:hover { color: var(--text); }
-  a[aria-current="page"] { background-color: var(--seg-pill); color: var(--text); }
+  a[aria-current="page"] { background-color: var(--seg-pill); box-shadow: var(--seg-lift); color: var(--text); }
   a:focus-visible { outline-offset: -1px; border-radius: 8px; }
 
   @media (max-width: 640px) {
