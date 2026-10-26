@@ -1,5 +1,5 @@
 // The real games the about page draws to explain the model, picked from a season's results.
-import type { Result } from "./elo.ts";
+import { shownChange, type Abbr, type Result, type Snapshot } from "./elo.ts";
 import { outcome, type Outcome } from "./facts.ts";
 
 export type ContrastKind = "close" | "blowout" | "upset";
@@ -35,4 +35,34 @@ export function examples(results: readonly Result[]) {
     opener: games[0] ?? null,
     contrasts: picks.flatMap(([kind, game]): Contrast[] => (game ? [{ kind, game, margin: margin(game) }] : [])),
   };
+}
+
+export type OffDay = { abbr: Abbr; day: string; change: number; beaten: Outcome; win: Outcome };
+
+/**
+ * A team that rose on a day it did not play because a team it had beaten won that day, which shows each
+ * morning's fit re-reading every past game: the biggest such rise, earliest first on a tie. `beaten` is the
+ * team's earlier win and `win` the beaten team's win that day; of several, the one that lifted the beaten
+ * team most. Null until a season has such a day.
+ */
+export function offDay(results: readonly Result[], series: readonly Snapshot[]): OffDay | null {
+  const games = results.map(outcome);
+  let best: OffDay | null = null;
+  for (let i = 1; i < series.length; i++) {
+    const { day, r } = series[i];
+    const before = series[i - 1].r;
+    const today = games.filter((o) => o.result.day === day);
+    const wins = new Map(today.map((o) => [o.winner.abbr, o]));
+    const played = new Set(today.flatMap((o) => [o.winner.abbr, o.loser.abbr]));
+    for (const abbr of Object.keys(r)) {
+      const change = shownChange(before[abbr], r[abbr]);
+      if (played.has(abbr) || change <= (best?.change ?? 0)) continue;
+      const beaten = lowest(
+        games.filter((o) => o.result.day < day && o.winner.abbr === abbr && wins.has(o.loser.abbr)),
+        (o) => -wins.get(o.loser.abbr)!.winner.change,
+      );
+      if (beaten) best = { abbr, day, change, beaten, win: wins.get(beaten.loser.abbr)! };
+    }
+  }
+  return best;
 }

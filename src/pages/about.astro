@@ -6,10 +6,11 @@ import Panel from "../components/Panel.astro";
 import Base from "../layouts/Base.astro";
 import { counted, PARAMS, START, winProb } from "../lib/elo.ts";
 import { int, pct, signed, weekdayDay } from "../lib/format.ts";
-import { examples, type ContrastKind } from "../lib/method.ts";
+import { examples, offDay, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
 
-// The newest season with a game: its ratings for step 1, its opener for step 2, its results for step 3.
+// The newest season with a game: its ratings for step 1, its opener and a team's day off for step 2, its results
+// for step 3.
 const season = allSeasons().find((s) => s.model.results.length > 0) ?? null;
 const model = season?.model ?? null;
 const { opener, contrasts } = examples(model?.results ?? []);
@@ -46,7 +47,12 @@ const lines = model && model.series.length > 1 && (() => {
   };
 })();
 
-// Step 2: the opener's two teams, before and after.
+// Step 2: a team that rose on a day it did not play, through a team it had beaten, and the opener's two teams,
+// before and after.
+const rest = model && offDay(model.results, model.series);
+const restSay = rest
+  ? `The ${name(rest.abbr)} rose ${int(rest.change)} point${rest.change === 1 ? "" : "s"} on ${weekdayDay(rest.day)} without playing, as the ${name(rest.win.winner.abbr)}, whom they beat on ${weekdayDay(rest.beaten.result.day)}, won by ${int(rest.win.winner.score - rest.win.loser.score)}.`
+  : "";
 const game = opener && {
   day: weekdayDay(opener.result.day),
   score: [opener.winner, opener.loser].map((s) => `${name(s.abbr)} ${s.score}`).join(", "),
@@ -135,7 +141,7 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
 
     <li><Panel title="Every morning, every game again">
       <div class="step">
-        <p class="say">Each morning the ratings are worked out again to best explain every margin so far, like SRS or Massey ratings.</p>
+        <p class="say">Each morning the ratings are worked out again to best explain every margin so far, like SRS or Massey ratings, so a win counts for more once the team you beat proves strong. {restSay}</p>
         {game && (
           <div class="game">
             <p class="day">Opening night, {game.day}</p>
