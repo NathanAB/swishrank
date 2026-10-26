@@ -66,74 +66,80 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
     <RatingChart season={season} team={abbr} height={260} />
   </Panel>
 
-  {season.current && (
-    <Panel class="card" title="Next games">
-      {fixtures.length === 0 ? (
-        <p class="empty">{noGamesAhead(season)}</p>
+  <div class="pair">
+    {season.current && (
+      <Panel class="card" title="Next games">
+        {fixtures.length === 0 ? (
+          <p class="empty">{noGamesAhead(season)}</p>
+        ) : (
+          <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
+            <div class="hd" role="row">
+              <span role="columnheader">Date</span>
+              <span role="columnheader">Opponent</span>
+              <span role="columnheader" class="r opt">Tip-off, ET</span>
+              <span role="columnheader" class="r">Win chance</span>
+            </div>
+            {fixtures.map((x) => (
+              <div class="row" role="row">
+                <span role="cell" class="when">{weekdayDay(x.day)}</span>
+                <span role="cell" class="who" data-team={x.opp}>
+                  {prep(x.venue)} <a class:list={["nm", { ink: x.chance < 0.5 }]} data-team={x.opp} data-preview href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
+                  {x.tag && <span class="tag">{x.tag}</span>}
+                  <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)}{x.tag ? ` · ${x.tag}` : ""}</span>
+                </span>
+                <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
+                <span role="cell" class:list={["r num", { ink: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+    )}
+
+    <Panel class="card" title="Game log">
+      {games.length === 0 ? (
+        <p class="empty">No games yet.</p>
       ) : (
-        <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
+        <div class="sheet gl" role="table" aria-label={`Games played by the ${me.short}, newest first`}>
           <div class="hd" role="row">
             <span role="columnheader">Date</span>
             <span role="columnheader">Opponent</span>
-            <span role="columnheader" class="r opt">Tip-off, ET</span>
-            <span role="columnheader" class="r">Win chance</span>
+            <span role="columnheader" class="wl"><abbr title="Result">W/L</abbr></span>
+            <span role="columnheader" class="r">Score</span>
+            <span role="columnheader" class="r opt">Win chance</span>
+            <span role="columnheader" class="r opt">Change</span>
+            <span role="columnheader" class="r">Rating</span>
           </div>
-          {fixtures.map((x) => (
+          {log.map((g) => (
             <div class="row" role="row">
-              <span role="cell" class="when">{weekdayDay(x.day)}</span>
-              <span role="cell" class="who" data-team={x.opp}>
-                {prep(x.venue)} <a class:list={["nm", { ink: x.chance < 0.5 }]} data-team={x.opp} data-preview href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
-                {x.tag && <span class="tag">{x.tag}</span>}
-                <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)}{x.tag ? ` · ${x.tag}` : ""}</span>
+              <span role="cell" class="when">{weekdayDay(g.result.day)}</span>
+              <span role="cell" class="who" data-team={g.them.abbr}>
+                {prep(g.venue)} <a class:list={["nm", { ink: g.them.won }]} data-team={g.them.abbr} data-preview href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
+                {g.stage.label && <span class="tag">{g.stage.label}</span>}
+                <span class="sub">{weekdayDay(g.result.day)}{g.stage.label ? ` · ${g.stage.label}` : ""}</span>
               </span>
-              <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
-              <span role="cell" class:list={["r num", { ink: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
+              <span role="cell" class:list={["wl", { ink: g.us.won }]}>{g.us.won ? "W" : "L"}</span>
+              <span role="cell" class:list={["r num", { ink: g.us.won }]}>{record(g.us.score, g.them.score)}</span>
+              <span role="cell" class:list={["r num opt", { ink: g.us.chance >= 0.5 }]}>{pct(g.us.chance)}</span>
+              <span role="cell" class="r num opt chg">{signed(g.us.change)}</span>
+              <span role="cell" class="r num rt">
+                {rating(g.us.rating)}
+                <span class="sub">{signed(g.us.change)}</span>
+              </span>
             </div>
           ))}
         </div>
       )}
     </Panel>
-  )}
-
-  <Panel class="card" title="Game log">
-    {games.length === 0 ? (
-      <p class="empty">No games yet.</p>
-    ) : (
-      <div class="sheet gl" role="table" aria-label={`Games played by the ${me.short}, newest first`}>
-        <div class="hd" role="row">
-          <span role="columnheader">Date</span>
-          <span role="columnheader">Opponent</span>
-          <span role="columnheader" class="wl"><abbr title="Result">W/L</abbr></span>
-          <span role="columnheader" class="r">Score</span>
-          <span role="columnheader" class="r opt">Win chance</span>
-          <span role="columnheader" class="r opt">Change</span>
-          <span role="columnheader" class="r">Rating</span>
-        </div>
-        {log.map((g) => (
-          <div class="row" role="row">
-            <span role="cell" class="when">{weekdayDay(g.result.day)}</span>
-            <span role="cell" class="who" data-team={g.them.abbr}>
-              {prep(g.venue)} <a class:list={["nm", { ink: g.them.won }]} data-team={g.them.abbr} data-preview href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
-              {g.stage.label && <span class="tag">{g.stage.label}</span>}
-              <span class="sub">{weekdayDay(g.result.day)}{g.stage.label ? ` · ${g.stage.label}` : ""}</span>
-            </span>
-            <span role="cell" class:list={["wl", { ink: g.us.won }]}>{g.us.won ? "W" : "L"}</span>
-            <span role="cell" class:list={["r num", { ink: g.us.won }]}>{record(g.us.score, g.them.score)}</span>
-            <span role="cell" class:list={["r num opt", { ink: g.us.chance >= 0.5 }]}>{pct(g.us.chance)}</span>
-            <span role="cell" class="r num opt chg">{signed(g.us.change)}</span>
-            <span role="cell" class="r num rt">
-              {rating(g.us.rating)}
-              <span class="sub">{signed(g.us.change)}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    )}
-  </Panel>
+  </div>
 </Base>
 
 <style>
   .card { margin-top: var(--gap); }
+  /* The next games and the game log side by side where both fit; the log has more columns, so it takes more. */
+  .pair { display: grid; align-items: start; gap: var(--gap); margin-top: var(--gap); }
+  .pair .card { margin-top: 0; }
+  @media (min-width: 1100px) { .pair:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); } }
   .empty { padding: 4px 0 8px; color: var(--muted); }
 
   .sheet { --lead: 112px minmax(0, 240px); }
