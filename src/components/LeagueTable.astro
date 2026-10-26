@@ -68,8 +68,7 @@ const playoffs = playoffsMark(m);
   <table>
     <thead>
       <tr>
-        <th class="lad" scope="col">
-          Rating to scale
+        <th class="lad" scope="col" aria-label="Rating chart">
           {charted && playoffs && <span class="mark-label" style={`--at: ${at(playoffs.i).toFixed(4)}`}>{playoffs.label}</span>}
         </th>
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
