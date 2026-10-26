@@ -207,8 +207,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .lead { stroke: var(--line-other); stroke-width: 1; stroke-dasharray: 1 3; stroke-linecap: round; }
   .grid { stroke: var(--grid); stroke-width: 1; }
   .marker { stroke: var(--muted); stroke-width: 1; }
-  .line { stroke: var(--tint-rest); stroke-width: 1; stroke-linejoin: round; }
-  .line.hov { stroke: var(--tint); stroke-width: 1.75; }
+  /* 1.5px, not 1: a 1px line on a stretched plot falls between pixels and shimmers on a standard-density screen. */
+  .line { stroke: var(--tint-rest); stroke-width: 1.5; stroke-linejoin: round; }
+  .line.hov { stroke: var(--tint); stroke-width: 2.25; }
   .history:has(.line.hov) { cursor: pointer; }
   .tick {
     position: absolute; right: calc(100% - var(--tl) + 8px); transform: translateY(-50%);
