@@ -1,6 +1,7 @@
 ---
 // A season's games in the week ahead, one card per US Eastern day: /fixtures/ for the current season and
-// /<id>/fixtures/ for the rest, which have none left. Each game reads away over home: tip-off in ET, each
+// /<id>/fixtures/ for the rest, which have none left and point on to their results and this season's fixtures.
+// Each game reads away over home: tip-off in ET, each
 // team's rating now, each side's win chance on those ratings, and the spread on the favourite's line.
 // Pointing at a team marks its other games in the week.
 import Panel from "../../components/Panel.astro";
@@ -9,7 +10,7 @@ import { addDays, dayKey, ELO_PER_POINT, HCA, type Abbr } from "../../lib/elo.ts
 import { WEEK, closest, mostOneSided, nextDays, type Fixture, type FixtureLine } from "../../lib/fixtures.ts";
 import { MINUS, int, longDay, pct, rating, tipTime, weekdayDay } from "../../lib/format.ts";
 import { href } from "../../lib/routes.ts";
-import { TODAY, noGamesAhead, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
+import { TODAY, currentSeason, noGamesAhead, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
   return seasonPaths();
@@ -63,6 +64,8 @@ if (near && far) {
         : [...side, `, from the ${a.fav} at `, { b: a.chance }, ` against the ${a.dog} ${when(a.day)} to the ${z.fav} at `, { b: z.chance }, ` against the ${z.dog} ${when(z.day)}.`];
 }
 
+const now = currentSeason();
+
 const chanceTitle = `Win chance on current ratings, with ${HCA} rating points for home court`;
 const spreadTitle = `Points the favourite should win by: ${ELO_PER_POINT} rating points to a point, to the half point`;
 ---
@@ -71,8 +74,15 @@ const spreadTitle = `Points the favourite should win by: ${ELO_PER_POINT} rating
   <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : <b>{p.b}</b>))}</Fragment>
 
   {all.length === 0 ? (
-    <Panel title="The week ahead" meta={`${weekdayDay(TODAY)} to ${weekdayDay(addDays(TODAY, WEEK - 1))}`}>
-      <p class="empty">{noGamesAhead(season)}</p>
+    <Panel title="The week ahead" meta={season.current ? `${weekdayDay(TODAY)} to ${weekdayDay(addDays(TODAY, WEEK - 1))}` : undefined}>
+      <p class="empty">
+        {noGamesAhead(season)}
+        {!season.current && (
+          <Fragment>
+            {" "}See its <a href={href({ kind: "results", season })}>results</a>, or the <a href={href({ kind: "fixtures", season: now })}>{now.label} fixtures</a>.
+          </Fragment>
+        )}
+      </p>
     </Panel>
   ) : (
     <div class="days">
@@ -129,6 +139,7 @@ const spreadTitle = `Points the favourite should win by: ${ELO_PER_POINT} rating
 <style>
   .days { display: flex; flex-direction: column; gap: var(--gap); }
   .empty { padding: 4px 0 8px; color: var(--muted); }
+  .empty a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
 
   /* Up to three games across at 1440: (1200 − 2 × 20 − 2 × 24) / 3 ≈ 370 each, which leaves the name
      column 126px against the 108 that "at Timberwolves" needs. Games read left to right in tip-off order. */

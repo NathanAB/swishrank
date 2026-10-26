@@ -14,13 +14,16 @@ interface Props {
   docTitle?: string;
   /** The meta description; defaults to the site's. */
   description?: string;
-  /** Which page this is: it decides the active nav item, the season and the season switch's targets. */
-  route: Route;
+  /**
+   * Which page this is: it decides the active nav item, the season and the season switch's targets. Leave it
+   * out for a page that is none of them, such as the not-found page: no nav item is active and no switch shows.
+   */
+  route?: Route;
 }
 
 const { title, docTitle = title, description = "Season-only Elo ratings for all 30 NBA teams. Every team starts the season at 1500.", route } = Astro.props;
 
-const season = routeSeason(route) ?? currentSeason();
+const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
   { label: "Results", kinds: ["results"], to: (s) => ({ kind: "results", season: s }) },
@@ -29,7 +32,7 @@ const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route
   { label: "Graph", kinds: ["graph"], to: (s) => ({ kind: "graph", season: s }) },
   { label: "About", kinds: ["about"], to: () => ({ kind: "about" }) },
 ];
-const switcher = route.kind === "about" ? [] : seasonSwitch(route);
+const switcher = !route || route.kind === "about" ? [] : seasonSwitch(route);
 const pulled = stamp(BUILT_AT);
 const asOf = season.model.asOf;
 const freshness = `${asOf ? `Scores through ${weekdayDay(asOf)}` : "No games yet"} · pulled ${pulled}`;
@@ -59,7 +62,7 @@ const home = href({ kind: "home", season: currentSeason() });
         </a>
         <nav class="nav" aria-label="Site">
           {NAV.map((item) => (
-            <a href={href(item.to(season))} aria-current={item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
+            <a href={href(item.to(season))} aria-current={route && item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
           ))}
         </nav>
         <p class="stamp">{freshness}</p>

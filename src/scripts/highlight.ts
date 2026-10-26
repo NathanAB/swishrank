@@ -1,11 +1,15 @@
 // The one interaction on the site: a team shown in several places on a page is highlighted in all of them.
-// Every element that shows a team carries data-team. Two kinds of element act on it, each with one action:
-// a pick target (data-pick: a chart line or end label, a row of the graph page's table) picks the team on a
-// click or Enter and holds no link; a link that names a team (data-preview) only previews it while pointed at
-// or focused, and a click just follows it. A page with a rating chart is rendered with a team already picked,
-// so without this script it still reads; a page without one highlights nothing until the reader picks. A URL
-// hash such as #okc picks that team on load.
-import { hashTeam } from "../lib/routes.ts";
+// Every element that shows a team carries data-team. Four kinds of element act on it: a rating chart's plot
+// (data-plot) previews the team whose line is nearest the pointer and picks it on a click or tap; the chart's
+// team menu (data-pick-select) picks the team chosen in it; a pick target (data-pick: a row of the graph page's
+// table) picks its team on a click or Enter and holds no link; a link that names a team (data-preview) only
+// previews it while pointed at or focused, and a click just follows it. A page with a rating chart is rendered
+// with a team already picked, so without this script it still reads; a page without one highlights nothing
+// until the reader picks. The URL hash names the pick: #okc picks the Thunder on load and whenever the hash
+// changes, and a pick rewrites the hash in place, so a reload or a shared link shows the same team and
+// picking adds no history entries.
+import { nearestLine, type PlotLine } from "../lib/pick.ts";
+import { hashTeam, teamSlug } from "../lib/routes.ts";
 
 const marks = () => document.querySelectorAll<HTMLElement | SVGElement>("[data-team]");
 
@@ -16,31 +20,59 @@ function paint(cls: "sel" | "hov", team: string | null) {
 }
 
 const closestOf = (t: EventTarget | null, selector: string) => (t instanceof Element ? t.closest<HTMLElement | SVGElement>(selector) : null);
-const pickOf = (t: EventTarget | null) => closestOf(t, "[data-pick]");
+const plotOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<SVGSVGElement>("svg[data-plot]") : null);
 
-const linked = hashTeam(location.hash, [...document.querySelectorAll<HTMLElement | SVGElement>("[data-pick]")].flatMap((el) => el.dataset.team ?? []));
-if (linked) paint("sel", linked);
+// Each plot's lines as drawn, read once before any line is raised, so ties go the same way all session.
+const plots = new Map<SVGSVGElement, PlotLine[]>(
+  [...document.querySelectorAll<SVGSVGElement>("svg[data-plot]")].map((plot) => [
+    plot,
+    [...plot.querySelectorAll<SVGPolylineElement>("polyline[data-team]")].map((l) => ({ team: l.dataset.team ?? "", ys: Array.from(l.points, (p) => p.y) })),
+  ]),
+);
+const pickable = [...document.querySelectorAll<HTMLElement | SVGElement>("[data-pick], svg[data-plot] [data-team]")].flatMap((el) => el.dataset.team ?? []);
+const menus = document.querySelectorAll<HTMLSelectElement>("[data-pick-select]");
+let picked = document.querySelector<SVGElement>("svg[data-plot] .sel")?.dataset.team ?? null;
 
-// Table rows that pick are the keyboard way in; chart lines and labels are the pointer's.
+function pick(team: string | null) {
+  if (!team) return;
+  picked = team;
+  paint("sel", team);
+  for (const menu of menus) menu.value = team;
+  history.replaceState(history.state, "", `#${teamSlug(team)}`);
+}
+
+/** The team a pointer is on: on a plot the nearest line, elsewhere the closest `selector` element's team. */
+function teamAt(e: MouseEvent, selector: string) {
+  const plot = plotOf(e.target);
+  if (!plot) return closestOf(e.target, selector)?.dataset.team ?? null;
+  const box = plot.getBoundingClientRect();
+  const y = ((e.clientY - box.top) / box.height) * plot.viewBox.baseVal.height;
+  return nearestLine(plots.get(plot) ?? [], (e.clientX - box.left) / box.width, y, picked);
+}
+
+const fromHash = () => pick(hashTeam(location.hash, pickable));
+fromHash();
+window.addEventListener("hashchange", fromHash);
+
+// Table rows that pick, and the chart's team menu, are the keyboard way in; the plot is the pointer's.
 for (const row of document.querySelectorAll<HTMLTableRowElement>("tr[data-pick]")) row.tabIndex = 0;
+for (const menu of menus) menu.addEventListener("change", () => pick(menu.value));
 
-document.addEventListener("click", (e) => {
-  const pick = pickOf(e.target);
-  if (pick) paint("sel", pick.dataset.team ?? null);
-});
+document.addEventListener("click", (e) => pick(teamAt(e, "[data-pick]")));
 document.addEventListener("keydown", (e) => {
-  const pick = pickOf(e.target);
-  if (pick && pick === e.target && (e.key === "Enter" || e.key === " ")) {
+  const target = closestOf(e.target, "[data-pick]");
+  if (target && target === e.target && (e.key === "Enter" || e.key === " ")) {
     e.preventDefault();
-    paint("sel", pick.dataset.team ?? null);
+    pick(target.dataset.team ?? null);
   }
 });
 
 let previewed: string | null = null;
-const preview = (t: EventTarget | null) => {
-  const team = closestOf(t, "[data-pick], [data-preview]")?.dataset.team ?? null;
+const preview = (team: string | null) => {
   if (team !== previewed) paint("hov", (previewed = team));
 };
-document.addEventListener("pointerover", (e) => preview(e.target));
-document.addEventListener("focusin", (e) => preview(e.target));
-document.addEventListener("focusout", (e) => preview(e.relatedTarget));
+const pointed = (e: PointerEvent) => preview(teamAt(e, "[data-pick], [data-preview]"));
+document.addEventListener("pointerover", pointed);
+for (const plot of plots.keys()) plot.addEventListener("pointermove", pointed);
+document.addEventListener("focusin", (e) => preview(closestOf(e.target, "[data-pick], [data-preview]")?.dataset.team ?? null));
+document.addEventListener("focusout", (e) => preview(closestOf(e.relatedTarget, "[data-pick], [data-preview]")?.dataset.team ?? null));

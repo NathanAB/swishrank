@@ -105,7 +105,6 @@ const nextGames = nextDay ? m.upcoming.filter((g) => dayKey(g.t) === nextDay) : 
           season={season}
           results={latestGames}
           label={`${latest.title}, biggest swing first`}
-          selected={lead}
           empty={opens ? `No games yet. The season opens ${weekdayDay(opens)}.` : "No games yet."}
         />
       </Panel>
@@ -126,7 +125,7 @@ const nextGames = nextDay ? m.upcoming.filter((g) => dayKey(g.t) === nextDay) : 
         meta={nextDay ? `${weekdayDay(nextDay)} · ${count(nextGames.length, "game")}` : ""}
         link={{ href: href({ kind: "fixtures", season }), label: "All fixtures" }}
       >
-        <FixtureList season={season} games={nextGames} label="The next day's games" selected={lead} fit empty={noGamesAhead(season)} />
+        <FixtureList season={season} games={nextGames} label="The next day's games" fit empty={noGamesAhead(season)} />
       </Panel>
     </div>
   </div>

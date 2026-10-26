@@ -1,7 +1,7 @@
 ---
 // Every team's daily rating from the 1500 they all start at. The picked team is drawn in the accent and named
-// in the legend, the name linking to its page; a reader picks another by its line or its end label. The end of
-// every line is labelled with its abbreviation in two staggered columns with short leaders, so labels never
+// in the legend, the name linking to its page; a reader picks another by pointing anywhere on the plot, which
+// picks the nearest line (lib/pick.ts), or with the team menu in the legend. The end of every line is labelled with its abbreviation in two staggered columns with short leaders, so labels never
 // collide. The plot stretches with the card; the tick lane and the label lane keep a fixed size, and the
 // height is fixed too, so the label layout worked out here holds at every width. Given a narrowest width per
 // day, a long season scrolls sideways inside the chart instead of squeezing its days together.
@@ -52,7 +52,7 @@ const y = (v: number) => PAD + ((H - 2 * PAD) * (hi - v)) / (hi - lo);
 const X = 1000; // the plot's viewBox width, stretched to the card
 const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
 const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
-const points = (a: Abbr, digits = 1) => ser.map((d, i) => `${x(i).toFixed(digits)},${y(d.r[a]).toFixed(digits)}`).join(" ");
+const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
 const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === selected) - Number(q === selected));
 
 // x labels on one step that lands on the last day: month starts for a long season, days for a short one.
@@ -120,6 +120,9 @@ const scroll = minDayWidth > 0;
         );
       })}
       <span class="key others">{m.abbrs.length - 1} others</span>
+      <select class="pick" aria-label="Team shown in the chart" data-pick-select>
+        {m.order.map((a) => <option value={a} selected={a === selected}>{m.rank[a]}. {m.data.teams[a].short}</option>)}
+      </select>
     </p>
     <div
       class:list={["rc", { scroll }]}
@@ -133,7 +136,7 @@ const scroll = minDayWidth > 0;
       <svg class="ticks" width="40" height={H} viewBox={`0 0 40 ${H}`}>
         {ticks.map((t) => <text class:list={{ ref: t === START }} x="32" y={y(t) + 4} text-anchor="end">{t}</text>)}
       </svg>
-      <svg class="plot" viewBox={`0 0 ${X} ${H}`} preserveAspectRatio="none" height={H}>
+      <svg class="plot" data-plot viewBox={`0 0 ${X} ${H}`} preserveAspectRatio="none" height={H}>
         {ticks.map((t) => <path class:list={["grid", { ref: t === START }]} d={`M0,${y(t)}H${X}`} />)}
         {markerAt >= 0 && <path class="marker" d={`M${x(markerAt).toFixed(1)},0V${H}`} />}
         <g>
@@ -141,8 +144,6 @@ const scroll = minDayWidth > 0;
             <polyline class:list={["line", { sel: a === selected }]} data-team={a} data-raise points={points(a)} />
           ))}
         </g>
-        {/* An unseen band along each line to point at; whole units are close enough for it. */}
-        <g>{drawOrder.map((a) => <polyline class="hit" data-team={a} data-pick points={points(a, 0)} />)}</g>
       </svg>
       <svg class="lane" width={LANE} height={H} viewBox={`0 0 ${LANE} ${H}`}>
         {labels.map((l, k) => {
@@ -150,7 +151,7 @@ const scroll = minDayWidth > 0;
           return (
             <g>
               <path class:list={["leader", { sel: l.a === selected }]} data-team={l.a} d={`M2,${l.y.toFixed(1)}L6,${l.y.toFixed(1)}L${GAP - 5},${l.ly.toFixed(1)}L${lx - 3},${l.ly.toFixed(1)}`} />
-              <text class:list={["lab", { sel: l.a === selected }]} data-team={l.a} data-pick x={lx} y={(l.ly + 4).toFixed(1)}>
+              <text class:list={["lab", { sel: l.a === selected }]} data-team={l.a} x={lx} y={(l.ly + 4).toFixed(1)}>
                 <title>{m.data.teams[l.a].name}, {rating(m.r[l.a])}</title>{l.a}
               </text>
             </g>
@@ -179,6 +180,10 @@ const scroll = minDayWidth > 0;
   .key::before { content: ""; width: 14px; height: 2px; align-self: center; background: var(--line-other); }
   .key.sel::before { background: var(--accent); }
   .key .nm { color: var(--text); font-weight: 600; }
+  .pick {
+    margin-left: auto; align-self: center; height: 28px; padding: 0 6px; font: inherit; color: var(--text);
+    background: var(--raised); border: 1px solid var(--control); border-radius: 4px; cursor: pointer;
+  }
   .key .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
   .fig { color: var(--text); font-size: 20px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; }
 
@@ -193,7 +198,7 @@ const scroll = minDayWidth > 0;
     font-size: 11px; line-height: 16px; color: var(--muted); white-space: nowrap;
   }
   .ticks { grid-row: 2; grid-column: 1; overflow: visible; }
-  .plot { grid-row: 2; grid-column: 2; width: 100%; overflow: visible; }
+  .plot { grid-row: 2; grid-column: 2; width: 100%; overflow: visible; cursor: pointer; }
   .lane { grid-row: 2; grid-column: 3; overflow: visible; }
   .xs { grid-row: 3; grid-column: 2; position: relative; }
   .xs span { position: absolute; top: 4px; transform: translateX(-50%); font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap; }
@@ -209,16 +214,17 @@ const scroll = minDayWidth > 0;
   .line { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; stroke-linejoin: round; }
   .line.hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 1.5; }
   .line.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
-  .hit { stroke: transparent; stroke-width: 12; stroke-linejoin: round; pointer-events: stroke; cursor: pointer; }
   .leader { fill: none; stroke: var(--line-other); stroke-opacity: 0.6; stroke-width: 1; }
   .leader.sel { stroke: var(--accent); stroke-opacity: 1; }
-  .lab { cursor: pointer; }
   .lab.hov { fill: var(--text); }
   .lab.sel { fill: var(--text); font-weight: 600; }
-  .end { display: none; fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+  /* The dot overhangs the plot's last day, so it lets the pointer through to pick there. */
+  .end { display: none; fill: var(--accent); stroke: var(--surface); stroke-width: 2; pointer-events: none; }
   .end.sel { display: inline; }
 
   @media (max-width: 640px) {
     .range { display: none; }
+    /* 44px tall to tap */
+    .pick { height: 44px; }
   }
 </style>

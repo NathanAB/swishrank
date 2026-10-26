@@ -1,6 +1,6 @@
 // A season's final games as the results pages show them: one page per US Eastern calendar month, each
-// day's games together. The newest month is the results index, so the page a reader reaches from the nav
-// always holds the latest games, and a month gets its own URL once a newer one has started.
+// day's games together. Every month has its own URL that never changes, and the results index shows the newest
+// month as well, so the page a reader reaches from the nav always holds the latest games.
 import type { Result, Season } from "./elo.ts";
 import type { Route, SeasonRef } from "./routes.ts";
 
@@ -27,6 +27,5 @@ export function months(model: Season): Month[] {
 /** Every game in a month, newest day first. */
 export const gamesIn = (month: Month) => month.days.flatMap((d) => d.results);
 
-/** Where a month's page lives: the newest month at the results index, every earlier one under its key. */
-export const monthRoute = (season: SeasonRef, all: readonly Month[], key: string): Route =>
-  key === all.at(-1)?.key ? { kind: "results", season } : { kind: "results", season, month: key };
+/** Where a month's page lives: under its key, the newest month included, so a shared link keeps its month. */
+export const monthRoute = (season: SeasonRef, key: string): Route => ({ kind: "results", season, month: key });

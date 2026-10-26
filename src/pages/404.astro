@@ -1,0 +1,19 @@
+---
+// What GitHub Pages serves for any path under the site that has no page, such as a mistyped team or a month
+// with no games, in the site's own frame.
+import Base from "../layouts/Base.astro";
+import { href } from "../lib/routes.ts";
+import { currentSeason } from "../lib/season.ts";
+
+const season = currentSeason();
+---
+
+<Base title="Page not found">
+  <Fragment slot="lede">
+    There is no page at this address, so try the <a href={href({ kind: "home", season })}>ratings</a> or the <a href={href({ kind: "teams", season })}>list of teams</a>.
+  </Fragment>
+</Base>
+
+<style>
+  a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+</style>
