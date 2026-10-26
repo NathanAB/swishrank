@@ -6,13 +6,13 @@ import { examples } from "./method.ts";
 // Every team plays once, on opening night, so each home team is the same 64% favourite and only the
 // margin and who won tell the games apart.
 const abbrs = "ABCDEFGHIJKLMN".split("");
-const teams = Object.fromEntries(abbrs.map((a) => [a, { name: `Team ${a}`, short: a }]));
+const teams = Object.fromEntries(abbrs.map((a) => [a, { name: `Team ${a}`, short: a, color: "000000", alternateColor: "ffffff" }]));
 const game = (id: string, away: string, home: string, as: number, hs: number, neutral = false): Game => ({
   id, t: "2026-10-20T23:00Z", home, away, hs, as, final: true, neutral, note: null,
 });
 const results = (games: Game[]) => compute({ season: "x", teams, games }).results;
 
-test("picks the favourite's narrowest and widest wins and the underdog's narrowest, earliest first on a tie", () => {
+test("picks the favourite's narrowest win, the underdog's narrowest and the favourite's widest, earliest first on a tie", () => {
   const { opener, contrasts } = examples(results([
     game("fav by 5", "A", "B", 100, 105),
     game("fav by 2", "C", "D", 100, 102),
@@ -25,7 +25,7 @@ test("picks the favourite's narrowest and widest wins and the underdog's narrowe
   assert.equal(opener?.result.game.id, "fav by 5");
   assert.deepEqual(
     contrasts.map((c) => [c.kind, c.game.result.game.id, c.margin]),
-    [["close", "fav by 2", 2], ["blowout", "fav by 30", 30], ["upset", "dog by 4", 4]],
+    [["close", "fav by 2", 2], ["upset", "dog by 4", 4], ["blowout", "fav by 30", 30]],
   );
 });
 

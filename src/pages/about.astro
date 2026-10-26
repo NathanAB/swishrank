@@ -4,12 +4,11 @@
 import Panel from "../components/Panel.astro";
 import Base from "../layouts/Base.astro";
 import { HCA, START, winProb } from "../lib/elo.ts";
-import type { Line } from "../lib/facts.ts";
-import { int, pct, record, shortDay, signed, weekdayDay } from "../lib/format.ts";
+import { int, pct, signed, weekdayDay } from "../lib/format.ts";
 import { examples, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
 
-// The newest season with a game: its opener for step 2, its results for step 3, its ratings for step 1.
+// The newest season with a game: its ratings for step 1, its opener for step 2, its results for step 3.
 const season = allSeasons().find((s) => s.model.results.length > 0) ?? null;
 const model = season?.model ?? null;
 const { opener, contrasts } = examples(model?.results ?? []);
@@ -18,57 +17,65 @@ const name = (abbr: string) => (season ? team(season, abbr).short : abbr);
 /** A value's place on a scale from lo to hi, as a CSS percentage. */
 const at = (v: number, lo: number, hi: number) => `${((v - lo) / (hi - lo)) * 100}%`;
 
-// Step 1: every team at the start, then where each stands now, on one scale padded so no dot is cut off.
-const spread = model && (() => {
-  const now = model.order.map((abbr) => ({ abbr, r: Math.round(model.r[abbr]) }));
-  const top = now[0];
-  const bottom = now[now.length - 1];
-  const pad = Math.max(4, (top.r - bottom.r) * 0.04);
-  const lo = Math.min(bottom.r, START) - pad;
-  const hi = Math.max(top.r, START) + pad;
-  const x = (v: number) => at(v, lo, hi);
-  // Dots closer than one dot's width on a phone's ~318px scale take the next lane: on the line, then
-  // above it, then below, so none hides another.
-  const near = ((hi - lo) * 10) / 318;
-  const last: number[] = [];
-  const dots = [...now].reverse().map((t) => {
-    let lane = last.findIndex((r) => t.r - r >= near);
-    if (lane < 0) lane = last.length;
-    last[lane] = t.r;
-    return { ...t, dy: [0, -10, 10, -20, 20][lane] ?? 0 };
-  });
-  return { dots, top, bottom, x, count: model.abbrs.length, asOf: shortDay(model.results[model.results.length - 1].day) };
+// Step 1: every team's daily rating, ticked at the start and one round step either side of it.
+const LINES_H = 160;
+const lines = model && model.series.length > 1 && (() => {
+  const ser = model.series;
+  const all = ser.flatMap((d) => model.abbrs.map((a) => d.r[a]));
+  const reach = Math.max(...all.map((v) => Math.abs(v - START)));
+  const step = [200, 100, 50, 25].find((s) => s <= reach) ?? 25;
+  const lo = Math.min(START - step, ...all);
+  const hi = Math.max(START + step, ...all);
+  const y = (v: number) => 6 + ((LINES_H - 12) * (hi - v)) / (hi - lo);
+  const x = (i: number) => (i / (ser.length - 1)) * 1000;
+  const points = (a: string) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
+  const end = (abbr: string) => ({ text: `${name(abbr)} ${Math.round(model.r[abbr])}`, points: points(abbr), y: y(model.r[abbr]) });
+  const top = end(model.order[0]);
+  const bottom = end(model.order[model.order.length - 1]);
+  // Two end labels closer than a line of text apart are pushed apart around their middle.
+  const room = Math.max(0, 16 - (bottom.y - top.y)) / 2;
+  const ends = [{ ...top, ly: top.y - room }, { ...bottom, ly: bottom.y + room }];
+  return {
+    ticks: [START + step, START, START - step].map((t) => ({ t, y: y(t) })),
+    start: y(START),
+    others: model.order.slice(1, -1).map(points),
+    ends,
+    lane: `calc(${Math.max(...ends.map((e) => e.text.length))}ch + 10px)`,
+    count: model.abbrs.length,
+  };
 })();
 
-// Step 2: the opener on a scale centred on the start, wide enough to label each team's new rating.
-const game = opener && (() => {
-  const { winner: w, loser: l, result } = opener;
-  const half = Math.max(Math.abs(w.change), Math.abs(l.change), 1) * 2.6;
-  const x = (v: number) => at(v, START - half, START + half);
-  const lane = (s: Line, verb: string) => ({
+// Step 2: the opener's two teams, before and after.
+const game = opener && {
+  day: weekdayDay(opener.result.day),
+  score: [opener.winner, opener.loser].map((s) => `${name(s.abbr)} ${s.score}`).join(", "),
+  rows: [opener.winner, opener.loser].map((s) => ({
     name: name(s.abbr),
-    said: `${verb} ${record(s.score, s === w ? l.score : w.score)}`,
-    before: Math.round(result.pre[s.side]),
+    before: Math.round(opener.result.pre[s.side]),
     after: Math.round(s.rating),
     change: s.change,
-    won: s === w,
-  });
-  return { w, l, x, day: weekdayDay(result.day), lanes: [lane(w, "won"), lane(l, "lost")] };
-})();
+  })),
+};
 
-// Step 3: the three wins as bars of the winner's gain, on one scale.
+// Step 3: the three wins as bars of the winner's gain on one scale, and how many times the favourite's
+// close win the underdog's close win earns.
 const LABEL: Record<ContrastKind, (margin: number) => string> = {
   close: (m) => `Favourite wins by ${m}`,
-  blowout: (m) => `Favourite wins by ${m}`,
   upset: (m) => `Underdog wins by ${m}`,
+  blowout: (m) => `Favourite wins by ${m}`,
 };
 const most = Math.max(1, ...contrasts.map((c) => c.game.winner.change));
 const bars = contrasts.map(({ kind, game: o, margin }) => ({
   label: LABEL[kind](margin),
-  detail: `The ${name(o.winner.abbr)}, ${pct(o.winner.chance)} to win, beat the ${name(o.loser.abbr)} ${record(o.winner.score, o.loser.score)}.`,
   change: o.winner.change,
-  width: `${(Math.max(0, o.winner.change) / most) * 82}%`,
+  width: `calc(${Math.max(0, o.winner.change) / most} * (100% - 40px))`,
 }));
+const gain = (kind: ContrastKind) => contrasts.find((c) => c.kind === kind)?.game.winner.change ?? 0;
+const times = gain("close") > 0 ? Math.round(gain("upset") / gain("close")) : 0;
+const TIMES: Record<number, string> = { 2: "twice", 3: "three times", 4: "four times", 5: "five times" };
+const upsetSay = times >= 2
+  ? `A close win by the underdog earns about ${TIMES[times] ?? `${times} times`} what a close win by the favourite does.`
+  : "A favourite that edges a close game gains a few points, but a blowout or an upset is worth more.";
 
 // Step 4: the favourite's chance against the rating gap, 0 to 400 points, on a 50% to 100% scale.
 const GAP_MAX = 400;
@@ -91,66 +98,67 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
   <div class="steps">
     <Panel title={`Everyone starts at ${START}`}>
       <p class="say">Nothing carries over from last season, so every team opens at {START} and the games spread them out.</p>
-      {spread && (
+      {lines && (
         <figure
-          class="spread"
+          class="lines"
           role="img"
-          aria-label={`On opening night all ${spread.count} teams are at ${START}. Through ${spread.asOf} they run from ${spread.bottom.r}, the ${name(spread.bottom.abbr)}, to ${spread.top.r}, the ${name(spread.top.abbr)}.`}
+          aria-label={`Every team's rating by day: all ${lines.count} start at ${START} on opening night and now run from ${lines.ends[1].text}, the lowest, to ${lines.ends[0].text}, the highest.`}
+          style={`--h: ${LINES_H}px; --lane: ${lines.lane}`}
         >
-          <span class="mid" style={`left: ${spread.x(START)}`}></span>
-          <span class="cap c1">Opening night</span>
-          <span class="dot accent r1" style={`left: ${spread.x(START)}`}></span>
-          <span class="tag r1" style={`left: ${spread.x(START)}`}>All {spread.count} teams at {START}</span>
-          <span class="cap c2">Through {spread.asOf}</span>
-          {spread.dots.map((t) => <span class="dot r2" style={`left: ${spread.x(t.r)}; translate: 0 ${t.dy}px`}></span>)}
-          <span class="end lo" style={`left: ${spread.x(spread.bottom.r)}`}>{name(spread.bottom.abbr)} {spread.bottom.r}</span>
-          <span class="end hi" style={`right: calc(100% - ${spread.x(spread.top.r)})`}>{name(spread.top.abbr)} {spread.top.r}</span>
+          <div class="ticks">
+            {lines.ticks.map((t) => <span class:list={{ ref: t.t === START }} style={`top: ${t.y}px`}>{t.t}</span>)}
+          </div>
+          <div class="field">
+            <svg viewBox={`0 0 1000 ${LINES_H}`} preserveAspectRatio="none" aria-hidden="true">
+              {lines.ticks.map((t) => <path class:list={["rule", { ref: t.t === START }]} d={`M0,${t.y}H1000`} />)}
+              {lines.others.map((pts) => <polyline class="other" points={pts} />)}
+              {lines.ends.map((e) => <polyline class="named" points={e.points} />)}
+            </svg>
+            <span class="stem" style={`top: ${lines.start}px`}></span>
+            <span class="dot accent" style={`left: 0; top: ${lines.start}px`}></span>
+            {lines.ends.map((e) => <span class="dot" style={`left: 100%; top: ${e.y}px`}></span>)}
+          </div>
+          <div class="lane">
+            {lines.ends.map((e) => <span style={`top: ${e.ly}px`}>{e.text}</span>)}
+          </div>
+          <p class="start">Opening night, all at {START}</p>
         </figure>
       )}
     </Panel>
 
     <Panel title="Win, and you take points" meta={game?.day}>
+      <p class="say">The winner takes points from the loser, as in the season's first game.</p>
       {game && (
-        <Fragment>
-          <p class="say">In the season's first game the {name(game.w.abbr)} beat the {name(game.l.abbr)} {record(game.w.score, game.l.score)} and took {game.w.change} points from them.</p>
-          <figure class="game">
-            <span class="mid" style={`left: ${game.x(START)}`}></span>
-            <span class="mid-tag" style={`left: ${game.x(START)}`}>Both at {START} before</span>
-            {game.lanes.map((s) => (
-              <div class="lane">
-                <p class="who"><b>{s.name}</b> {s.said}</p>
-                <div class="track">
-                  <span
-                    class:list={["seg", { accent: s.won }]}
-                    style={`left: ${game.x(Math.min(s.before, s.after))}; right: calc(100% - ${game.x(Math.max(s.before, s.after))})`}
-                  ></span>
-                  <span class:list={["dot", { accent: s.won }]} style={`left: ${game.x(s.after)}`}></span>
-                  {s.change >= 0
-                    ? <span class="val up" style={`left: ${game.x(s.after)}`}><b>{signed(s.change)}</b> to {s.after}</span>
-                    : <span class="val down" style={`right: calc(100% - ${game.x(s.after)})`}><b>{signed(s.change)}</b> to {s.after}</span>}
-                </div>
-              </div>
+        <div class="game">
+          <p class="score">{game.score}</p>
+          <table class="moves">
+            {game.rows.map((r) => (
+              <tr>
+                <th scope="row">{r.name}</th>
+                <td>{r.before}</td>
+                <td class="to">→</td>
+                <td>{r.after}</td>
+                <td class:list={["change", r.change > 0 ? "up" : "down"]}>{signed(r.change)}</td>
+              </tr>
             ))}
-          </figure>
-        </Fragment>
+          </table>
+        </div>
       )}
     </Panel>
 
     <Panel title="Upsets and blowouts move more">
-      <p class="say">A favourite that edges a close game gains a few points, but a blowout or an upset is worth more.</p>
+      <p class="say">{upsetSay}</p>
       {bars.length > 0 && (
-        <ul class="bars">
+        <div class="bars">
+          <span></span>
+          <span class="head">Winner gains</span>
           {bars.map((b) => (
-            <li>
-              <p class="who"><b>{b.label}</b></p>
-              <p class="detail">{b.detail}</p>
-              <div class="bar">
-                <span class="fill" style={`width: ${b.width}`}></span>
-                <span class="v">{signed(b.change)}</span>
-              </div>
-            </li>
+            <Fragment>
+              <span class="label">{b.label}</span>
+              <span class="bar"><span class="fill" style={`width: ${b.width}`}></span><b class="v">{signed(b.change)}</b></span>
+            </Fragment>
           ))}
-        </ul>
+        </div>
       )}
     </Panel>
 
@@ -208,41 +216,38 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
     background: var(--bar); box-shadow: 0 0 0 2px var(--surface);
   }
   .dot.accent { background: var(--accent); }
-  .mid { position: absolute; width: 1px; background: var(--grid); }
 
-  /* Step 1: two rows on one scale, the start and now. */
-  .spread { height: 136px; margin: 0 4px; }
-  .spread .mid { top: 22px; height: 94px; }
-  .spread .cap { position: absolute; left: 0; }
-  .spread .c1 { top: 0; }
-  .spread .c2 { top: 50px; }
-  .spread .r1 { top: 30px; }
-  .spread .r2 { top: 92px; }
-  .spread .tag { position: absolute; margin: -8px 0 0 12px; color: var(--text); white-space: nowrap; }
-  .spread .end { position: absolute; top: 120px; white-space: nowrap; }
-  .spread .lo { margin-left: -4px; }
-  .spread .hi { margin-right: -4px; }
+  /* Step 1: a tick lane, the plot stretched to the card, and a lane for the two end labels. */
+  .lines { display: grid; grid-template-columns: 36px minmax(0, 1fr) var(--lane); grid-template-rows: var(--h) auto; }
+  .lines .ticks, .lines .field, .lines .lane { position: relative; height: var(--h); }
+  .lines .ticks span { position: absolute; right: 8px; transform: translateY(-50%); }
+  .lines .ticks .ref { color: var(--text); }
+  .lines svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .lines path, .lines polyline { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+  .lines .rule { stroke: var(--grid); stroke-width: 1; }
+  .lines .rule.ref { stroke: var(--muted); stroke-opacity: 0.7; stroke-dasharray: 3 3; }
+  .lines .other { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; }
+  .lines .named { stroke: var(--bar); stroke-width: 1.5; }
+  .lines .stem { position: absolute; left: 0; bottom: 0; width: 1px; background: var(--control); }
+  .lines .lane span { position: absolute; left: 10px; transform: translateY(-50%); color: var(--text); white-space: nowrap; }
+  .lines .start { grid-column: 2 / 4; margin: 6px 0 0 -4px; color: var(--text); }
 
-  /* Step 2: one lane per team, from the shared start to the new rating. */
-  .game { padding-top: 24px; }
-  .game .mid { top: 18px; bottom: 0; }
-  .game .mid-tag { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
-  .lane + .lane { margin-top: 8px; }
-  .who { color: var(--muted); }
-  .track { position: relative; height: 24px; }
-  .seg { position: absolute; top: 11px; height: 2px; background: var(--bar); }
-  .seg.accent { background: var(--accent); }
-  .track .dot { top: 12px; }
-  .val { position: absolute; top: 4px; white-space: nowrap; }
-  .val.up { margin-left: 10px; }
-  .val.down { margin-right: 10px; }
+  /* Step 2: the score, then each team's rating before and after. */
+  .score { font-size: var(--fs-card); line-height: 24px; font-weight: 600; margin-bottom: 8px; }
+  .moves { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .moves th { text-align: left; font-weight: 500; padding-right: 20px; }
+  .moves td { padding: 2px 0; text-align: right; }
+  .moves .to { padding: 2px 8px; color: var(--muted); }
+  .moves .change { padding-left: 16px; font-weight: 600; }
+  .moves .up { color: var(--accent); }
+  .moves .down { color: var(--muted); }
 
-  /* Step 3: a bar per game, its length the winner's gain. */
-  .bars { display: flex; flex-direction: column; gap: 14px; }
-  .bars .detail { color: var(--muted); font-size: var(--fs-small); line-height: 16px; margin-top: 2px; }
-  .bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; height: 16px; }
-  .fill { height: 12px; min-width: 2px; background: var(--accent); border-radius: 0 4px 4px 0; }
-  .v { font-variant-numeric: tabular-nums; font-weight: 500; }
+  /* Step 3: a bar per game, its length the winner's gain, on one scale. */
+  .bars { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 10px 16px; }
+  .bars .head { font-size: var(--fs-small); line-height: 16px; color: var(--muted); margin-bottom: -4px; }
+  .bar { display: flex; align-items: center; gap: 8px; }
+  .fill { flex: none; height: 6px; min-width: 2px; background: var(--accent); border-radius: 0 3px 3px 0; }
+  .v { font-variant-numeric: tabular-nums; }
 
   /* Step 4: the curve. The svg stretches to the plot, and its 2px stroke stays 2px. */
   .curve { padding-left: 36px; padding-right: 12px; }
