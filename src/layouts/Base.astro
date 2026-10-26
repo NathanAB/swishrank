@@ -6,6 +6,7 @@
 // default slot.
 import { Font } from "astro:assets";
 import "../styles/global.css";
+import PostHog from "../components/PostHog.astro";
 import { stamp } from "../lib/format.ts";
 import { SHARE_SIZE, SITE_NAME } from "../lib/meta.ts";
 import { href, shareImage, sharePath, withBase, type Route } from "../lib/routes.ts";
@@ -69,6 +70,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href={withBase("/favicon.svg")} />
     <Font cssVariable="--font-public-sans" preload />
+    <PostHog />
   </head>
   <body>
     <header class="bar">
