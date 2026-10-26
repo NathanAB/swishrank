@@ -1,0 +1,19 @@
+---
+// A season's home cut to one conference, such as /east/ or /2025-26/west/.
+import HomePage from "../../components/HomePage.astro";
+import { conferencePaths, type SeasonView } from "../../lib/season.ts";
+import type { Conference } from "../../lib/teams.ts";
+
+export function getStaticPaths() {
+  return conferencePaths();
+}
+
+interface Props {
+  season: SeasonView;
+  conference: Conference;
+}
+
+const { season, conference } = Astro.props;
+---
+
+<HomePage season={season} conference={conference} />

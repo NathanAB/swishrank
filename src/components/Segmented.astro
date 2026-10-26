@@ -1,0 +1,38 @@
+---
+// A switch between a few sibling pages, such as the home's All, East and West: a rounded track of links with
+// the current page raised on a pill. A longer list, such as the seasons, goes in a menu instead
+// (SeasonMenu.astro).
+interface Props {
+  /** The nav's accessible name, such as "Conference". */
+  label: string;
+  options: readonly { label: string; href: string; current: boolean }[];
+}
+
+const { label, options } = Astro.props;
+---
+
+<nav class="seg" aria-label={label}>
+  {options.map((o) => (
+    <a href={o.href} aria-current={o.current ? "page" : undefined}>{o.label}</a>
+  ))}
+</nav>
+
+<style>
+  .seg { display: inline-flex; flex: none; border-radius: 8px; background: var(--seg-track); }
+  /* The transparent border insets the pill inside its link, so the whole link stays the target. */
+  a {
+    flex: 1 0 auto; display: flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px;
+    border: 3px solid transparent; border-radius: 8px; background-clip: padding-box;
+    color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap;
+    transition: color 150ms ease, background-color 150ms ease;
+  }
+  a:hover { color: var(--text); }
+  a[aria-current="page"] { background-color: var(--seg-pill); color: var(--text); }
+  a:focus-visible { outline-offset: -1px; border-radius: 8px; }
+
+  /* On a phone the track spans its line, with 44px tall targets. */
+  @media (max-width: 640px) {
+    .seg { display: flex; }
+    a { height: 44px; }
+  }
+</style>

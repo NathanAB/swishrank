@@ -2,17 +2,25 @@
 // lives at the root and every other season under its own id, so adding a season to seasons.json moves the
 // old one under /<id>/ without code changes.
 
+import type { Conference } from "./teams.ts";
+
 export type SeasonRef = { readonly id: string; readonly current: boolean };
 
 export type Route =
-  | { kind: "home"; season: SeasonRef }
+  /** With `conference`, the table and chart cut to that conference; without it, the whole league. */
+  | { kind: "home"; season: SeasonRef; conference?: Conference }
   /** `month` ("YYYY-MM") is that month's results alone; without it, the week ahead and the newest month. */
   | { kind: "games"; season: SeasonRef; month?: string }
   | { kind: "team"; season: SeasonRef; abbr: string }
+  /** Every season as a plain link to its home: the season menu's fallback without script. */
+  | { kind: "seasons" }
   | { kind: "about" };
 
 /** A team's URL segment: its abbreviation in lower case (OKC becomes okc). */
 export const teamSlug = (abbr: string) => abbr.toLowerCase();
+
+/** A conference's URL segment: east or west. */
+export const conferenceSlug = (conference: Conference) => conference.toLowerCase();
 
 const prefix = (season: SeasonRef) => (season.current ? "" : `/${season.id}`);
 
@@ -20,11 +28,13 @@ const prefix = (season: SeasonRef) => (season.current ? "" : `/${season.id}`);
 export function routePath(route: Route): string {
   switch (route.kind) {
     case "home":
-      return `${prefix(route.season)}/`;
+      return `${prefix(route.season)}/${route.conference ? `${conferenceSlug(route.conference)}/` : ""}`;
     case "games":
       return `${prefix(route.season)}/games/${route.month ? `${route.month}/` : ""}`;
     case "team":
       return `${prefix(route.season)}/teams/${teamSlug(route.abbr)}/`;
+    case "seasons":
+      return "/seasons/";
     case "about":
       return "/about/";
     default: {
@@ -41,12 +51,15 @@ export const withBase = (path: string) => `${import.meta.env.BASE_URL.replace(/\
 export const href = (route: Route) => withBase(routePath(route));
 
 /**
- * The page a reader lands on when they pick season `to` from `route`: the same page in that season. A month
- * of games does not carry over, and a team that `to` lacks falls back to that season's home.
+ * The page a reader lands on when they pick season `to` from `route`: the same page in that season. A
+ * conference carries over, a month of games does not, and a team that `to` lacks falls back to that season's
+ * home.
  */
 export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string) => boolean): Route {
   switch (route.kind) {
     case "home":
+      return { ...route, season: to };
+    case "seasons":
     case "about":
       return { kind: "home", season: to };
     case "games":

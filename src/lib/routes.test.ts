@@ -14,6 +14,19 @@ test("the current season lives at the root and a past season under its id", () =
   assert.equal(routePath({ kind: "games", season: past }), "/2025-26/games/");
 });
 
+test("a conference's table lives under its name in either season", () => {
+  assert.equal(routePath({ kind: "home", season: now, conference: "East" }), "/east/");
+  assert.equal(routePath({ kind: "home", season: past, conference: "West" }), "/2025-26/west/");
+});
+
+test("the seasons list, the season menu's fallback, lives at /seasons/", () => {
+  assert.equal(routePath({ kind: "seasons" }), "/seasons/");
+});
+
+test("the season switch keeps the conference", () => {
+  assert.deepEqual(switchTarget({ kind: "home", season: now, conference: "East" }, past, anyTeam), { kind: "home", season: past, conference: "East" });
+});
+
 test("the season switch keeps the page but not a month, and a team the other season lacks goes to its home", () => {
   assert.deepEqual(switchTarget({ kind: "team", season: now, abbr: "OKC" }, past, anyTeam), { kind: "team", season: past, abbr: "OKC" });
   assert.deepEqual(switchTarget({ kind: "games", season: past, month: "2026-06" }, now, anyTeam), { kind: "games", season: now });

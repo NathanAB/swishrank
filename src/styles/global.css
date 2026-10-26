@@ -16,9 +16,12 @@
   --grid: #e1e1e5;
   --line-other: #a9abb2;
   --bar: #85878e;
-  /* How strongly the home chart draws each team's tint: at rest, and for the others while one is previewed. */
-  --tint-rest: 0.5;
-  --tint-dim: 0.25;
+  /* How strongly the home chart draws each team's tint at rest; a previewed team draws at full strength. */
+  --tint-rest: 0.3;
+  /* A switch's track, and the pill that raises its current option (components/Segmented.astro); the
+     season menu sits on the same track. */
+  --seg-track: #e9e9ec;
+  --seg-pill: #ffffff;
   --panel-edge: 1px solid var(--border);
   --shadow: none;
 
@@ -53,8 +56,8 @@
     --grid: #26252b;
     --line-other: #5b5c63;
     --bar: #727379;
-    /* The dark theme's team colours run brighter against its surface, so they rest a step fainter. */
-    --tint-rest: 0.45;
+    --seg-track: #222226;
+    --seg-pill: #38383e;
     /* Dark panels sit a step below the ground and lift on a soft shadow instead of a border. */
     --panel-edge: 0;
     --shadow: 0 12px 28px rgba(0, 0, 0, 0.2); /* taste-skill-ignore: the dealt data-terminal card shadow, dark only */

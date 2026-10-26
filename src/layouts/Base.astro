@@ -1,8 +1,9 @@
 ---
 // The shell every page shares: the top bar (mark, wordmark, nav), the title row (the page's h1, its
-// optional lede and the season switch) and the footer. Pages fill the default slot.
+// optional lede and the season menu) and the footer. Pages fill the default slot.
 import { Font } from "astro:assets";
 import "../styles/global.css";
+import SeasonMenu from "../components/SeasonMenu.astro";
 import { stamp } from "../lib/format.ts";
 import { href, withBase, type Route } from "../lib/routes.ts";
 import { BUILT_AT, currentSeason, routeSeason, seasonSwitch, type SeasonView } from "../lib/season.ts";
@@ -15,8 +16,8 @@ interface Props {
   /** The meta description; defaults to the site's. */
   description?: string;
   /**
-   * Which page this is: it decides the active nav item, the season and the season switch's targets. Leave it
-   * out for a page that is none of them, such as the not-found page: no nav item is active and no switch shows.
+   * Which page this is: it decides the active nav item, the season and the season menu's targets. Leave it
+   * out for a page that is none of them, such as the not-found page: no nav item is active and no menu shows.
    */
   route?: Route;
 }
@@ -28,7 +29,7 @@ const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
   { label: "Games", kinds: ["games"], to: (s) => ({ kind: "games", season: s }) },
 ];
-const switcher = !route || route.kind === "about" ? [] : seasonSwitch(route);
+const switcher = route && routeSeason(route) ? seasonSwitch(route) : [];
 const home = href({ kind: "home", season: currentSeason() });
 ---
 
@@ -67,13 +68,7 @@ const home = href({ kind: "home", season: currentSeason() });
           <h1>{title}</h1>
           {Astro.slots.has("lede") && <p class="lede"><slot name="lede" /></p>}
         </div>
-        {switcher.length > 1 && (
-          <nav class="seasons" aria-label="Season">
-            {switcher.map((s) => (
-              <a href={s.href} aria-current={s.active ? "page" : undefined}>{s.season.label}</a>
-            ))}
-          </nav>
-        )}
+        {switcher.length > 1 && <SeasonMenu options={switcher.map((s) => ({ label: s.season.label, href: s.href, current: s.active }))} />}
       </div>
       <slot />
     </main>
@@ -81,7 +76,7 @@ const home = href({ kind: "home", season: currentSeason() });
     <footer class="foot">
       <div class="foot-in">
         <p>Scores from <a href="https://www.espn.com/nba/scoreboard">ESPN</a>, pulled {stamp(BUILT_AT)}.</p>
-        <p><a href={href({ kind: "about" })}>How the ratings work</a></p>
+        <p><a href={href({ kind: "about" })}>How the ratings work</a> · <a href={href({ kind: "seasons" })}>All seasons</a></p>
       </div>
     </footer>
     <script>
@@ -113,11 +108,6 @@ const home = href({ kind: "home", season: currentSeason() });
   .lede { margin-top: 6px; max-width: 72ch; font-size: 15px; line-height: 22px; color: var(--muted); }
   .lede :global(b) { color: var(--text); font-weight: 500; }
 
-  .seasons { display: flex; align-items: flex-end; gap: 20px; flex: none; border-bottom: 1px solid var(--border); }
-  .seasons a { position: relative; display: block; padding: 6px 0 7px; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; transition: color 150ms ease; }
-  .seasons a:hover { color: var(--text); }
-  .seasons a[aria-current="page"] { color: var(--text); }
-  .seasons a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
 
   .foot { border-top: 1px solid var(--border); color: var(--muted); }
   .foot-in {
@@ -131,8 +121,6 @@ const home = href({ kind: "home", season: currentSeason() });
     .canvas { padding-top: 20px; }
     h1 { line-height: 28px; }
     .title-row { flex-direction: column; align-items: stretch; gap: 16px; }
-    /* 44px tall targets on a phone */
-    .seasons a { padding: 12px 0 11px; }
   }
   @media (max-width: 374px) {
     .bar-in, .nav { gap: 12px; }

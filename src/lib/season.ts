@@ -4,7 +4,8 @@ import list from "../data/seasons.json" with { type: "json" };
 import { compute, dayKey, type Abbr, type Game, type Season, type SeasonData, type Team } from "./elo.ts";
 import { seasonLabel } from "./format.ts";
 import { months } from "./results.ts";
-import { href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
+import { conferenceSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
+import { CONFERENCE_ORDER } from "./teams.ts";
 
 export type SeasonView = SeasonRef & {
   /** "2026–27" */
@@ -102,6 +103,12 @@ const seasonParam = (season: SeasonRef) => (season.current ? undefined : season.
 /** getStaticPaths for a page under src/pages/[...season]/: one page per season. */
 export const seasonPaths = () => allSeasons().map((season) => ({ params: { season: seasonParam(season) }, props: { season } }));
 
+/** getStaticPaths for src/pages/[...season]/[conference].astro: one home per conference per season. */
+export const conferencePaths = () =>
+  allSeasons().flatMap((season) =>
+    CONFERENCE_ORDER.map((conference) => ({ params: { season: seasonParam(season), conference: conferenceSlug(conference) }, props: { season, conference } })),
+  );
+
 /** getStaticPaths for a page per month of games: one per month with a final game, per season. */
 export const monthPaths = () =>
   allSeasons().flatMap((season) =>
@@ -114,11 +121,11 @@ export const teamPaths = () =>
     season.model.abbrs.map((abbr) => ({ params: { season: seasonParam(season), team: teamSlug(abbr) }, props: { season, abbr } })),
   );
 
-/** The season a page shows; the about page has none. */
+/** The season a page shows; the about and seasons pages have none. */
 export const routeSeason = (route: Route): SeasonView | null =>
-  route.kind === "about" ? null : (allSeasons().find((s) => s.id === route.season.id) ?? null);
+  route.kind === "about" || route.kind === "seasons" ? null : (allSeasons().find((s) => s.id === route.season.id) ?? null);
 
-/** The season switch for a page: one link per season to the same page in that season. */
+/** The season menu for a page: one link per season, newest first, to the same page in that season. */
 export const seasonSwitch = (route: Route) =>
   allSeasons().map((season) => ({
     season,

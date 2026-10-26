@@ -1,7 +1,38 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, type Game } from "./elo.ts";
-import { nextGames, stage } from "./teams.ts";
+import { readdirSync, readFileSync } from "node:fs";
+import { compute, type Game, type SeasonData } from "./elo.ts";
+import { conferenceOf, nextGames, stage, standings } from "./teams.ts";
+
+const dir = new URL("../data/games/", import.meta.url);
+const seasons: SeasonData[] = readdirSync(dir).map((f) => JSON.parse(readFileSync(new URL(f, dir), "utf8")));
+
+test("the conference map agrees with the data's Cup groups and playoff rounds", () => {
+  // Cup group games are played inside a conference, and every team plays four, so they pin all 30 teams;
+  // play-in and playoff notes name the conference outright.
+  const wrong: string[] = [];
+  for (const { season, games } of seasons) {
+    for (const g of games) {
+      const named = g.note?.match(/^(?:NBA Play-In - )?(East|West)\b/)?.[1];
+      const want = named ?? (g.note === "NBA Cup - Group Play" ? conferenceOf(g.home) : undefined);
+      if (want === undefined) continue;
+      for (const abbr of [g.home, g.away]) if (conferenceOf(abbr) !== want) wrong.push(`${season} ${g.id}: ${abbr} is not ${want}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test("a conference's table holds only its teams, ranked from 1 among themselves", () => {
+  const team = { color: "000000", alternateColor: "ffffff" };
+  const final = (id: string, home: string, away: string): Game => ({ id, t: "2026-10-25T23:00Z", home, away, hs: 110, as: 100, final: true, neutral: false, note: null });
+  // OKC (West) wins both its games, BOS (East) splits, NY (East) loses both: the league goes OKC, BOS, NY.
+  const model = compute({
+    season: "2026-27",
+    teams: { OKC: { name: "OKC", short: "OKC", ...team }, BOS: { name: "BOS", short: "BOS", ...team }, NY: { name: "NY", short: "NY", ...team } },
+    games: [final("1", "OKC", "BOS"), final("2", "OKC", "NY"), final("3", "BOS", "NY")],
+  });
+  assert.deepEqual(standings(model, "East"), { order: ["BOS", "NY"], rank: { BOS: 1, NY: 2 } });
+});
 
 test("Cup semifinals are regular-season games and conference semifinals are playoffs", () => {
   assert.deepEqual(stage("NBA Cup - Semifinals"), { phase: "regular", label: "Cup semifinal" });

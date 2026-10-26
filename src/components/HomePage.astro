@@ -1,0 +1,42 @@
+---
+// A season's home: the league table with every team's season drawn into it, for the whole league or one
+// conference, picked by the switch in the card's header.
+import Base from "../layouts/Base.astro";
+import LeagueTable from "./LeagueTable.astro";
+import Panel from "./Panel.astro";
+import Segmented from "./Segmented.astro";
+import { href } from "../lib/routes.ts";
+import type { SeasonView } from "../lib/season.ts";
+import { CONFERENCE_ORDER, type Conference } from "../lib/teams.ts";
+
+interface Props {
+  season: SeasonView;
+  /** The conference this page shows; leave it out for the whole league. */
+  conference?: Conference;
+}
+
+const { season, conference } = Astro.props;
+const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
+  label: c ?? "All",
+  href: href({ kind: "home", season, conference: c }),
+  current: c === conference,
+}));
+---
+
+<Base
+  title={`${season.label} ratings`}
+  docTitle={conference ? `${season.label} ${conference} ratings` : undefined}
+  route={{ kind: "home", season, conference }}
+>
+  <Fragment slot="lede"><a class="what" href={href({ kind: "about" })}>What's Elo?</a></Fragment>
+
+  <Panel title={conference ? `${conference}ern Conference` : "League table"}>
+    <Segmented slot="aside" label="Conference" options={views} />
+    <LeagueTable season={season} conference={conference} />
+  </Panel>
+</Base>
+
+<style>
+  .what { color: var(--muted); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; white-space: nowrap; }
+  .what:hover { color: var(--text); text-decoration-color: currentColor; }
+</style>

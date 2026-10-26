@@ -16,6 +16,8 @@ import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
   season: SeasonView;
+  /** The teams to draw, in rating order; leave it out for the whole league. The scale is always the league's. */
+  teams?: readonly Abbr[];
   /** The page's own team, on a team's page: its line alone is in the accent and labelled. */
   team?: Abbr;
   /** Plot height in px, the same at every width. */
@@ -27,7 +29,7 @@ interface Props {
   minDayWidth?: number;
 }
 
-const { season, team, height: H = 300, minDayWidth = 0 } = Astro.props;
+const { season, team, teams = season.model.order, height: H = 300, minDayWidth = 0 } = Astro.props;
 const m = season.model;
 const ser = m.series;
 const n = ser.length;
@@ -54,7 +56,7 @@ const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
 const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
 const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
 const tint = tintStyles(m.data.teams);
-const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === team) - Number(q === team));
+const drawOrder = [...teams].reverse().sort((p, q) => Number(p === team) - Number(q === team));
 
 const xLabels = dateTicks(ser.map((d) => d.day));
 const marker = playoffsMark(m);
@@ -67,7 +69,7 @@ const text = (a: Abbr) => (team ? m.data.teams[a].short : a);
 const PITCH = 6, GAP = 22, COL = 8 + 8 * Math.max(...m.abbrs.map((a) => a.length));
 const LANE = team ? GAP + 4 + 7 * text(team).length : GAP + 2 * COL;
 const last = ser[n - 1];
-const labels = m.order.filter((a) => !team || a === team).map((a) => ({ a, y: last ? y(last.r[a]) : 0, ly: 0 }));
+const labels = teams.filter((a) => !team || a === team).map((a) => ({ a, y: last ? y(last.r[a]) : 0, ly: 0 }));
 type Cluster = { list: typeof labels; sum: number; top: number; bot: number };
 const place = (c: Cluster) => {
   const span = (c.list.length - 1) * PITCH;
@@ -90,7 +92,7 @@ for (let merged = true; merged; ) {
 }
 for (const c of clusters) c.list.forEach((l, k) => (l.ly = c.top + k * PITCH));
 
-const label = `Daily rating of all ${m.abbrs.length} teams${n ? `, ${shortDay(ser[0].day)} to ${shortDay(ser[n - 1].day)}` : ""}, each starting at ${START}`;
+const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}${teams.length} teams${n ? `, ${shortDay(ser[0].day)} to ${shortDay(ser[n - 1].day)}` : ""}, each starting at ${START}`;
 const scroll = minDayWidth > 0;
 ---
 
@@ -179,7 +181,6 @@ const scroll = minDayWidth > 0;
   .leader { fill: none; stroke: var(--line-other); stroke-opacity: 0.6; stroke-width: 1; }
   .leader.own { stroke: var(--accent); stroke-opacity: 1; }
   .tinted :is(.line, .leader) { stroke: var(--tint); stroke-opacity: var(--tint-rest); }
-  .tinted:has(.hov) :is(.line, .leader):not(.hov) { stroke-opacity: var(--tint-dim); }
   .tinted .line.hov { stroke: var(--tint); stroke-opacity: 1; stroke-width: 1.75; }
   .tinted .leader.hov { stroke-opacity: 1; }
   .lab.hov { fill: var(--text); }

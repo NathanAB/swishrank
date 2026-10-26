@@ -1,6 +1,7 @@
 ---
 // A card: a titled section on the surface tone. Every block on a page sits in one. Other attributes
-// (class, data-*) land on the section, so a page can place the card with its own scoped classes.
+// (class, data-*) land on the section, so a page can place the card with its own scoped classes. The
+// "aside" slot sits at the header's right end, such as a switch for what the card shows.
 import type { HTMLAttributes } from "astro/types";
 
 interface Props extends Omit<HTMLAttributes<"section">, "title"> {
@@ -22,6 +23,7 @@ const headingId = hid ?? `h-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
   <header class="head">
     <h2 id={headingId}>{title}</h2>
     {meta && <p class="meta">{meta}</p>}
+    {Astro.slots.has("aside") && <div class="aside"><slot name="aside" /></div>}
   </header>
   <div class="body"><slot /></div>
 </section>
@@ -34,6 +36,10 @@ const headingId = hid ?? `h-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
   .head { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; margin-bottom: 8px; }
   h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
   .meta { min-width: 0; color: var(--muted); }
+  .aside { margin-left: auto; }
+  @media (max-width: 640px) {
+    .aside { flex-basis: 100%; }
+  }
   .fill { flex: 1 1 auto; display: flex; flex-direction: column; }
   .fill > .body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 </style>

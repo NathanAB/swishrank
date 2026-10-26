@@ -7,7 +7,9 @@
 // fractions of the rows' height and stretched over them, so it fits the desktop's one-line rows and the
 // phone's two-line rows without measuring anything in the browser. Narrower, the chart stacks above the
 // table on its own axis, and the table keeps its scale. Each team's line, curve and dot carry a faint tint of
-// its colour (lib/tint.ts), which goes full strength while the team is previewed; the rows stay ink.
+// its colour (lib/tint.ts), which goes full strength while the team is previewed; the rows stay ink. Given a
+// conference, only its teams are drawn and listed, ranked among themselves, on the same league-wide scale, so
+// a rating sits at the same height in every view.
 import RatingChart from "./RatingChart.astro";
 import { dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START } from "../lib/elo.ts";
@@ -15,18 +17,22 @@ import { ratingRange } from "../lib/facts.ts";
 import { rating, record } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
+import { standings, type Conference } from "../lib/teams.ts";
 import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
   season: SeasonView;
+  /** The conference to show; leave it out for the whole league. */
+  conference?: Conference;
 }
 
-const { season } = Astro.props;
+const { season, conference } = Astro.props;
 const m = season.model;
+const { order, rank } = standings(m, conference);
 
-const shown = Object.fromEntries(m.order.map((a) => [a, Math.round(m.r[a])]));
+const shown = Object.fromEntries(order.map((a) => [a, Math.round(m.r[a])]));
 const { lo, hi } = ratingRange(m);
-const n = m.order.length;
+const n = order.length;
 const tint = tintStyles(m.data.teams);
 // Fractions of the body's height: row i's centre, and a rating's place on a scale from the first row's
 // centre (the season's top rating) to the last row's (its bottom one).
@@ -42,20 +48,23 @@ const marks: number[] = [];
 for (let v = START - Math.floor((START - lo) / step) * step; v <= hi; v += step) marks.push(v);
 
 // Curves and lines are drawn bottom team first, so the top team's sit on top.
-const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) })).reverse();
+const curves = order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) })).reverse();
 
 // The chart, from the day before opening night on its left edge to the latest day on the scale's axis.
 const ser = m.series;
 const charted = ser.length >= 2;
 const X = 1000; // the plot's viewBox width
 const at = (i: number) => i / (ser.length - 1);
-const lines = m.order.map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(d.r[a]))}`).join(" ") })).reverse();
+// Each line ends on its dot, at the displayed rating.
+const lines = order
+  .map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(i === ser.length - 1 ? shown[a] : d.r[a]))}`).join(" ") }))
+  .reverse();
 const dates = dateTicks(ser.map((d) => d.day));
 const playoffs = playoffsMark(m);
 ---
 
 <div class:list={["lt", { charted }]}>
-  <div class="stacked"><RatingChart season={season} height={400} minDayWidth={2} /></div>
+  <div class="stacked"><RatingChart season={season} teams={order} height={400} minDayWidth={2} /></div>
   <table>
     <thead>
       <tr>
@@ -70,7 +79,7 @@ const playoffs = playoffsMark(m);
       </tr>
     </thead>
     <tbody>
-      {m.order.map((a, i) => {
+      {order.map((a, i) => {
         const s = m.stats[a];
         return (
           <tr data-team={a}>
@@ -103,7 +112,7 @@ const playoffs = playoffsMark(m);
                 </div>
               </td>
             )}
-            <td class="num rank">{m.rank[a]}</td>
+            <td class="num rank">{rank[a]}</td>
             <td class="team">
               <a class="go" href={href({ kind: "team", season, abbr: a })} data-team={a} data-preview><span class="name">{m.data.teams[a].short}</span></a>
               <span class="sub">{record(s.W, s.L)}</span>
@@ -180,7 +189,6 @@ const playoffs = playoffsMark(m);
   .marker { stroke: var(--muted); stroke-width: 1; }
   .line { stroke: var(--tint); stroke-opacity: var(--tint-rest); stroke-width: 1; stroke-linejoin: round; }
   .line.hov { stroke-opacity: 1; stroke-width: 1.75; }
-  .lt:has(.hov) :is(.line, .lead):not(.hov) { stroke-opacity: var(--tint-dim); }
   .tick {
     position: absolute; right: calc(100% - var(--tl) + 8px); transform: translateY(-50%);
     font-size: 11px; line-height: 12px; color: var(--muted);
@@ -190,7 +198,6 @@ const playoffs = playoffsMark(m);
     position: absolute; left: calc(100% - var(--cv)); width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
     background: color-mix(in srgb, var(--tint) calc(var(--tint-rest) * 100%), var(--surface)); box-shadow: 0 0 0 1.5px var(--surface);
   }
-  .lt:has(.hov) .dot:not(.hov) { background: color-mix(in srgb, var(--tint) calc(var(--tint-dim) * 100%), var(--surface)); }
   .dot.hov { background: var(--tint); }
   .mark-label {
     position: absolute; bottom: 2px; left: calc(var(--tl) + (100% - var(--tl) - var(--cv)) * var(--at));

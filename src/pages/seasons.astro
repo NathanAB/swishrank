@@ -1,0 +1,22 @@
+---
+// Every season as a plain link to its home, newest first: where the season menu leads without script.
+import Panel from "../components/Panel.astro";
+import Base from "../layouts/Base.astro";
+import { href } from "../lib/routes.ts";
+import { allSeasons } from "../lib/season.ts";
+---
+
+<Base title="Seasons" route={{ kind: "seasons" }}>
+  <Panel title="Every season">
+    <ul>
+      {allSeasons().map((s) => (
+        <li><a href={href({ kind: "home", season: s })}>{s.label}</a>{s.current && <span> · in progress</span>}</li>
+      ))}
+    </ul>
+  </Panel>
+</Base>
+
+<style>
+  li { padding: 6px 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+  a { color: var(--text); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+</style>

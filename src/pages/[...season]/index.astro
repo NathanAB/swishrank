@@ -1,10 +1,6 @@
 ---
-// A season's home: the league table with every team's season drawn into it.
-// / is the current season and /<id>/ every other one.
-import LeagueTable from "../../components/LeagueTable.astro";
-import Panel from "../../components/Panel.astro";
-import Base from "../../layouts/Base.astro";
-import { href } from "../../lib/routes.ts";
+// A season's home for the whole league. / is the current season and /<id>/ every other one.
+import HomePage from "../../components/HomePage.astro";
 import { seasonPaths, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
@@ -18,15 +14,4 @@ interface Props {
 const { season } = Astro.props;
 ---
 
-<Base title={`${season.label} ratings`} route={{ kind: "home", season }}>
-  <Fragment slot="lede"><a class="what" href={href({ kind: "about" })}>What's Elo?</a></Fragment>
-
-  <Panel title="League table">
-    <LeagueTable season={season} />
-  </Panel>
-</Base>
-
-<style>
-  .what { color: var(--muted); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; white-space: nowrap; }
-  .what:hover { color: var(--text); text-decoration-color: currentColor; }
-</style>
+<HomePage season={season} />

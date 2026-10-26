@@ -1,8 +1,35 @@
-// One team's season as the team pages show it. Every change is the displayed one (facts.ts outcome), so a
-// team's log agrees with the league's lists.
-import { addDays, dayKey, type Abbr, type Game, type Result, type Season } from "./elo.ts";
+// One team's season as the team pages show it, and the conference each team plays in. Every change is the
+// displayed one (facts.ts outcome), so a team's log agrees with the league's lists.
+import { addDays, dayKey, ranksOf, type Abbr, type Game, type Result, type Season } from "./elo.ts";
 import { outcome, type Line } from "./facts.ts";
 import { WEEK } from "./fixtures.ts";
+
+export type Conference = "East" | "West";
+
+export const CONFERENCE_ORDER: readonly Conference[] = ["East", "West"];
+
+/**
+ * The two conferences, which seed the playoffs. The game data has no conference field, so this is the one
+ * place it lives, under ESPN's abbreviations; teams.test.ts checks it against the data's Cup groups and
+ * playoff rounds.
+ */
+export const CONFERENCES: Record<Conference, readonly Abbr[]> = {
+  East: ["ATL", "BKN", "BOS", "CHA", "CHI", "CLE", "DET", "IND", "MIA", "MIL", "NY", "ORL", "PHI", "TOR", "WSH"],
+  West: ["DAL", "DEN", "GS", "HOU", "LAC", "LAL", "MEM", "MIN", "NO", "OKC", "PHX", "POR", "SA", "SAC", "UTAH"],
+};
+
+/** A team's conference, or null for a team the map does not know yet (an expansion team). */
+export const conferenceOf = (abbr: Abbr): Conference | null => CONFERENCE_ORDER.find((c) => CONFERENCES[c].includes(abbr)) ?? null;
+
+/**
+ * The league table, or one conference's part of it: its teams in rating order, ranked among themselves (1 to
+ * 15 in a conference), the same standard competition ranks as the league's.
+ */
+export function standings(model: Season, conference?: Conference): { order: Abbr[]; rank: Record<Abbr, number> } {
+  if (!conference) return { order: model.order, rank: model.rank };
+  const order = model.order.filter((a) => conferenceOf(a) === conference);
+  return { order, rank: ranksOf(Object.fromEntries(order.map((a) => [a, model.r[a]]))) };
+}
 
 export type Phase = "regular" | "play-in" | "playoffs";
 /** What kind of game it was, and a short tag for it ("Finals game 3", "Cup", "Berlin"), if any. */
