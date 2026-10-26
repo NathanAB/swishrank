@@ -3,7 +3,8 @@
 // team is a dot at its true rating, joined by a curve to its row, so ties bunch and the gaps between
 // tiers open up. It is drawn in row units and stretched over the rows, so it fits the desktop's
 // one-line rows and the phone's two-line rows without measuring anything in the browser.
-import { dayChanges } from "../lib/facts.ts";
+import { START } from "../lib/elo.ts";
+import { dayChanges, widestGap } from "../lib/facts.ts";
 import { DASH, rating, record, shortDay, signed } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
@@ -30,6 +31,29 @@ const rowY = (i: number) => (i + 0.5) / n;
 const valY = (v: number) => (hi === lo ? 0.5 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
 const Y = 1000; // the ladder's viewBox height
 const f = (x: number) => (x * Y).toFixed(1);
+
+// Round values to label on the scale, counted from 1500 so every gap between them is the same step. At most
+// six steps across the range keeps them over 150px apart on the desktop's 960px body.
+const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 6) ?? 500;
+const marks: number[] = [];
+for (let v = START - Math.floor((START - lo) / step) * step; v <= hi; v += step) marks.push(v);
+
+// The widest gap is a bar on the axis with its size beside it in the tick lane, centred on the longest stretch
+// of the bar that stays 14px clear of every tick (the bar's middle when no stretch does).
+const gap = widestGap(m);
+const gapBar = gap && gap.points > 0 ? { top: valY(shown[gap.upper]), bottom: valY(shown[gap.lower]), text: `${gap.points} pts` } : null;
+const CLEAR = 14 / 960;
+let clear: [number, number][] = gapBar ? [[gapBar.top, gapBar.bottom]] : [];
+for (const t of marks.map(valY)) {
+  clear = clear.flatMap(([a, b]): [number, number][] => {
+    if (t + CLEAR <= a || t - CLEAR >= b) return [[a, b]];
+    const parts: [number, number][] = [[a, t - CLEAR], [t + CLEAR, b]];
+    return parts.filter(([x, y]) => y > x);
+  });
+}
+const longest = clear.sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
+const gapLabelY = gapBar && (longest ? (longest[0] + longest[1]) / 2 : (gapBar.top + gapBar.bottom) / 2);
+
 const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }));
 ---
 
@@ -37,7 +61,7 @@ const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }))
   <table>
     <thead>
       <tr>
-        <th class="lad" scope="col"></th>
+        <th class="lad" scope="col"><span class="lad-label">Rating to scale</span></th>
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
         <th class="team" scope="col">Team<span class="sub"> · W–L</span></th>
         <th class="num" scope="col">Rating</th>
@@ -54,7 +78,13 @@ const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }))
             {i === 0 && (
               <td class="lad" rowspan={n} aria-hidden="true">
                 <div class="lad-in">
+                  {marks.map((v) => (
+                    <span class:list={["tick", { start: v === START }]} style={`top: ${(valY(v) * 100).toFixed(2)}%`}>{v}</span>
+                  ))}
+                  {gapBar && gapLabelY !== null && <span class="tick gap-label" style={`top: ${(gapLabelY * 100).toFixed(2)}%`}>{gapBar.text}</span>}
                   <svg viewBox={`0 0 100 ${Y}`} preserveAspectRatio="none">
+                    <path class="axis" d={`M0,${f(valY(hi))}V${f(valY(lo))}`} />
+                    {gapBar && <path class="gap" d={`M0,${f(gapBar.top)}V${f(gapBar.bottom)}`} />}
                     {curves.map((c) => (
                       <path class="lead" data-team={c.a} data-raise d={`M0,${f(c.from)}C50,${f(c.from)} 50,${f(c.to)} 100,${f(c.to)}`} />
                     ))}
@@ -82,7 +112,7 @@ const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }))
 </div>
 
 <style>
-  .lt { --row: 32px; --lad: 88px; --axis: 6px; }
+  .lt { --row: 32px; --lad: 124px; --axis: 38px; }
   table { width: 100%; border-collapse: collapse; }
   th {
     height: 36px; padding: 0 8px; font-size: var(--fs-small); font-weight: 400; color: var(--muted);
@@ -117,8 +147,16 @@ const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }))
   .lad-in { position: absolute; inset: 0; }
   .lad svg { position: absolute; top: 0; bottom: 0; left: var(--axis); width: calc(100% - var(--axis)); height: 100%; overflow: visible; }
   .lad path { fill: none; vector-effect: non-scaling-stroke; }
+  .axis { stroke: var(--grid); stroke-width: 1; }
+  .gap { stroke: var(--text); stroke-width: 2; }
   .lead { stroke: var(--line-other); stroke-opacity: 0.7; stroke-width: 1; transition: stroke 120ms ease; }
   .lead.hov { stroke: var(--text); stroke-opacity: 1; }
+  .tick {
+    position: absolute; right: calc(100% - var(--axis) + 8px); transform: translateY(-50%);
+    font-size: 11px; line-height: 12px; color: var(--muted);
+  }
+  .tick.start { color: var(--text); font-weight: 500; }
+  .gap-label { white-space: nowrap; }
   .dot {
     position: absolute; left: var(--axis); width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
     background: var(--bar); box-shadow: 0 0 0 1.5px var(--surface);
@@ -127,11 +165,12 @@ const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }))
 
   /* Phone: one two-line row per team, with the other figures on the second line. */
   @media (max-width: 640px) {
-    .lt { --row: 48px; --lad: 40px; --axis: 4px; }
+    .lt { --row: 48px; --lad: 46px; --axis: 28px; }
     /* The curves stop short of the rank, which sits flush against the ladder on a phone. */
     .lad svg { width: calc(100% - var(--axis) - 5px); }
     table { table-layout: fixed; }
     th, td { padding: 0 4px; }
+    th.lad { font-size: 0; }
     th.rank { width: 22px; padding: 0 2px; }
     td.rank { padding: 0 2px; }
     th.num:not(.opt):not(.rank) { width: 76px; }

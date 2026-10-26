@@ -63,6 +63,18 @@ export function dayChanges(model: Season, day: string): Map<Abbr, number> {
 /** Teams that share first place on the displayed ratings, in table order. */
 export const leaders = (model: Season) => model.order.filter((a) => model.rank[a] === 1);
 
+/** The widest gap between neighbours in the table, on the displayed ratings. */
+export function widestGap(model: Season): { points: number; upper: Abbr; lower: Abbr } | null {
+  let best: { points: number; upper: Abbr; lower: Abbr } | null = null;
+  for (let i = 1; i < model.order.length; i++) {
+    const upper = model.order[i - 1];
+    const lower = model.order[i];
+    const points = Math.round(model.r[upper]) - Math.round(model.r[lower]);
+    if (!best || points > best.points) best = { points, upper, lower };
+  }
+  return best;
+}
+
 export type Finals = { champion: Abbr; runnerUp: Abbr; wins: number; losses: number; games: Result[] };
 
 const isFinals = (r: Result) => r.game.note?.startsWith("NBA Finals") ?? false;
