@@ -31,8 +31,8 @@ export function getStaticPaths() {
 
 type Props = { season: SeasonView; image: ShareImage };
 
-const [light, dark] = css.replace(/\/\*[\s\S]*?\*\//g, "").split("@media (prefers-color-scheme: dark)");
-if (dark === undefined) throw new Error("styles/global.css has no dark-scheme block to end the light theme's tokens");
+const [light, dark] = css.replace(/\/\*[\s\S]*?\*\//g, "").split(':root[data-theme="dark"]');
+if (dark === undefined) throw new Error("styles/global.css has no dark-theme block to end the light theme's tokens");
 const LIGHT = new Map([...light.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 
 /** A light-theme token with its var()s filled in; `own` adds properties, such as a team's --tint-light. */

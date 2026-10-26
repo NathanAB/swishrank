@@ -1,10 +1,10 @@
 /* Tokens from the data-terminal prototype: a true neutral palette, Public Sans, and basketball-leather
    orange as the one accent. The accent marks the mark, a selection (a 1px line as wide as its label), focus
    and the about page's worked examples; everything else is ink and greys, but for the charts' lines, which
-   carry each team's colour. Light follows the system's light mode with its own values, not an inversion of
-   dark. Every page but the ratings chart keeps to a 1200px column. */
+   carry each team's colour. Dark has its own values, not an inversion of light, and applies when the root's
+   data-theme is dark: the system's setting until the reader picks one with the switch in the top bar. Every page but the ratings chart keeps to a 1200px column. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   /* Cards sit lighter than the page in both themes, edged by a border a step darker than either, so every
      card reads as a raised surface. */
   --ground: #f0f0f0;
@@ -49,27 +49,26 @@
 /* A team's line colour for this theme (lib/tint.ts), on whatever draws that team, and its resting shade. */
 [data-team] { --tint: var(--tint-light); --tint-rest: color-mix(in oklab, var(--tint) var(--tint-mix), var(--line-other)); }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #0c0c0c;
-    --surface: #191919;
-    --border: #2e2e2e;
-    --rule: #242424;
-    --control: #444444;
-    --text: #f5f5f5;
-    --muted: #999999;
-    --accent: #f08c3a;
-    --grid: #2a2a2a;
-    --line-other: #646464;
-    --bar: #737373;
-    /* The dark theme's grey line sits low against its surface, so it takes a little more of the team colour. */
-    --tint-mix: 50%;
-    --seg-track: #262626;
-    --seg-pill: #454545;
-    --seg-lift: none;
-  }
-  [data-team] { --tint: var(--tint-dark); }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0c0c0c;
+  --surface: #191919;
+  --border: #2e2e2e;
+  --rule: #242424;
+  --control: #444444;
+  --text: #f5f5f5;
+  --muted: #999999;
+  --accent: #f08c3a;
+  --grid: #2a2a2a;
+  --line-other: #646464;
+  --bar: #737373;
+  /* The dark theme's grey line sits low against its surface, so it takes a little more of the team colour. */
+  --tint-mix: 50%;
+  --seg-track: #262626;
+  --seg-pill: #454545;
+  --seg-lift: none;
 }
+:root[data-theme="dark"] [data-team] { --tint: var(--tint-dark); }
 
 
 @media (max-width: 640px) {
