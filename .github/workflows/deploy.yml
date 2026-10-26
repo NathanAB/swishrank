@@ -27,6 +27,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      fetch: ${{ steps.fetch.outcome }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -34,9 +36,14 @@ jobs:
           node-version: 24
       - name: Test the Elo math
         run: npm test
+      # A failed fetch writes nothing, so the site still builds and deploys on the scores already committed, and
+      # an outage at ESPN never holds back a change to the site. The fetch-failed job below then turns the run red.
       - name: Fetch this season's games from ESPN
+        id: fetch
+        continue-on-error: true
         run: npm run fetch
       - name: Commit new scores
+        if: steps.fetch.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -56,3 +63,12 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  fetch-failed:
+    needs: [build, deploy]
+    if: always() && needs.build.outputs.fetch == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::The ESPN fetch failed, so the site went out with the scores it already had. The build job's fetch step says why."
+          exit 1

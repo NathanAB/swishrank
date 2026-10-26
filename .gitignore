@@ -25,3 +25,6 @@ pnpm-debug.log*
 
 # agent worktrees
 .claude/
+
+# Launch research: strategy notes kept out of this public repo.
+docs/research/

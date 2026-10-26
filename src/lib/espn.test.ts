@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dayKey, type SeasonData } from "./elo.ts";
-import { canonicalNote, parse, type EspnEvent } from "./espn.ts";
+import { canonicalNote, lostFinals, parse, type EspnEvent } from "./espn.ts";
 import { stage } from "./teams.ts";
 
 const side = (homeAway: "home" | "away", id: string, abbreviation: string) => ({
@@ -38,4 +38,20 @@ test("older seasons' playoff notes read as the same rounds as today's", () => {
   assert.equal(stage(canonicalNote("WEST PLAY-IN - GAME 1")).phase, "play-in");
   assert.equal(canonicalNote("NBA LONDON GAME"), "NBA London Game");
   assert.equal(parse("2015-16", [event("1", "2016-04-17T17:00Z", "EASTERN CONFERENCE 1ST ROUND - GAME 1")], {})[0].note, "East 1st Round - Game 1");
+});
+
+test("a final game without two whole scores stops the fetch instead of counting as 0 or dropping out", () => {
+  const scored = (score: string | undefined) => {
+    const e = event("1", "2026-10-25T23:00Z");
+    e.competitions[0].competitors[0].score = score;
+    return e;
+  };
+  assert.equal(parse("2026-27", [scored("98")], {})[0].hs, 98);
+  assert.throws(() => parse("2026-27", [scored("")], {}), /whole score/);
+  assert.throws(() => parse("2026-27", [scored(undefined)], {}), /whole score/);
+});
+
+test("a fetch that no longer has a game as final is caught before it overwrites the season", () => {
+  const g = (id: string, final: boolean) => ({ id, t: "2026-10-25T23:00Z", home: "A", away: "B", hs: final ? 1 : null, as: final ? 0 : null, final, neutral: false, note: null });
+  assert.deepEqual(lostFinals([g("1", true), g("2", true), g("3", false)], [g("1", true), g("3", true), g("4", false)]), ["2"]);
 });

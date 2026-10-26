@@ -62,14 +62,20 @@ export function parse(season: string, events: readonly EspnEvent[], teams: Recor
     const { home, away } = side;
     if (!home || !away) throw new Error(`ESPN event ${e.id} lacks a home or away side`);
     const final = Boolean(status.completed);
+    // A final game without two whole scores is a fault in ESPN's feed: a blank would count as 0 and a missing
+    // score would drop the game from the fit, so the fetch stops and the committed scores stay as they were.
+    const score = (c: Competitor) => {
+      if (!/^\d+$/.test(c.score ?? "")) throw new Error(`ESPN event ${e.id} is final without a whole score for ${c.team.abbreviation}`);
+      return Number(c.score);
+    };
     const note = comp.notes?.find((n) => n.headline)?.headline;
     games.push({
       id: e.id,
       t: e.date,
       home: home.team.abbreviation,
       away: away.team.abbreviation,
-      hs: final ? Number(home.score) : null,
-      as: final ? Number(away.score) : null,
+      hs: final ? score(home) : null,
+      as: final ? score(away) : null,
       final,
       neutral: Boolean(comp.neutralSite) || inBubble(season, e.date),
       note: note ? canonicalNote(note) : null,
@@ -77,3 +83,12 @@ export function parse(season: string, events: readonly EspnEvent[], teams: Recor
   }
   return games;
 }
+
+/**
+ * The games final in `before` that `after` no longer has as final. A final game never goes back, so any here
+ * means ESPN sent a partial season, and writing it would drop those games from the ratings.
+ */
+export const lostFinals = (before: readonly Game[], after: readonly Game[]): string[] => {
+  const final = new Set(after.filter((g) => g.final).map((g) => g.id));
+  return before.filter((g) => g.final && !final.has(g.id)).map((g) => g.id);
+};
