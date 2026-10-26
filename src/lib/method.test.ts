@@ -12,7 +12,7 @@ const game = (id: string, away: string, home: string, as: number, hs: number, ne
 });
 const results = (games: Game[]) => compute({ season: "x", teams, games }).results;
 
-test("picks the favourite's narrowest win, the underdog's narrowest and the favourite's widest, earliest first on a tie", () => {
+test("with no margin in common, picks the favourite's narrowest win, the underdog's narrowest and the favourite's widest, earliest first on a tie", () => {
   const { opener, contrasts } = examples(results([
     game("fav by 5", "A", "B", 100, 105),
     game("fav by 2", "C", "D", 100, 102),
@@ -26,6 +26,21 @@ test("picks the favourite's narrowest win, the underdog's narrowest and the favo
   assert.deepEqual(
     contrasts.map((c) => [c.kind, c.game.result.game.id, c.margin]),
     [["close", "fav by 2", 2], ["upset", "dog by 4", 4], ["blowout", "fav by 30", 30]],
+  );
+});
+
+test("compares the favourite's and the underdog's wins at the narrowest margin both have won by", () => {
+  const { contrasts } = examples(results([
+    game("fav by 2", "A", "B", 100, 102),
+    game("fav by 5", "C", "D", 100, 105),
+    game("dog by 3", "E", "F", 103, 100),
+    game("dog by 5", "G", "H", 105, 100),
+    game("fav by 7", "I", "J", 93, 100),
+    game("dog by 7", "K", "L", 107, 100),
+  ]));
+  assert.deepEqual(
+    contrasts.map((c) => [c.kind, c.game.result.game.id]),
+    [["close", "fav by 5"], ["upset", "dog by 5"], ["blowout", "fav by 7"]],
   );
 });
 
