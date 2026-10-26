@@ -2,7 +2,7 @@
 // displayed one (facts.ts outcome), so a team's log agrees with the league's lists.
 import { addDays, dayKey, ranksOf, START, type Abbr, type Game, type Result, type Season, type TeamStats } from "./elo.ts";
 import { outcome, type Line } from "./facts.ts";
-import { DASH, rating } from "./format.ts";
+import { DASH, ordinal, rating } from "./format.ts";
 import { WEEK } from "./fixtures.ts";
 
 export type Conference = "East" | "West";
@@ -30,6 +30,12 @@ export function standings(model: Season, conference?: Conference): { order: Abbr
   if (!conference) return { order: model.order, rank: model.rank };
   const order = model.order.filter((a) => conferenceOf(a) === conference);
   return { order, rank: ranksOf(Object.fromEntries(order.map((a) => [a, model.r[a]]))) };
+}
+
+/** A team's place in the league table: "9th", or "tied 9th" when another team shares its rank. */
+export function place(model: Season, abbr: Abbr): string {
+  const tied = model.order.some((a) => a !== abbr && model.rank[a] === model.rank[abbr]);
+  return `${tied ? "tied " : ""}${ordinal(model.rank[abbr])}`;
 }
 
 export type Phase = "regular" | "play-in" | "playoffs";

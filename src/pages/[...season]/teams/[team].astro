@@ -9,10 +9,11 @@ import RatingChart from "../../../components/RatingChart.astro";
 import SeasonMenu from "../../../components/SeasonMenu.astro";
 import Base from "../../../layouts/Base.astro";
 import { dayKey, gap, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
-import { ordinal, pct, rating, record, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
+import { pct, rating, record, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
+import { teamDescription } from "../../../lib/meta.ts";
 import { href, type Route } from "../../../lib/routes.ts";
 import { TODAY, noGamesAhead, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
-import { highLow, includesPostseason, nextGames, stage, teamGames, type Venue } from "../../../lib/teams.ts";
+import { highLow, includesPostseason, nextGames, place, stage, teamGames, type Venue } from "../../../lib/teams.ts";
 
 export function getStaticPaths() {
   return teamPaths();
@@ -29,11 +30,10 @@ const m = season.model;
 const me = team(season, abbr);
 const s = m.stats[abbr];
 const games = teamGames(m, abbr);
-const tied = m.order.filter((a) => m.rank[a] === m.rank[abbr]).length > 1;
 const prep = (v: Venue) => (v === "away" ? "at" : "vs");
 
 const kpis: Kpi[] = [
-  { label: "Rating", value: rating(m.r[abbr]), unit: `${tied ? "tied " : ""}${ordinal(m.rank[abbr])}` },
+  { label: "Rating", value: rating(m.r[abbr]), unit: place(m, abbr) },
   { label: includesPostseason(games.map((g) => g.result)) ? "Record incl. playoffs" : "Record", value: record(s.W, s.L) },
   { label: "High / low", ...highLow(s) },
 ];
@@ -52,8 +52,8 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
 
 <Base
   title={me.name}
-  docTitle={`${me.name} ${season.label}`}
-  description={`${season.label} Elo rating, game log${season.current ? " and next games" : ""} for the ${me.name}.`}
+  docTitle={`${me.name} power ranking ${season.label}`}
+  description={teamDescription(season, abbr)}
   route={route}
   ownHeading
 >

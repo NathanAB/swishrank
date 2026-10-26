@@ -6,6 +6,7 @@ import LeagueTable from "./LeagueTable.astro";
 import Panel from "./Panel.astro";
 import SeasonMenu from "./SeasonMenu.astro";
 import Segmented from "./Segmented.astro";
+import { homeDescription, homeTitle } from "../lib/meta.ts";
 import { href, type Route } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
 import { CONFERENCE_ORDER, type Conference } from "../lib/teams.ts";
@@ -27,7 +28,8 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
 
 <Base
   title={`${season.label} ratings`}
-  docTitle={conference ? `${season.label} ${conference} ratings` : undefined}
+  docTitle={homeTitle(season, conference)}
+  description={homeDescription(season, conference)}
   route={route}
   ownHeading
 >

@@ -13,7 +13,12 @@ const rows = allSeasons().map((s) => {
 });
 ---
 
-<Base title="Seasons" route={{ kind: "seasons" }} ownHeading>
+<Base
+  title="Seasons"
+  description={`Every NBA season since ${rows[rows.length - 1].s.label}, with each season's top-rated team.`}
+  route={{ kind: "seasons" }}
+  ownHeading
+>
   <Panel level={1} class="seasons" title="Seasons">
     <table>
       <thead>
