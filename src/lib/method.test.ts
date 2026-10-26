@@ -1,24 +1,36 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { compute, K } from "./elo.ts";
-import { winWorth, worked } from "./method.ts";
+import { compute, type Game } from "./elo.ts";
+import { examples } from "./method.ts";
 
-const load = (id: string) => compute(JSON.parse(readFileSync(new URL(`../data/games/${id}.json`, import.meta.url), "utf8")));
-const opener = worked(load("2026-27").results[0]);
+// Every team plays once, on opening night, so each home team is the same 64% favourite and only the
+// margin and who won tell the games apart.
+const abbrs = "ABCDEFGHIJKLMN".split("");
+const teams = Object.fromEntries(abbrs.map((a) => [a, { name: `Team ${a}`, short: a }]));
+const game = (id: string, away: string, home: string, as: number, hs: number, neutral = false): Game => ({
+  id, t: "2026-10-20T23:00Z", home, away, hs, as, final: true, neutral, note: null,
+});
+const results = (games: Game[]) => compute({ season: "x", teams, games }).results;
 
-test("the 2026-27 opener comes apart into the figures the about page prints", () => {
-  const { home, away, winner } = opener;
+test("picks the favourite's narrowest and widest wins and the underdog's narrowest, earliest first on a tie", () => {
+  const { opener, contrasts } = examples(results([
+    game("fav by 5", "A", "B", 100, 105),
+    game("fav by 2", "C", "D", 100, 102),
+    game("fav by 2, later", "E", "F", 90, 92),
+    game("fav by 30", "G", "H", 100, 130),
+    game("dog by 9", "I", "J", 109, 100),
+    game("dog by 4", "K", "L", 104, 100),
+    game("even, by 1", "M", "N", 101, 100, true),
+  ]));
+  assert.equal(opener?.result.game.id, "fav by 5");
   assert.deepEqual(
-    { home: home.abbr, edge: home.edge, gap: opener.gap, chance: Math.round(home.chance * 100), margin: opener.margin, multiplier: opener.multiplier.toFixed(2), moved: winner.moved.toFixed(2), shown: [home.change, away.change] },
-    { home: "DET", edge: 100, gap: 100, chance: 64, margin: 8, multiplier: "0.84", moved: "6.05", shown: [6, -6] },
+    contrasts.map((c) => [c.kind, c.game.result.game.id, c.margin]),
+    [["close", "fav by 2", 2], ["blowout", "fav by 30", 30], ["upset", "dog by 4", 4]],
   );
-  // Each team's column of the ledger multiplies out to the points it moved.
-  for (const side of [home, away]) assert.ok(Math.abs(K * opener.multiplier * side.surprise - side.moved) < 1e-9, side.abbr);
 });
 
-test("the what-a-win-is-worth table agrees with the opener for its margin", () => {
-  assert.equal(winWorth(opener.margin).home, opener.home.change);
-  const by10 = winWorth(10);
-  assert.ok(by10.road > by10.neutral && by10.neutral > by10.home, JSON.stringify(by10));
+test("leaves out a kind with no game yet", () => {
+  assert.deepEqual(examples([]), { opener: null, contrasts: [] });
+  const { contrasts } = examples(results([game("fav by 5", "A", "B", 100, 105)]));
+  assert.deepEqual(contrasts.map((c) => c.kind), ["close", "blowout"]);
 });

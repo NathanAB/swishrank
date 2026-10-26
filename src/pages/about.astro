@@ -1,96 +1,82 @@
 ---
-// How the ratings work, for fans: the fresh start at 1500, one real game worked through step by step,
-// what a rating gap and a margin are worth, which games count, and where the scores come from. Every
-// figure comes from elo.ts, so the page cannot disagree with the ratings it explains.
+// How the ratings work, for a fan who has never heard of Elo: four steps, each one sentence and one small
+// drawing of real games. Every figure comes from elo.ts, so the page cannot disagree with the ratings.
 import Panel from "../components/Panel.astro";
 import Base from "../layouts/Base.astro";
-import { HCA, K, START } from "../lib/elo.ts";
-import { int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
-import { gapRow, winWorth, worked, type Step } from "../lib/method.ts";
-import { href } from "../lib/routes.ts";
+import { HCA, START, winProb } from "../lib/elo.ts";
+import type { Line } from "../lib/facts.ts";
+import { int, pct, record, shortDay, signed, weekdayDay } from "../lib/format.ts";
+import { examples, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
 
-const seasons = allSeasons();
-// The worked game is the first of the newest season that has one: an opener, so both teams start level.
-const season = seasons.find((s) => s.model.results.length > 0) ?? null;
-const ex = season ? worked(season.model.results[0]) : null;
+// The newest season with a game: its opener for step 2, its results for step 3, its ratings for step 1.
+const season = allSeasons().find((s) => s.model.results.length > 0) ?? null;
+const model = season?.model ?? null;
+const { opener, contrasts } = examples(model?.results ?? []);
+const name = (abbr: string) => (season ? team(season, abbr).short : abbr);
 
-const signedTo = (n: number, digits: number) => `${n < 0 ? MINUS : "+"}${Math.abs(n).toFixed(digits)}`;
-const signedPct = (p: number) => `${p < 0 ? MINUS : "+"}${pct(Math.abs(p))}`;
-const withRow = (base: number[], extra: number | null) => [...new Set(extra === null ? base : [...base, extra])].sort((a, b) => a - b);
+/** A value's place on a scale from lo to hi, as a CSS percentage. */
+const at = (v: number, lo: number, hi: number) => `${((v - lo) / (hi - lo)) * 100}%`;
 
-// The ledger: one row per step, each team's figure in its own column, multiplying down to the points moved.
-type Row = { label: string; why: string; away: string; home: string; key?: boolean };
-let ledger: { meta: string; teams: { name: string; href: string }[]; rows: Row[] } | null = null;
-let matchup = "";
-if (season && ex) {
-  const short = (s: Step) => team(season, s.abbr).short;
-  const { home, away, winner: w, loser: l } = ex;
-  const fav = home.chance >= away.chance ? home : away;
-  const mult = ex.multiplier.toFixed(2);
-  const as = ex.gap === 0 ? "between level teams" : w === fav ? "as the favourite" : "as the underdog";
-  matchup = `${short(away)} ${ex.result.game.neutral ? "vs" : "at"} ${short(home)}`;
-  ledger = {
-    meta: `${matchup}, ${weekdayDay(ex.result.day)}`,
-    teams: [away, home].map((s) => ({ name: short(s), href: href({ kind: "team", season, abbr: s.abbr }) })),
-    rows: [
-      {
-        label: "Rating before",
-        why: `The season's first game, so both started at ${START}.`,
-        away: rating(away.before), home: rating(home.before),
-      },
-      {
-        label: "Home court",
-        why: ex.result.game.neutral
-          ? `A neutral site, so neither team got the ${HCA}-point home edge.`
-          : `Worth ${HCA} points to the ${short(home)} for this game only.`,
-        away: away.edge ? `+${away.edge}` : "0", home: home.edge ? `+${home.edge}` : "0",
-      },
-      {
-        label: "Win chance",
-        why: ex.gap === 0
-          ? `Level ratings made it an even game, ${pct(0.5)} each.`
-          : `The ${int(Math.abs(ex.gap))}-point gap made the ${short(fav)} ${pct(fav.chance)} favourites.`,
-        away: pct(away.chance), home: pct(home.chance),
-      },
-      {
-        label: "Final score",
-        why: `The ${short(w)} won by ${ex.margin}.`,
-        away: String(away.score), home: String(home.score),
-      },
-      {
-        label: "Surprise",
-        why: `A win scores ${pct(1)} and a loss ${pct(0)}, less the team's chance, so an upset scores high.`,
-        away: signedPct(away.surprise), home: signedPct(home.surprise),
-      },
-      {
-        label: "Margin multiplier",
-        why: `For winning by ${ex.margin} ${as}. A wider win or an upset raises it.`,
-        away: `× ${mult}`, home: `× ${mult}`,
-      },
-      {
-        label: "K",
-        why: "The same for every game. It sets how far one game can move a rating.",
-        away: `× ${K}`, home: `× ${K}`,
-      },
-      {
-        label: "Points moved",
-        why: `${K} × ${mult} × ${pct(w.surprise)} is ${w.moved.toFixed(2)} points, from the ${short(l)} to the ${short(w)}.`,
-        away: signedTo(away.moved, 2), home: signedTo(home.moved, 2),
-      },
-      {
-        label: "Rating after",
-        why: `Rounded from ${w.rating.toFixed(2)} and ${l.rating.toFixed(2)}, so the site shows the game as ${signed(w.change)} and ${signed(l.change)}.`,
-        away: rating(away.rating), home: rating(home.rating), key: true,
-      },
-    ],
-  };
-}
+// Step 1: every team at the start, then where each stands now, on one scale padded so no dot is cut off.
+const spread = model && (() => {
+  const now = model.order.map((abbr) => ({ abbr, r: Math.round(model.r[abbr]) }));
+  const top = now[0];
+  const bottom = now[now.length - 1];
+  const pad = Math.max(4, (top.r - bottom.r) * 0.04);
+  const lo = Math.min(bottom.r, START) - pad;
+  const hi = Math.max(top.r, START) + pad;
+  const x = (v: number) => at(v, lo, hi);
+  // Dots closer than one dot's width on a phone's ~318px scale take the next lane: on the line, then
+  // above it, then below, so none hides another.
+  const near = ((hi - lo) * 10) / 318;
+  const last: number[] = [];
+  const dots = [...now].reverse().map((t) => {
+    let lane = last.findIndex((r) => t.r - r >= near);
+    if (lane < 0) lane = last.length;
+    last[lane] = t.r;
+    return { ...t, dy: [0, -10, 10, -20, 20][lane] ?? 0 };
+  });
+  return { dots, top, bottom, x, count: model.abbrs.length, asOf: shortDay(model.results[model.results.length - 1].day) };
+})();
 
-// The two reference tables, each with the worked game's own row added and labelled.
-const gaps = withRow([0, 50, 100, 150, 200, 300], ex ? Math.abs(ex.gap) : null).map(gapRow);
-const margins = withRow([1, 5, 10, 20, 30], ex?.margin ?? null).map(winWorth);
-const isExample = { gap: (g: number) => ex !== null && Math.abs(ex.gap) === g, margin: (m: number) => ex?.margin === m };
+// Step 2: the opener on a scale centred on the start, wide enough to label each team's new rating.
+const game = opener && (() => {
+  const { winner: w, loser: l, result } = opener;
+  const half = Math.max(Math.abs(w.change), Math.abs(l.change), 1) * 2.6;
+  const x = (v: number) => at(v, START - half, START + half);
+  const lane = (s: Line, verb: string) => ({
+    name: name(s.abbr),
+    said: `${verb} ${record(s.score, s === w ? l.score : w.score)}`,
+    before: Math.round(result.pre[s.side]),
+    after: Math.round(s.rating),
+    change: s.change,
+    won: s === w,
+  });
+  return { w, l, x, day: weekdayDay(result.day), lanes: [lane(w, "won"), lane(l, "lost")] };
+})();
+
+// Step 3: the three wins as bars of the winner's gain, on one scale.
+const LABEL: Record<ContrastKind, (margin: number) => string> = {
+  close: (m) => `Favourite wins by ${m}`,
+  blowout: (m) => `Favourite wins by ${m}`,
+  upset: (m) => `Underdog wins by ${m}`,
+};
+const most = Math.max(1, ...contrasts.map((c) => c.game.winner.change));
+const bars = contrasts.map(({ kind, game: o, margin }) => ({
+  label: LABEL[kind](margin),
+  detail: `The ${name(o.winner.abbr)}, ${pct(o.winner.chance)} to win, beat the ${name(o.loser.abbr)} ${record(o.winner.score, o.loser.score)}.`,
+  change: o.winner.change,
+  width: `${(Math.max(0, o.winner.change) / most) * 82}%`,
+}));
+
+// Step 4: the favourite's chance against the rating gap, 0 to 400 points, on a 50% to 100% scale.
+const GAP_MAX = 400;
+const y = (p: number) => (1 - (p - 0.5) / 0.5) * 100;
+const curve = Array.from({ length: GAP_MAX / 5 + 1 }, (_, i) => `${i ? "L" : "M"}${i * 5} ${y(winProb(i * 5)).toFixed(2)}`).join(" ");
+const home = { x: at(HCA, 0, GAP_MAX), y: `${y(winProb(HCA))}%`, chance: pct(winProb(HCA)) };
+const gapTicks = [0, 100, 200, 300, 400];
+const chanceTicks = [0.5, 0.75, 1];
 
 const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirtyeight.com/features/how-we-calculate-nba-elo-ratings/";
 ---
@@ -100,167 +86,176 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
   description={`Every NBA team starts each season at ${START}, and each game moves points from the loser to the winner, after FiveThirtyEight's NBA Elo.`}
   route={{ kind: "about" }}
 >
-  <Fragment slot="lede">Elo is a rating that goes up when a team wins and down when it loses. Beating a strong team earns more than beating a weak one, and a bigger win earns more than a close one.</Fragment>
+  <Fragment slot="lede">Elo is a rating that goes up when a team wins and down when it loses. Beating a strong team, or winning big, earns more.</Fragment>
 
-  <div class="grid">
-    <div class="main">
-      <Panel class="fresh" title={`Why every team starts at ${START}`}>
-        <div class="prose">
-          <p>Trades, the draft and free agency change rosters over the summer, so nothing carries over from last season. FiveThirtyEight kept three-quarters of a rating; this site keeps none, so early ratings rest on a few games each.</p>
-          <p>{START} stays the league average all season, because every point one team gains, another loses.</p>
-        </div>
-      </Panel>
-
-      {ledger && (
-        <Panel class="ledger" title="One game, step by step" meta={ledger.meta}>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Step</th>
-                {ledger.teams.map((t) => <th class="num" scope="col"><a href={t.href}>{t.name}</a></th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {ledger.rows.map((r, i) => (
-                <Fragment>
-                  <tr class:list={["step", { key: r.key }]}>
-                    <th scope="row" aria-describedby={`why-${i}`}>{r.label}</th>
-                    <td class="num">{r.away}</td>
-                    <td class="num">{r.home}</td>
-                  </tr>
-                  <tr class="why"><td colspan="3" id={`why-${i}`}><span>{r.why}</span></td></tr>
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </Panel>
+  <div class="steps">
+    <Panel title={`Everyone starts at ${START}`}>
+      <p class="say">Nothing carries over from last season, so every team opens at {START} and the games spread them out.</p>
+      {spread && (
+        <figure
+          class="spread"
+          role="img"
+          aria-label={`On opening night all ${spread.count} teams are at ${START}. Through ${spread.asOf} they run from ${spread.bottom.r}, the ${name(spread.bottom.abbr)}, to ${spread.top.r}, the ${name(spread.top.abbr)}.`}
+        >
+          <span class="mid" style={`left: ${spread.x(START)}`}></span>
+          <span class="cap c1">Opening night</span>
+          <span class="dot accent r1" style={`left: ${spread.x(START)}`}></span>
+          <span class="tag r1" style={`left: ${spread.x(START)}`}>All {spread.count} teams at {START}</span>
+          <span class="cap c2">Through {spread.asOf}</span>
+          {spread.dots.map((t) => <span class="dot r2" style={`left: ${spread.x(t.r)}; translate: 0 ${t.dy}px`}></span>)}
+          <span class="end lo" style={`left: ${spread.x(spread.bottom.r)}`}>{name(spread.bottom.abbr)} {spread.bottom.r}</span>
+          <span class="end hi" style={`right: calc(100% - ${spread.x(spread.top.r)})`}>{name(spread.top.abbr)} {spread.top.r}</span>
+        </figure>
       )}
+    </Panel>
 
-
-      <Panel class="sources" fill title="Sources">
-        <div class="prose">
-          <p>The method is FiveThirtyEight's NBA Elo from <a href={methodLink}>How We Calculate NBA Elo Ratings</a> (2015), with one change, the fresh start each season.</p>
-          <p>Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN's scoreboard</a>. Every morning the site pulls the whole season again and rebuilds every rating from the first game, so a score ESPN corrects is fixed the next day.</p>
-        </div>
-      </Panel>
-    </div>
-
-    <div class="rail">
-      <Panel class="gaps" title="What a rating gap means">
-        <p class="note">The gap includes home court, {HCA} points to the home team and none at a neutral site.</p>
-        <table class="ref">
-          <thead>
-            <tr><th scope="col">Gap</th><th class="num" scope="col">Favourite's chance</th></tr>
-          </thead>
-          <tbody>
-            {gaps.map((g) => (
-              <tr>
-                <th scope="row">
-                  <span class:list={["fig", { sel: isExample.gap(g.points) }]}>{int(g.points)}</span>
-                  {isExample.gap(g.points) && <span class="tag">{matchup}</span>}
-                </th>
-                <td class="num">{pct(g.chance)}</td>
-              </tr>
+    <Panel title="Win, and you take points" meta={game?.day}>
+      {game && (
+        <Fragment>
+          <p class="say">In the season's first game the {name(game.w.abbr)} beat the {name(game.l.abbr)} {record(game.w.score, game.l.score)} and took {game.w.change} points from them.</p>
+          <figure class="game">
+            <span class="mid" style={`left: ${game.x(START)}`}></span>
+            <span class="mid-tag" style={`left: ${game.x(START)}`}>Both at {START} before</span>
+            {game.lanes.map((s) => (
+              <div class="lane">
+                <p class="who"><b>{s.name}</b> {s.said}</p>
+                <div class="track">
+                  <span
+                    class:list={["seg", { accent: s.won }]}
+                    style={`left: ${game.x(Math.min(s.before, s.after))}; right: calc(100% - ${game.x(Math.max(s.before, s.after))})`}
+                  ></span>
+                  <span class:list={["dot", { accent: s.won }]} style={`left: ${game.x(s.after)}`}></span>
+                  {s.change >= 0
+                    ? <span class="val up" style={`left: ${game.x(s.after)}`}><b>{signed(s.change)}</b> to {s.after}</span>
+                    : <span class="val down" style={`right: calc(100% - ${game.x(s.after)})`}><b>{signed(s.change)}</b> to {s.after}</span>}
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </Panel>
+          </figure>
+        </Fragment>
+      )}
+    </Panel>
 
-      <Panel class="worth" title="What a win is worth">
-        <p class="note">Points the winner gains when both teams start at {START}. A home win gains less, because the home team was favoured.</p>
-        <table class="ref">
-          <thead>
-            <tr>
-              <th scope="col">Won by</th>
-              <th class="num" scope="col">Neutral</th>
-              <th class="num" scope="col">Home win</th>
-              <th class="num" scope="col">Road win</th>
-            </tr>
-          </thead>
-          <tbody>
-            {margins.map((m) => (
-              <tr>
-                <th scope="row">
-                  <span class:list={["fig", { sel: isExample.margin(m.margin) }]}>{m.margin}</span>
-                  {isExample.margin(m.margin) && <span class="tag">{matchup}</span>}
-                </th>
-                <td class="num">{signed(m.neutral)}</td>
-                <td class="num">{signed(m.home)}</td>
-                <td class="num">{signed(m.road)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Panel>
+    <Panel title="Upsets and blowouts move more">
+      <p class="say">A favourite that edges a close game gains a few points, but a blowout or an upset is worth more.</p>
+      {bars.length > 0 && (
+        <ul class="bars">
+          {bars.map((b) => (
+            <li>
+              <p class="who"><b>{b.label}</b></p>
+              <p class="detail">{b.detail}</p>
+              <div class="bar">
+                <span class="fill" style={`width: ${b.width}`}></span>
+                <span class="v">{signed(b.change)}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
 
-
-      <Panel class="counts" fill title="Which games count">
-        <div class="prose">
-          <p>The regular season, the play-in, the playoffs and the NBA Cup final count. The NBA leaves the Cup final out of its standings, but it is a real game, so it counts here. Preseason games and the All-Star Game do not.</p>
+    <Panel title="A bigger gap, a bigger favourite">
+      <p class="say">Before tip-off, the gap between two ratings gives each team its chance to win.</p>
+      <figure
+        class="curve"
+        role="img"
+        aria-label={`A rating gap of ${int(HCA)} points gives the higher-rated team a ${home.chance} chance, and ${int(GAP_MAX)} points gives ${pct(winProb(GAP_MAX))}.`}
+      >
+        <p class="axis-title">Chance the higher-rated team wins</p>
+        <div class="plot">
+          {chanceTicks.map((p) => (
+            <Fragment>
+              <span class="grid" style={`top: ${y(p)}%`}></span>
+              <span class="ytick" style={`top: ${y(p)}%`}>{pct(p)}</span>
+            </Fragment>
+          ))}
+          <span class="guide v" style={`left: ${home.x}; top: ${home.y}`}></span>
+          <span class="guide h" style={`width: ${home.x}; top: ${home.y}`}></span>
+          <svg viewBox={`0 0 ${GAP_MAX} 100`} preserveAspectRatio="none" aria-hidden="true">
+            <path d={curve} vector-effect="non-scaling-stroke" />
+          </svg>
+          <span class="dot accent" style={`left: ${home.x}; top: ${home.y}`}></span>
+          <span class="mark" style={`left: ${home.x}; top: ${home.y}`}>{int(HCA)} points, {home.chance}</span>
+          {gapTicks.map((g) => <span class="xtick" style={`left: ${at(g, 0, GAP_MAX)}`}>{int(g)}</span>)}
         </div>
-      </Panel>
-    </div>
+        <p class="axis-title x">Rating gap, in points</p>
+      </figure>
+      <p class="note">Home court counts as {int(HCA)} points, so a home team facing an equal rival is a {home.chance} favourite.</p>
+    </Panel>
   </div>
+
+  <Panel class="counts" title="Which games count">
+    <p class="say">Regular-season, play-in and playoff games count, but preseason games and the All-Star Game don't. Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN</a> each morning, and the method follows <a href={methodLink}>FiveThirtyEight's NBA Elo</a>.</p>
+  </Panel>
 </Base>
 
 <style>
-  /* 744 + 24 + 432 = 1200 at 1440, the home page's split; the rail keeps 360 for its four-column table.
-     The columns balance by their content, and each one's last card takes up the rest so both end level. */
-  .grid { display: grid; grid-template-columns: minmax(0, 744fr) minmax(360px, 432fr); gap: var(--gap); }
-  .main, .rail { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+  .steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
+  @media (max-width: 899px) { .steps { grid-template-columns: minmax(0, 1fr); } }
 
-  .prose p { max-width: 68ch; line-height: 22px; }
-  .prose p + p { margin-top: 10px; }
-  .prose a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
-  .prose a:hover { text-decoration-color: currentColor; }
-  .note { color: var(--muted); margin-bottom: 4px; }
+  .say { max-width: 60ch; line-height: 22px; margin-bottom: 16px; }
+  .say a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
+  .say a:hover { text-decoration-color: currentColor; }
+  .counts .say { margin-bottom: 4px; }
+  .note { margin-top: 12px; color: var(--muted); }
 
-  table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 0 8px; text-align: left; font-weight: 400; }
-  th:first-child { padding-left: 0; }
-  th:last-child, td:last-child { padding-right: 0; }
-  thead th { height: 36px; font-size: var(--fs-small); color: var(--muted); white-space: nowrap; border-bottom: 1px solid var(--border); }
-  tbody th, tbody td { border-bottom: 1px solid var(--rule); }
-  tbody tr:last-child > * { border-bottom: 0; }
-  .num { text-align: right; white-space: nowrap; }
+  figure { position: relative; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
+  b { color: var(--text); font-weight: 500; }
 
-  /* the ledger */
-  .ledger thead th.num { width: 84px; }
-  .ledger thead a { color: var(--text); font-weight: 500; }
-  .ledger thead a:hover { text-decoration: underline; text-underline-offset: 3px; }
-  /* Each step is two rows: the step and its figures, then the sentence that explains them across the
-     full width, so a phone keeps the sentence readable beside two figure columns. */
-  .ledger tr.step > * { padding-top: 10px; line-height: 20px; border-bottom: 0; }
-  .ledger tr.step th { font-weight: 500; }
-  .ledger tr.key td { font-weight: 600; }
-  /* Sentences inside a table keep proportional figures; only the columns line up digit for digit. */
-  .ledger tr.why td { padding: 2px 0 10px; color: var(--muted); line-height: 20px; font-variant-numeric: normal; }
-  .ledger tr.why span { display: block; max-width: 64ch; }
-
-  /* the reference tables */
-  .ref tbody th, .ref tbody td { height: 36px; }
-  .ref thead th.num { width: 84px; }
-  /* 64px figure columns leave the label column room for its tag at the rail's narrowest, 360. */
-  .worth .ref thead th.num { width: 64px; }
-  .ref tbody th { white-space: nowrap; }
-  .fig { position: relative; display: inline-block; font-variant-numeric: tabular-nums; }
-  .fig.sel::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px; background: var(--accent); }
-  .tag { margin-left: 10px; color: var(--muted); font-size: var(--fs-small); white-space: nowrap; }
-
-  /* Below 900 the columns stack into one reading order: the fresh start, the game, the two tables, then
-     which games count and the sources. */
-  @media (max-width: 899px) {
-    .grid { grid-template-columns: minmax(0, 1fr); }
-    .main, .rail { display: contents; }
-    .fresh { order: 1; }
-    .ledger { order: 2; }
-    .gaps { order: 3; }
-    .worth { order: 4; }
-    .counts { order: 5; }
-    .sources { order: 6; }
+  /* A dot is 8px with a 2px ring of the card's colour, so dots that overlap stay apart. */
+  .dot {
+    position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+    background: var(--bar); box-shadow: 0 0 0 2px var(--surface);
   }
-  @media (max-width: 640px) {
-    .ledger thead th.num, .ref thead th.num { width: 64px; }
-    th, td { padding: 0 4px; }
-  }
+  .dot.accent { background: var(--accent); }
+  .mid { position: absolute; width: 1px; background: var(--grid); }
+
+  /* Step 1: two rows on one scale, the start and now. */
+  .spread { height: 136px; margin: 0 4px; }
+  .spread .mid { top: 22px; height: 94px; }
+  .spread .cap { position: absolute; left: 0; }
+  .spread .c1 { top: 0; }
+  .spread .c2 { top: 50px; }
+  .spread .r1 { top: 30px; }
+  .spread .r2 { top: 92px; }
+  .spread .tag { position: absolute; margin: -8px 0 0 12px; color: var(--text); white-space: nowrap; }
+  .spread .end { position: absolute; top: 120px; white-space: nowrap; }
+  .spread .lo { margin-left: -4px; }
+  .spread .hi { margin-right: -4px; }
+
+  /* Step 2: one lane per team, from the shared start to the new rating. */
+  .game { padding-top: 24px; }
+  .game .mid { top: 18px; bottom: 0; }
+  .game .mid-tag { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+  .lane + .lane { margin-top: 8px; }
+  .who { color: var(--muted); }
+  .track { position: relative; height: 24px; }
+  .seg { position: absolute; top: 11px; height: 2px; background: var(--bar); }
+  .seg.accent { background: var(--accent); }
+  .track .dot { top: 12px; }
+  .val { position: absolute; top: 4px; white-space: nowrap; }
+  .val.up { margin-left: 10px; }
+  .val.down { margin-right: 10px; }
+
+  /* Step 3: a bar per game, its length the winner's gain. */
+  .bars { display: flex; flex-direction: column; gap: 14px; }
+  .bars .detail { color: var(--muted); font-size: var(--fs-small); line-height: 16px; margin-top: 2px; }
+  .bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; height: 16px; }
+  .fill { height: 12px; min-width: 2px; background: var(--accent); border-radius: 0 4px 4px 0; }
+  .v { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+  /* Step 4: the curve. The svg stretches to the plot, and its 2px stroke stays 2px. */
+  .curve { padding-left: 36px; padding-right: 12px; }
+  .axis-title { margin: 0 0 10px -36px; }
+  .axis-title.x { margin: 26px 0 0; text-align: center; }
+  .plot { position: relative; height: 150px; }
+  .plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .plot path { fill: none; stroke: var(--text); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
+  .grid { position: absolute; left: 0; right: 0; height: 1px; background: var(--grid); }
+  .ytick { position: absolute; right: calc(100% + 8px); transform: translateY(-50%); }
+  .xtick { position: absolute; top: calc(100% + 6px); transform: translateX(-50%); }
+  .guide { position: absolute; background: var(--control); }
+  .guide.v { width: 1px; bottom: 0; }
+  .guide.h { left: 0; height: 1px; }
+  .mark { position: absolute; margin: 6px 0 0 10px; color: var(--text); white-space: nowrap; }
 </style>
