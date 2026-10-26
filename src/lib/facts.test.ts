@@ -14,9 +14,9 @@ test("a game's change is the gap between the displayed ratings, not the rounded 
   assert.equal(outcome(result(1500.4, 5.4)).winner.change, 6);
 });
 
-test("an upset is a win by the side whose pre-game chance shows under 50%", () => {
-  // The home side wins each game; p is its chance. 49.6% shows as 50%, so that winner was no underdog on the page.
-  assert.deepEqual([0.3, 0.494, 0.496, 0.6].map((p) => upset(outcome(result(1500, 5, p)))), [true, true, false, false]);
+test("an upset is a win by the side whose pre-game chance shows under 35%", () => {
+  // The home side wins each game; p is its chance. 34.6% shows as 35%, so that winner is not called an upset.
+  assert.deepEqual([0.3, 0.344, 0.346, 0.45].map((p) => upset(outcome(result(1500, 5, p)))), [true, true, false, false]);
 });
 
 test("the rating range reaches the highs and lows a team held before today, so every day's line fits on it", () => {

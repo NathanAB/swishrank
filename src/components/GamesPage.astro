@@ -28,8 +28,10 @@ const shown = month === undefined ? null : all.find((x) => x.key === month);
 if (month !== undefined && !shown) throw new Error(`${season.id} has no games in ${month}`);
 const days = shown ? shown.days : recentDays(m, WEEK);
 
-// The week ahead, on the index of the season in progress; days without games are left out.
-const ahead = month === undefined && season.current ? nextDays(m, TODAY, WEEK).filter((d) => d.fixtures.length) : null;
+// The next few game days, on the index of the season in progress. A full week runs to about 50 games, which
+// on a phone pushes last night's results thousands of pixels down; each team's page lists its own week.
+const AHEAD_DAYS = 3;
+const ahead = month === undefined && season.current ? nextDays(m, TODAY, WEEK).filter((d) => d.fixtures.length).slice(0, AHEAD_DAYS) : null;
 // Side by side only when both have games, so a week ahead with none never stands as a column of its own.
 const split = Boolean(ahead?.length) && days.length > 0;
 
@@ -42,7 +44,7 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
   docTitle={month ? `${title}, ${monthName(month)}` : title}
   route={route}
   ownHeading
-  description={`Scores and Elo changes for every ${season.label} NBA game${season.current ? ", and the week ahead with win chances" : ""}.`}
+  description={`Scores and Elo changes for every ${season.label} NBA game${season.current ? ", and the next few days' games with win chances" : ""}.`}
 >
   <Panel level={1} title={title}>
     <SeasonMenu slot="aside" route={route} />
@@ -51,7 +53,7 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
       {ahead && (
         <section class="part" aria-labelledby="ahead">
           <div class="part-head">
-            <h2 id="ahead">Next {WEEK} days</h2>
+            <h2 id="ahead">Coming up</h2>
             <p class="meta">Tip-off times ET, chances on today's ratings</p>
           </div>
           {ahead.length === 0 ? <p class="empty">{noGamesAhead(season)}</p> : ahead.map((d, i) => <FixtureList season={season} day={d} lead={i === 0} />)}
@@ -61,7 +63,7 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
       <section class="part" aria-labelledby="results">
         <div class="part-head">
           <h2 id="results">Results</h2>
-          <p class="meta">{shown ? monthName(shown.key) : `Last ${WEEK} days`}</p>
+          <p class="meta">{shown ? monthName(shown.key) : `Last ${WEEK} days`} · each team's rating change beside its score</p>
           {switcher.length > 1 && (
             <nav class="months" aria-label="Results by month">
               {switcher.map((x) => (

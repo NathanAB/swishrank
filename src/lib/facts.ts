@@ -42,8 +42,13 @@ export function outcome(result: Result): Outcome {
   return { result, home, away, winner: homeWon ? home : away, loser: homeWon ? away : home };
 }
 
-/** Whether the winner was the underdog: its pre-game chance shows under 50%, so a 49.6% winner shown at 50% is not. */
-export const upset = (o: Outcome) => percent(o.winner.chance) < 50;
+/**
+ * Whether the win was an upset: the winner's pre-game chance shows under UPSET percent. A third of all winners
+ * had under 50% in 2023-24 to 2025-26, too many to call out; under 35% it is about one game in nine. The
+ * chance as shown decides, so a 34.6% winner shown at 35% is not one.
+ */
+const UPSET = 35;
+export const upset = (o: Outcome) => percent(o.winner.chance) < UPSET;
 
 /**
  * The lowest and highest displayed rating any team has held this season, today included, so a scale over it
