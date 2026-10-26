@@ -1,27 +1,29 @@
 ---
 // A card: a titled section on the surface tone. Every block on a page sits in one. Other attributes
 // (class, data-*) land on the section, so a page can place the card with its own scoped classes. The
-// "aside" slot sits at the header's right end, such as a switch for what the card shows.
+// "aside" slot sits at the header's right end, such as a switch for what the card shows and the season
+// menu. A page's first card carries the page's h1 as its title (level 1), so the page has one header row.
 import type { HTMLAttributes } from "astro/types";
 
 interface Props extends Omit<HTMLAttributes<"section">, "title"> {
-  /** The card's h2. */
+  /** The card's heading. */
   title: string;
+  /** 1 for the page's first card, whose title is the page's h1; 2, the default, for every other card. */
+  level?: 1 | 2;
   /** Grey context after the title, such as the day. */
   meta?: string;
-  /** Grow to fill a flex column, so the last card in a column ends level with its neighbour. */
-  fill?: boolean;
-  /** The h2's id, for aria-labelledby; defaults to one made from the title. */
+  /** The heading's id, for aria-labelledby; defaults to one made from the title. */
   headingId?: string;
 }
 
-const { title, meta, fill = false, headingId: hid, class: cls, ...rest } = Astro.props;
+const { title, level = 2, meta, headingId: hid, class: cls, ...rest } = Astro.props;
 const headingId = hid ?? `h-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+const Heading = level === 1 ? "h1" : "h2";
 ---
 
-<section {...rest} class:list={["panel", cls, { fill }]} aria-labelledby={headingId}>
+<section {...rest} class:list={["panel", cls]} aria-labelledby={headingId}>
   <header class="head">
-    <h2 id={headingId}>{title}</h2>
+    <Heading id={headingId}>{title}</Heading>
     {meta && <p class="meta">{meta}</p>}
     {Astro.slots.has("aside") && <div class="aside"><slot name="aside" /></div>}
   </header>
@@ -30,16 +32,15 @@ const headingId = hid ?? `h-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 
 <style>
   .panel {
-    min-width: 0; padding: 16px var(--card-pad) 12px;
+    min-width: 0; padding: 10px var(--card-pad) 12px;
     background: var(--surface); border: var(--panel-edge); box-shadow: var(--shadow); border-radius: var(--radius-card);
   }
-  .head { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .head { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
   h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
   .meta { min-width: 0; color: var(--muted); }
-  .aside { margin-left: auto; }
+  .aside { display: flex; align-items: center; gap: 8px; margin-left: auto; }
   @media (max-width: 640px) {
     .aside { flex-basis: 100%; }
   }
-  .fill { flex: 1 1 auto; display: flex; flex-direction: column; }
-  .fill > .body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 </style>

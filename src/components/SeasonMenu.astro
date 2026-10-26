@@ -1,20 +1,28 @@
 ---
-// The season menu in the title row: a native select on the switch track, newest season first, that goes to
-// the same page in the chosen season. Without script it cannot navigate, so the footer links the seasons
-// page, which lists every season as a plain link.
+// The season menu in a page's header: a native select on the switch track, newest season first, that goes to
+// the same page in the chosen season. It draws nothing on a page that has no season, or when there is only
+// one. Without script it cannot navigate, so the footer links the seasons page, which lists every season as
+// a plain link.
+import { routeSeason, seasonSwitch } from "../lib/season.ts";
+import type { Route } from "../lib/routes.ts";
+
 interface Props {
-  options: readonly { label: string; href: string; current: boolean }[];
+  /** The page the menu sits on: each option leads to this page in that season. */
+  route: Route;
 }
 
-const { options } = Astro.props;
+const { route } = Astro.props;
+const options = routeSeason(route) ? seasonSwitch(route) : [];
 ---
 
-<div class="menu">
-  <select aria-label="Season" data-season-menu>
-    {options.map((o) => <option value={o.href} selected={o.current}>{o.label}</option>)}
-  </select>
-  <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
-</div>
+{options.length > 1 && (
+  <div class="menu">
+    <select aria-label="Season" data-season-menu>
+      {options.map((o) => <option value={o.href} selected={o.active}>{o.season.label}</option>)}
+    </select>
+    <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
+  </div>
+)}
 
 <script>
   for (const menu of document.querySelectorAll<HTMLSelectElement>("select[data-season-menu]")) {
@@ -25,18 +33,13 @@ const { options } = Astro.props;
 </script>
 
 <style>
-  .menu { position: relative; flex: none; align-self: flex-start; }
+  .menu { position: relative; flex: none; }
   select {
-    appearance: none; height: 32px; padding: 0 30px 0 12px; border: 0; border-radius: 8px; background: var(--seg-track);
+    appearance: none; height: var(--control-h); padding: 0 30px 0 12px; border: 0; border-radius: 8px; background: var(--seg-track);
     color: var(--text); font: inherit; font-weight: 500; font-variant-numeric: tabular-nums; cursor: pointer;
   }
   select:hover { background: var(--seg-pill); }
   select:focus-visible { outline-offset: -1px; border-radius: 8px; }
   svg { position: absolute; top: 50%; right: 12px; width: 10px; height: 6px; margin-top: -3px; pointer-events: none; }
   path { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-
-  /* 44px tall targets on a phone */
-  @media (max-width: 640px) {
-    select { height: 44px; }
-  }
 </style>
