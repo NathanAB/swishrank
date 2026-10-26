@@ -12,10 +12,11 @@
 // the rows stay ink. Given a conference, only its teams are drawn and listed, ranked among themselves, on the
 // same league-wide scale, so a rating sits at the same height in every view.
 import RatingChart from "./RatingChart.astro";
-import { dateTicks, playoffsMark } from "../lib/chart.ts";
+import { clearOfMark, dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START } from "../lib/elo.ts";
 import { ratingRange } from "../lib/facts.ts";
-import { rating, record } from "../lib/format.ts";
+import { rating, record, weekdayDay } from "../lib/format.ts";
+import { scaleAttr } from "../lib/readout.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
 import { standings, type Conference } from "../lib/teams.ts";
@@ -37,7 +38,7 @@ const n = order.length;
 const tint = tintStyles(m.data.teams);
 // Px down the body on a wide screen: row i's centre, and a rating's place on a scale from the first row's
 // centre (the season's top rating) to the last row's (its bottom one).
-const ROW = 32; // a row's height on a wide screen; the styles read it as --row-wide
+const ROW = 26; // a row's height on a wide screen; the styles read it as --row-wide
 const Y = n * ROW; // the body's height, and the drawing's viewBox height
 const rowY = (i: number) => (i + 0.5) * ROW;
 const valY = (v: number) => (hi === lo ? Y / 2 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
@@ -59,17 +60,28 @@ const X = 1000; // the plot's viewBox width
 const at = (i: number) => i / (ser.length - 1);
 // Lines run through the displayed (rounded) ratings, as the dots do, so each one ends on its dot.
 const lines = order.map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(Math.round(d.r[a])))}`).join(" ") })).reverse();
-const dates = dateTicks(ser.map((d) => d.day));
+const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const playoffs = playoffsMark(m);
+// The dates share the plot's top edge with the playoffs label. The narrowest plot beside the table is about
+// 530px, where that label takes some 112px and a month about 30px.
+const PLOT_MIN = 530;
+const dates = clearOfMark(dateTicks(ser.map((d) => d.day)), ser.length, playoffs, { mark: 112 / PLOT_MIN, tick: 30 / PLOT_MIN });
 ---
 
 <div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-wide: ${ROW}px`}>
-  <div class="stacked"><RatingChart season={season} teams={order} height={400} minDayWidth={2} /></div>
+  <div class="stacked"><RatingChart season={season} teams={order} height={400} /></div>
   <table>
     <thead>
       <tr>
         <th class="lad" scope="col" aria-label="Rating chart">
-          {charted && playoffs && <span class="mark-label" style={`--at: ${at(playoffs.i).toFixed(4)}`}>{playoffs.label}</span>}
+          {charted && (
+            <div class="xs" aria-hidden="true">
+              {dates.map((d) => (
+                <span class:list={{ first: d.i === 0, last: d.i === ser.length - 1 }} style={`--at: ${at(d.i).toFixed(4)}`}>{d.text}</span>
+              ))}
+              {playoffs && <span class="mark-label" style={`--at: ${at(playoffs.i).toFixed(4)}`}>{playoffs.label}</span>}
+            </div>
+          )}
         </th>
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
         <th class="team" scope="col">Team<span class="sub"> · W–L</span></th>
@@ -89,16 +101,34 @@ const playoffs = playoffsMark(m);
                     <span class="tick" style={`top: calc(${(valY(v) / ROW).toFixed(4)} * var(--row))`}>{v}</span>
                   ))}
                   {charted && (
-                    <svg class="history" data-plot viewBox={`0 0 ${X} ${Y}`} preserveAspectRatio="none">
+                    <svg
+                      class="history"
+                      data-plot
+                      data-chart
+                      data-scale={scaleAttr({ hi, yHi: valY(hi), lo, yLo: valY(lo) })}
+                      data-days={days}
+                      viewBox={`0 0 ${X} ${Y}`}
+                      preserveAspectRatio="none"
+                    >
                       {marks.map((v) => <path class="grid" d={`M0,${f(valY(v))}H${X}`} />)}
                       {playoffs && <path class="marker" d={`M${(at(playoffs.i) * X).toFixed(1)},0V${Y}`} />}
+                      <path class="cross" data-cross d={`M0,0V${Y}`} />
                       <g>
                         {lines.map((l) => (
-                          <polyline class="line" data-team={l.a} data-raise style={tint[l.a]} points={l.points} />
+                          <polyline
+                            class="line"
+                            data-team={l.a}
+                            data-name={m.data.teams[l.a].short}
+                            data-href={href({ kind: "team", season, abbr: l.a })}
+                            data-raise
+                            style={tint[l.a]}
+                            points={l.points}
+                          />
                         ))}
                       </g>
                     </svg>
                   )}
+                  {charted && <div class="tip" data-tip hidden></div>}
                   <svg class="rail" viewBox={`0 0 100 ${Y}`} preserveAspectRatio="none">
                     <path class="axis" d={`M0,${f(valY(hi))}V${f(valY(lo))}`} />
                     {curves.map((c) => (
@@ -127,20 +157,6 @@ const playoffs = playoffsMark(m);
         );
       })}
     </tbody>
-    {charted && (
-      <tfoot class="dates" aria-hidden="true">
-        <tr>
-          <td class="lad">
-            <div class="xs">
-              {dates.map((d) => (
-                <span class:list={{ first: d.i === 0, last: d.i === ser.length - 1 }} style={`--at: ${at(d.i).toFixed(4)}`}>{d.text}</span>
-              ))}
-            </div>
-          </td>
-          <td colspan="4" />
-        </tr>
-      </tfoot>
-    )}
   </table>
 </div>
 
@@ -150,7 +166,7 @@ const playoffs = playoffsMark(m);
   .lt { --row: var(--row-wide); --tl: 38px; --cv: 86px; }
   table { width: 100%; border-collapse: collapse; }
   th {
-    height: 36px; padding: 0 8px; font-size: var(--fs-small); font-weight: 400; color: var(--muted);
+    height: 18px; padding: 0 8px 2px; vertical-align: bottom; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted);
     text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border);
   }
   th abbr { text-decoration: none; }
@@ -177,7 +193,7 @@ const playoffs = playoffsMark(m);
   /* the scale, and the chart on it */
   .lad { width: calc(var(--tl) + var(--cv)); padding: 0; }
   th.lad { position: relative; padding-right: 8px; }
-  .mark-label, .history, .dates { display: none; }
+  .xs, .history { display: none; }
   /* Above the rows' links, so the plot takes the pointer. */
   td.lad { position: relative; z-index: 2; border-bottom: 0; }
   /* The cell starts below half of the header's collapsed 1px rule, so the drawing moves up by that half to
@@ -195,6 +211,7 @@ const playoffs = playoffsMark(m);
   .marker { stroke: var(--muted); stroke-width: 1; }
   .line { stroke: var(--tint-rest); stroke-width: 1; stroke-linejoin: round; }
   .line.hov { stroke: var(--tint); stroke-width: 1.75; }
+  .history:has(.line.hov) { cursor: pointer; }
   .tick {
     position: absolute; right: calc(100% - var(--tl) + 8px); transform: translateY(-50%);
     font-size: 11px; line-height: 12px; color: var(--muted);
@@ -207,41 +224,39 @@ const playoffs = playoffsMark(m);
   /* While one team is previewed, the rest step back so its line can be followed. */
   .lt:has(.hov) :is(.line, .lead, .dot):not(.hov) { opacity: 0.4; }
   .lt:has(.hov) tbody tr:not(.hov) > td:not(.lad) { opacity: 0.4; }
-  .mark-label {
-    position: absolute; bottom: 2px; left: calc(var(--tl) + (100% - var(--tl) - var(--cv)) * var(--at));
-    transform: translateX(calc(-100% - 4px)); font-size: 11px; line-height: 16px;
-  }
-  .dates td { height: 20px; padding: 0; border-bottom: 0; }
-  .xs { position: relative; height: 20px; margin: 0 var(--cv) 0 var(--tl); }
-  .xs span {
-    position: absolute; top: 4px; left: calc(var(--at) * 100%); transform: translateX(-50%);
-    font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap;
-  }
+  /* The plot's dates and the playoffs label along its top edge, in the header row. */
+  .xs { position: absolute; inset: 0 var(--cv) 0 var(--tl); }
+  .xs span { position: absolute; bottom: 2px; left: calc(var(--at) * 100%); transform: translateX(-50%); line-height: 16px; }
   .xs .first { transform: none; }
   .xs .last { transform: translateX(-100%); }
+  .xs .mark-label { transform: translateX(calc(-100% - 4px)); }
   .stacked { margin-bottom: 16px; }
 
-  /* From a tablet up the scale's cell takes the width the columns leave, so no gap opens between a name and
-     its figures. With the chart stacked above, that width goes to the curves. */
-  @media (min-width: 641px) {
-    .lad { width: 100%; }
-    .lt { --cv: calc(100% - var(--tl)); }
+  /* With the chart stacked above, on a tablet or a phone, the scale is a narrow strip whose curves stop short of
+     the rank, and the table keeps to the width its columns need, so no gap opens between a name and its
+     figures. Tablet rows are tall enough to tap. */
+  @media (max-width: 999px) {
+    .lt { --cv: 18px; }
+    .rail { width: calc(var(--cv) - 5px); }
   }
-  /* From 1000px the chart sits beside the rows in that width, about 410px or more for a season's 240 days, and
-     the stacked chart goes. */
+  @media (min-width: 641px) {
+    table { width: auto; min-width: 440px; }
+  }
+  @media (min-width: 641px) and (max-width: 999px) {
+    .lt { --row: 36px; }
+  }
+  /* From 1000px the chart sits beside the rows in the width the columns leave, about 530px or more, and the
+     stacked chart goes. */
   @media (min-width: 1000px) {
-    .charted { --cv: 86px; }
+    .charted table { width: 100%; }
+    .charted .lad { width: 100%; }
     .charted .stacked { display: none; }
-    .charted .mark-label, .charted .history { display: block; }
-    .charted .dates { display: table-footer-group; }
-    .charted th.lad { text-align: right; }
+    .charted .xs, .charted .history { display: block; }
   }
 
   /* Phone: one two-line row per team, with the other figures on the second line. */
   @media (max-width: 640px) {
-    .lt { --row: 48px; --tl: 28px; --cv: 18px; }
-    /* The curves stop short of the rank, which sits flush against the scale on a phone. */
-    .rail { width: calc(var(--cv) - 5px); }
+    .lt { --row: 48px; --tl: 28px; }
     table { table-layout: fixed; }
     th, td { padding: 0 4px; }
     th.lad { font-size: 0; }

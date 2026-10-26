@@ -20,6 +20,14 @@ test("the whole plot is the target: a point far from every line still picks the 
   assert.equal(nearestLine([], 0.3, 120), null);
 });
 
+test("a point just past either edge of the plot reads the first or the last day", () => {
+  const lines = [
+    { team: "UP", ys: [100, 50, 0] },
+    { team: "DOWN", ys: [0, 50, 100] },
+  ];
+  assert.deepEqual([nearestLine(lines, -0.3, 90), nearestLine(lines, 1.3, 90)], ["UP", "DOWN"]);
+});
+
 test("lines that coincide go to the earlier line", () => {
   const lines = [
     { team: "A", ys: [40, 40] },

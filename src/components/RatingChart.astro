@@ -1,16 +1,19 @@
 ---
 // Every team's daily rating from the 1500 they all start at, with the start of the playoffs marked once they
-// begin. Pointing anywhere on the plot previews the nearest line (lib/pick.ts). The end of every line is
-// labelled with its abbreviation in two staggered columns with short leaders, so labels never collide. Given
-// a `team`, a team's own page, the same lines are drawn with only that team's in its own colour and labelled, by
-// its name, and pointing at the plot does nothing. Otherwise each line and leader carries a faint tint of its
-// team's colour (lib/tint.ts), full strength while the team is previewed. The plot stretches with the card;
-// the tick lane and the label lane keep a fixed size, and the height is fixed too, so the label layout worked
-// out here holds at every width. Given a narrowest width per day, a long season scrolls sideways inside the
-// chart instead of squeezing its days together.
+// begin. Pointing anywhere on the plot previews the nearest line (lib/pick.ts), shows that day with a thin
+// line and a box with the team's rating and rank (lib/readout.ts), and a click opens the team's page. The end
+// of every line is labelled with its abbreviation in two staggered columns with short leaders, so labels
+// never collide. Given a `team`, a team's own page, the same lines are drawn with only that team's in its own
+// colour and labelled, by its name, and pointing at the plot reads out that team alone. Otherwise each line
+// and leader carries a faint tint of its team's colour (lib/tint.ts), full strength while the team is
+// previewed. The plot stretches with the card, the whole season at any width; the tick lane and the label
+// lane keep a fixed size, and the height is fixed too, so the label layout worked out here holds at every
+// width.
 import { dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START, type Abbr } from "../lib/elo.ts";
-import { shortDay } from "../lib/format.ts";
+import { shortDay, weekdayDay } from "../lib/format.ts";
+import { scaleAttr } from "../lib/readout.ts";
+import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
 import { tintStyles } from "../lib/tint.ts";
 
@@ -22,14 +25,9 @@ interface Props {
   team?: Abbr;
   /** Plot height in px, the same at every width. */
   height?: number;
-  /**
-   * The plot's narrowest width per day in px. Below it the chart scrolls sideways inside itself, opening on
-   * the latest days, with the rating ticks held at its left edge. Leave it out to fit the plot to any width.
-   */
-  minDayWidth?: number;
 }
 
-const { season, team, teams = season.model.order, height: H = 300, minDayWidth = 0 } = Astro.props;
+const { season, team, teams = season.model.order, height: H = 300 } = Astro.props;
 const m = season.model;
 const ser = m.series;
 const n = ser.length;
@@ -54,7 +52,9 @@ const y = (v: number) => PAD + ((H - 2 * PAD) * (hi - v)) / (hi - lo);
 const X = 1000; // the plot's viewBox width, stretched to the card
 const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
 const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
-const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
+// Lines run through the displayed (rounded) ratings, so the hover box reads each day's rating back exactly.
+const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(2)}`).join(" ");
+const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const tint = tintStyles(m.data.teams);
 const drawOrder = [...teams].reverse().sort((p, q) => Number(p === team) - Number(q === team));
 
@@ -93,31 +93,42 @@ for (let merged = true; merged; ) {
 for (const c of clusters) c.list.forEach((l, k) => (l.ly = c.top + k * PITCH));
 
 const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}${teams.length} teams${n ? `, ${shortDay(ser[0].day)} to ${shortDay(ser[n - 1].day)}` : ""}, each starting at ${START}`;
-const scroll = minDayWidth > 0;
 ---
 
 {n < 2 ? (
   <p class="empty">No games yet.</p>
 ) : (
   <div class="chart">
-    <div
-      class:list={["rc", { scroll, tinted: !team }]}
-      role="img"
-      aria-label={label}
-      tabindex={scroll ? "0" : undefined}
-      data-scroll-end={scroll ? "" : undefined}
-      style={`--h: ${H}px; --lane: ${LANE}px${scroll ? `; --plot-min: ${(n - 1) * minDayWidth}px` : ""}`}
-    >
+    <div class:list={["rc", { tinted: !team }]} role="img" aria-label={label} style={`--h: ${H}px; --lane: ${LANE}px`}>
       {marker && <span class="mark-label" style={`left: ${pct(marker.i)}`}>{marker.label}</span>}
       <svg class="ticks" width="40" height={H} viewBox={`0 0 40 ${H}`}>
         {ticks.map((t) => <text x="32" y={y(t) + 4} text-anchor="end">{t}</text>)}
       </svg>
-      <svg class="plot" data-plot={team ? undefined : ""} viewBox={`0 0 ${X} ${H}`} preserveAspectRatio="none" height={H}>
+      <svg
+        class="plot"
+        data-plot={team ? undefined : ""}
+        data-chart
+        data-own={team}
+        data-scale={scaleAttr({ hi, yHi: y(hi), lo, yLo: y(lo) })}
+        data-days={days}
+        viewBox={`0 0 ${X} ${H}`}
+        preserveAspectRatio="none"
+        height={H}
+      >
         {ticks.map((t) => <path class="grid" d={`M0,${y(t)}H${X}`} />)}
         {marker && <path class="marker" d={`M${x(marker.i).toFixed(1)},0V${H}`} />}
+        <path class="cross" data-cross d={`M0,0V${H}`} />
         <g>
           {drawOrder.map((a) => (
-            <polyline class:list={["line", { own: a === team }]} data-team={a} data-raise style={tint[a]} points={points(a)} />
+            <polyline
+              class:list={["line", { own: a === team }]}
+              data-team={a}
+              data-name={m.data.teams[a].short}
+              data-href={team ? undefined : href({ kind: "team", season, abbr: a })}
+              data-raise
+              style={tint[a]}
+              points={points(a)}
+            />
           ))}
         </g>
       </svg>
@@ -140,23 +151,15 @@ const scroll = minDayWidth > 0;
           <span class:list={{ first: l.i === 0, last: l.i === n - 1 }} style={`left: ${pct(l.i)}`}>{l.text}</span>
         ))}
       </div>
+      <div class="tip" data-tip hidden></div>
     </div>
   </div>
 )}
 
-<script>
-  for (const el of document.querySelectorAll("[data-scroll-end]")) el.scrollLeft = el.scrollWidth;
-</script>
-
 <style>
   .empty { padding: 8px 0 12px; color: var(--muted); }
 
-  .rc { display: grid; grid-template-columns: 40px minmax(var(--plot-min, 0px), 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
-  /* Scrolling, the tick lane stays at the left edge over a cover down to the dates, so the lines and the
-     dates pass under it. */
-  .rc.scroll { overflow: auto hidden; }
-  .rc.scroll::before { content: ""; grid-area: 2 / 1 / 4 / 2; position: sticky; left: 0; z-index: 1; background: var(--surface); }
-  .rc.scroll .ticks { position: sticky; left: 0; z-index: 2; }
+  .rc { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
   .mark-label {
     grid-row: 1; grid-column: 2; position: relative; justify-self: start; transform: translateX(calc(-100% - 4px));
     font-size: 11px; line-height: 16px; color: var(--muted); white-space: nowrap;
@@ -182,6 +185,7 @@ const scroll = minDayWidth > 0;
   .tinted .line.hov { stroke: var(--tint); stroke-opacity: 1; stroke-width: 1.75; }
   .tinted .leader.hov { stroke: var(--tint); }
   .tinted:has(.hov) :is(.line, .leader):not(.hov) { opacity: 0.4; }
+  .plot[data-plot]:has(.line.hov) { cursor: pointer; }
   .lab.hov { fill: var(--text); }
   .lab.own { fill: var(--text); font-weight: 600; }
   .end { display: none; fill: var(--tint); stroke: var(--surface); stroke-width: 2; }
