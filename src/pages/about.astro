@@ -96,7 +96,6 @@ const home = { x: at(edge, 0, GAP_MAX), y: `${y(winProb(edge))}%`, chance: pct(w
 const gapTicks = [0, 100, 200, 300, 400];
 const chanceTicks = [0.5, 0.75, 1];
 
-const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md";
 ---
 
 <Base
@@ -211,7 +210,6 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
     </Panel></li>
   </ol>
 
-  <p class="close">Every setting was chosen by testing on past seasons, as <a href={methodLink}>the model notes</a> show.</p>
 </Base>
 
 <style>
@@ -221,10 +219,7 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
   .step { display: grid; grid-template-columns: 380px minmax(0, 1fr); align-items: start; gap: 16px 56px; padding-bottom: 8px; }
   @media (max-width: 1023px) { .step { grid-template-columns: minmax(0, 1fr); } }
 
-  .say { max-width: 60ch; line-height: 22px; }
-  .close { max-width: 72ch; margin-top: var(--gap); line-height: 22px; color: var(--muted); }
-  .close a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
-  .close a:hover { text-decoration-color: currentColor; }
+  .say { line-height: 22px; }
 
   figure { position: relative; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
   b { color: var(--text); font-weight: 500; }
