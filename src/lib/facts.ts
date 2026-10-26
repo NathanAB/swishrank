@@ -47,7 +47,7 @@ const swing = (result: Result) => outcome(result).winner.change;
 /** Biggest swing first; games with equal swings keep the order they came in. */
 export const bySwing = (results: readonly Result[]) => [...results].sort((x, y) => swing(y) - swing(x));
 
-export const gamesOn = (model: Season, day: string) => model.results.filter((r) => r.day === day);
+const gamesOn = (model: Season, day: string) => model.results.filter((r) => r.day === day);
 
 /** Each team's displayed rating change on one day; teams that did not play are absent. */
 export function dayChanges(model: Season, day: string): Map<Abbr, number> {
@@ -73,6 +73,15 @@ export function widestGap(model: Season): { points: number; upper: Abbr; lower: 
     if (!best || points > best.points) best = { points, upper, lower };
   }
   return best;
+}
+
+/**
+ * The lowest and highest displayed rating any team has held this season, today included, so a scale over it
+ * fits every day of every team's line. It always holds the 1500 every team starts at.
+ */
+export function ratingRange(model: Season): { lo: number; hi: number } {
+  const all = model.abbrs.flatMap((a) => [model.stats[a].lo, model.stats[a].hi, model.r[a]]).map(Math.round);
+  return { lo: Math.min(...all), hi: Math.max(...all) };
 }
 
 export type Finals = { champion: Abbr; runnerUp: Abbr; wins: number; losses: number; games: Result[] };

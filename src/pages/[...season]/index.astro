@@ -1,16 +1,14 @@
 ---
-// A season's home: who is best right now, who moved on the latest game day, and who plays next. / is the
-// current season, /<id>/ every other one.
-import FixtureList from "../../components/FixtureList.astro";
-import GameList from "../../components/GameList.astro";
+// A season's home: the league table with every team's season drawn into it, under who is best right now.
+// / is the current season, /<id>/ every other one, and /#okc opens with the Thunder picked on the chart.
 import LeagueTable from "../../components/LeagueTable.astro";
 import Panel from "../../components/Panel.astro";
 import Base from "../../layouts/Base.astro";
-import { addDays, START, type Abbr } from "../../lib/elo.ts";
-import { bySwing, gamesOn, leaders } from "../../lib/facts.ts";
-import { nextDays, WEEK } from "../../lib/fixtures.ts";
+import { START, type Abbr } from "../../lib/elo.ts";
+import { leaders } from "../../lib/facts.ts";
 import { int, weekdayDay } from "../../lib/format.ts";
-import { TODAY, noGamesAhead, openingDay, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
+import { href } from "../../lib/routes.ts";
+import { openingDay, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
   return seasonPaths();
@@ -25,14 +23,6 @@ const m = season.model;
 const short = (a: Abbr) => team(season, a).short;
 const opens = openingDay(season);
 
-// The latest game day's games, biggest swing first: last night's while a season is being played, the last
-// day of a finished one.
-const latestDay = m.asOf;
-const latestGames = latestDay ? bySwing(gamesOn(m, latestDay)) : [];
-const latestTitle = latestDay === addDays(TODAY, -1) ? "Last night" : "Latest games";
-
-const next = nextDays(m, TODAY, WEEK).find((d) => d.fixtures.length) ?? null;
-
 const top = leaders(m);
 const verb = season.current ? (top.length > 1 ? "share the lead" : "lead") : top.length > 1 ? "finished level on top" : "finished top";
 const lede = m.results.length
@@ -41,44 +31,14 @@ const lede = m.results.length
 ---
 
 <Base title={`${season.label} ratings`} route={{ kind: "home", season }}>
-  <Fragment slot="lede">{lede}</Fragment>
+  <Fragment slot="lede">{lede}{" "}<a class="what" href={href({ kind: "about" })}>What's Elo?</a></Fragment>
 
-  <div class="grid">
-    <Panel class="table" title="League table">
-      <LeagueTable season={season} />
-    </Panel>
-
-    <div class="rail">
-      {latestDay && latestGames.length > 0 && (
-        <Panel class="latest" title={latestTitle} meta={weekdayDay(latestDay)}>
-          <GameList season={season} results={latestGames} label={`${latestTitle}, biggest swing first`} />
-        </Panel>
-      )}
-
-      {season.current && (
-        <Panel class="next" title={next?.day === TODAY ? "Tonight" : "Next up"} meta={next ? weekdayDay(next.day) : undefined}>
-          <FixtureList season={season} fixtures={next?.fixtures ?? []} label="The next day's games" empty={noGamesAhead(season)} />
-        </Panel>
-      )}
-    </div>
-  </div>
+  <Panel title="League table">
+    <LeagueTable season={season} />
+  </Panel>
 </Base>
 
 <style>
-  /* 744 + 24 + 432 = 1200 at 1440. */
-  .grid { display: grid; grid-template-columns: minmax(0, 744fr) minmax(0, 432fr); gap: var(--gap); align-items: start; }
-  .rail { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
-
-  /* Narrower, the rail's cards come first, side by side, and the table runs the full width under them. */
-  @media (max-width: 1239px) {
-    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .rail { display: contents; }
-    .table { order: 1; grid-column: 1 / -1; }
-  }
-  /* Below 900 everything stacks: the latest games, the table, then the next games. */
-  @media (max-width: 899px) {
-    .grid { grid-template-columns: minmax(0, 1fr); }
-    .latest { order: 0; }
-    .next { order: 2; }
-  }
+  .what { color: var(--muted); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; white-space: nowrap; }
+  .what:hover { color: var(--text); text-decoration-color: currentColor; }
 </style>

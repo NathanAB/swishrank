@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { compute, type Result } from "./elo.ts";
-import { bySwing, finals, outcome } from "./facts.ts";
+import { bySwing, finals, outcome, ratingRange } from "./facts.ts";
 
 const last = compute(JSON.parse(readFileSync(new URL("../data/games/2025-26.json", import.meta.url), "utf8")));
 
@@ -27,4 +27,22 @@ test("biggest swing first", () => {
   const small = result(1500, 3);
   const large = result(1500, 12);
   assert.deepEqual(bySwing([small, large]).map((r) => r.shift), [12, 3]);
+});
+
+test("the rating range reaches the highs and lows a team held before today, so every day's line fits on it", () => {
+  const game = (id: string, t: string, home: string, hs: number, as: number) =>
+    ({ id, t, home, away: home === "A" ? "B" : "A", hs, as, final: true, neutral: false, note: null });
+  // A peaks after winning night one, then gives most of it back: both teams end inside the range they held.
+  const m = compute({
+    season: "2026-27",
+    teams: { A: { name: "Alpha", short: "Alpha" }, B: { name: "Beta", short: "Beta" } },
+    games: [game("1", "2026-10-21T23:00Z", "A", 130, 100), game("2", "2026-10-22T23:00Z", "B", 110, 108)],
+  });
+  const { lo, hi } = ratingRange(m);
+  const today = m.abbrs.map((a) => Math.round(m.r[a]));
+  assert.ok(hi > Math.max(...today) && lo < Math.min(...today), "the range is wider than today's ratings");
+  for (const day of m.series) for (const a of m.abbrs) {
+    const v = Math.round(day.r[a]);
+    assert.ok(lo <= v && v <= hi, `${a} on ${day.day} at ${v} fits ${lo} to ${hi}`);
+  }
 });

@@ -9,8 +9,6 @@ export type Route =
   /** `month` ("YYYY-MM") is that month's results alone; without it, the week ahead and the newest month. */
   | { kind: "games"; season: SeasonRef; month?: string }
   | { kind: "team"; season: SeasonRef; abbr: string }
-  /** `abbr` opens the graph with that team picked, through the URL's hash. */
-  | { kind: "graph"; season: SeasonRef; abbr?: string }
   | { kind: "about" };
 
 /** A team's URL segment: its abbreviation in lower case (OKC becomes okc). */
@@ -33,8 +31,6 @@ export function routePath(route: Route): string {
       return `${prefix(route.season)}/games/${route.month ? `${route.month}/` : ""}`;
     case "team":
       return `${prefix(route.season)}/teams/${teamSlug(route.abbr)}/`;
-    case "graph":
-      return `${prefix(route.season)}/graph/${route.abbr ? `#${teamSlug(route.abbr)}` : ""}`;
     case "about":
       return "/about/";
     default: {
@@ -61,8 +57,6 @@ export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string
       return { kind: "home", season: to };
     case "games":
       return { kind: "games", season: to };
-    case "graph":
-      return { kind: "graph", season: to };
     case "team":
       return hasTeam(route.abbr) ? { kind: "team", season: to, abbr: route.abbr } : { kind: "home", season: to };
     default: {

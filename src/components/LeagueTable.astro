@@ -1,10 +1,16 @@
 ---
-// The league table with its ladder. The ladder is one rating scale down the table's left edge: each
-// team is a dot at its true rating, joined by a curve to its row, so ties bunch and the gaps between
-// tiers open up. It is drawn in row units and stretched over the rows, so it fits the desktop's
-// one-line rows and the phone's two-line rows without measuring anything in the browser.
+// The league table with the season drawn into it. A rating scale runs down the table's left edge: each team
+// is a dot at its rating, joined by a curve to its row, so ties bunch and the gaps between tiers open up. On a
+// wide screen the rating chart runs left of that scale and on it, so each team's line ends at its dot and the
+// curve carries it on to its row, which is the line's label. The scale spans every rating of the season
+// (ratingRange), so a line that ran higher or lower than today's table still fits. Everything is drawn in
+// fractions of the rows' height and stretched over them, so it fits the desktop's one-line rows and the
+// phone's two-line rows without measuring anything in the browser. Narrower, the chart stacks above the
+// table on its own axis, and the table keeps its scale.
+import RatingChart from "./RatingChart.astro";
+import { dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START } from "../lib/elo.ts";
-import { dayChanges, widestGap } from "../lib/facts.ts";
+import { dayChanges, ratingRange, widestGap } from "../lib/facts.ts";
 import { DASH, rating, record, shortDay, signed } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
@@ -21,15 +27,13 @@ const changes = changeDay ? dayChanges(m, changeDay) : null;
 const changeLabel = changeDay ? shortDay(changeDay) : "";
 
 const shown = Object.fromEntries(m.order.map((a) => [a, Math.round(m.r[a])]));
-const vals = m.order.map((a) => shown[a]);
-const hi = Math.max(...vals);
-const lo = Math.min(...vals);
+const { lo, hi } = ratingRange(m);
 const n = m.order.length;
 // Fractions of the body's height: row i's centre, and a rating's place on a scale from the first row's
-// centre (the top rating) to the last row's (the bottom one).
+// centre (the season's top rating) to the last row's (its bottom one).
 const rowY = (i: number) => (i + 0.5) / n;
 const valY = (v: number) => (hi === lo ? 0.5 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
-const Y = 1000; // the ladder's viewBox height
+const Y = 1000; // the scale's viewBox height
 const f = (x: number) => (x * Y).toFixed(1);
 
 // Round values to label on the scale, counted from 1500 so every gap between them is the same step. At most
@@ -38,8 +42,8 @@ const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 6
 const marks: number[] = [];
 for (let v = START - Math.floor((START - lo) / step) * step; v <= hi; v += step) marks.push(v);
 
-// The widest gap is a bar on the axis with its size beside it in the tick lane, centred on the longest stretch
-// of the bar that stays 14px clear of every tick (the bar's middle when no stretch does).
+// The widest gap is a bar on the axis with its size just left of it, centred on the longest stretch of the
+// bar that stays 14px clear of every tick (the bar's middle when no stretch does).
 const gap = widestGap(m);
 const gapBar = gap && gap.points > 0 ? { top: valY(shown[gap.upper]), bottom: valY(shown[gap.lower]), text: `${gap.points} pts` } : null;
 const CLEAR = 14 / 960;
@@ -54,14 +58,38 @@ for (const t of marks.map(valY)) {
 const longest = clear.sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
 const gapLabelY = gapBar && (longest ? (longest[0] + longest[1]) / 2 : (gapBar.top + gapBar.bottom) / 2);
 
-const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }));
+// The picked team, the top one until the reader picks another, is drawn last so it sits on top.
+const lead = m.order[0];
+const onTop = <T extends { a: string }>(list: T[]) => [...list].sort((p, q) => Number(p.a === lead) - Number(q.a === lead));
+const curves = onTop(m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) })));
+
+// The chart, from the day before opening night on its left edge to the latest day on the scale's axis.
+const ser = m.series;
+const charted = ser.length >= 2;
+const X = 1000; // the plot's viewBox width
+const at = (i: number) => i / (ser.length - 1);
+const lines = onTop(m.order.map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(d.r[a]))}`).join(" ") })));
+const dates = dateTicks(ser.map((d) => d.day));
+const playoffs = playoffsMark(m);
+const cols = changeDay ? 6 : 5;
 ---
 
-<div class="lt">
+<div class:list={["lt", { charted }]}>
+  <div class="stacked"><RatingChart season={season} selected={lead} height={400} minDayWidth={2} /></div>
   <table>
     <thead>
       <tr>
-        <th class="lad" scope="col"><span class="lad-label">Rating to scale</span></th>
+        <th class="lad" scope="col">
+          <div class="lad-head">
+            {charted && (
+              <select class="pick" aria-label="Team picked in the chart" data-pick-select>
+                {m.order.map((a) => <option value={a} selected={a === lead}>{m.rank[a]}. {m.data.teams[a].short}</option>)}
+              </select>
+            )}
+            <span class="lad-label">Rating to scale</span>
+          </div>
+          {charted && playoffs && <span class="mark-label" style={`--at: ${at(playoffs.i).toFixed(4)}`}>{playoffs.label}</span>}
+        </th>
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
         <th class="team" scope="col">Team<span class="sub"> · W–L</span></th>
         <th class="num" scope="col">Rating</th>
@@ -74,22 +102,35 @@ const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }))
         const s = m.stats[a];
         const c = changes?.get(a);
         return (
-          <tr data-team={a}>
+          <tr data-team={a} class:list={{ sel: a === lead }}>
             {i === 0 && (
               <td class="lad" rowspan={n} aria-hidden="true">
                 <div class="lad-in">
                   {marks.map((v) => (
                     <span class:list={["tick", { start: v === START }]} style={`top: ${(valY(v) * 100).toFixed(2)}%`}>{v}</span>
                   ))}
+                  {charted && (
+                    <svg class="history" data-plot viewBox={`0 0 ${X} ${Y}`} preserveAspectRatio="none">
+                      {marks.map((v) => <path class:list={["grid", { start: v === START }]} d={`M0,${f(valY(v))}H${X}`} />)}
+                      {playoffs && <path class="marker" d={`M${(at(playoffs.i) * X).toFixed(1)},0V${Y}`} />}
+                      <g>
+                        {lines.map((l) => (
+                          <polyline class:list={["line", { sel: l.a === lead }]} data-team={l.a} data-raise points={l.points} />
+                        ))}
+                      </g>
+                    </svg>
+                  )}
                   {gapBar && gapLabelY !== null && <span class="tick gap-label" style={`top: ${(gapLabelY * 100).toFixed(2)}%`}>{gapBar.text}</span>}
-                  <svg viewBox={`0 0 100 ${Y}`} preserveAspectRatio="none">
+                  <svg class="rail" viewBox={`0 0 100 ${Y}`} preserveAspectRatio="none">
                     <path class="axis" d={`M0,${f(valY(hi))}V${f(valY(lo))}`} />
                     {gapBar && <path class="gap" d={`M0,${f(gapBar.top)}V${f(gapBar.bottom)}`} />}
                     {curves.map((c) => (
-                      <path class="lead" data-team={c.a} data-raise d={`M0,${f(c.from)}C50,${f(c.from)} 50,${f(c.to)} 100,${f(c.to)}`} />
+                      <path class:list={["lead", { sel: c.a === lead }]} data-team={c.a} data-raise d={`M0,${f(c.from)}C50,${f(c.from)} 50,${f(c.to)} 100,${f(c.to)}`} />
                     ))}
                   </svg>
-                  {curves.map((c) => <i class="dot" data-team={c.a} style={`top: ${(c.from * 100).toFixed(2)}%`} />)}
+                  {curves.map((c) => (
+                    <i class:list={["dot", { sel: c.a === lead }]} data-team={c.a} data-preview style={`top: ${(c.from * 100).toFixed(2)}%`} />
+                  ))}
                 </div>
               </td>
             )}
@@ -108,11 +149,27 @@ const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }))
         );
       })}
     </tbody>
+    {charted && (
+      <tfoot class="dates" aria-hidden="true">
+        <tr>
+          <td class="lad">
+            <div class="xs">
+              {dates.map((d) => (
+                <span class:list={{ first: d.i === 0, last: d.i === ser.length - 1 }} style={`--at: ${at(d.i).toFixed(4)}`}>{d.text}</span>
+              ))}
+            </div>
+          </td>
+          <td colspan={cols - 1} />
+        </tr>
+      </tfoot>
+    )}
   </table>
 </div>
 
 <style>
-  .lt { --row: 32px; --lad: 124px; --axis: 38px; }
+  /* --tl is the tick lane on the scale's left and --cv the curves' lane on its right; the axis runs between
+     them, and on a wide screen the chart's plot fills the space between the two. */
+  .lt { --row: 32px; --tl: 38px; --cv: 86px; }
   table { width: 100%; border-collapse: collapse; }
   th {
     height: 36px; padding: 0 8px; font-size: var(--fs-small); font-weight: 400; color: var(--muted);
@@ -125,49 +182,93 @@ const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) }))
   th:last-child, td:last-child { padding-right: 0; }
   .rank { width: 32px; }
   td.team { color: var(--text); }
-  /* Each row is one link to the team's page: the name's link stretches over the row, all but the ladder.
-     Pointing at a row or focusing it previews the team in the ladder. */
+  /* Each row is one link to the team's page: the name's link stretches over the row, under the scale's cell.
+     Pointing at a row or focusing it previews the team on the scale and the chart. */
   tbody tr { position: relative; }
-  .go::before { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: var(--lad); z-index: 1; }
+  .go::before { content: ""; position: absolute; inset: 0; z-index: 1; }
   .go:focus-visible { outline: none; }
   tr:has(.go:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
   .name { position: relative; display: inline-block; font-weight: 500; line-height: calc(var(--row) - 1px); }
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
-  tr:hover .name { text-decoration: underline; text-underline-offset: 3px; }
-  tr:hover .name::after, tr.hov .name::after { background: var(--control); }
+  .go:hover .name { text-decoration: underline; text-underline-offset: 3px; }
+  .go:hover .name::after, tr.hov .name::after { background: var(--control); }
+  tr.sel .name::after { background: var(--accent); }
   td.rating { color: var(--text); font-weight: 600; }
   td.quiet { color: var(--muted); }
   td.opt:not(.quiet) { color: var(--text); }
   .sub { display: none; }
 
-  /* the ladder */
-  .lad { width: var(--lad); padding: 0; }
-  th.lad { padding-right: 8px; }
-  td.lad { position: relative; border-bottom: 0; }
+  /* the scale, and the chart on it */
+  .lad { width: calc(var(--tl) + var(--cv)); padding: 0; }
+  th.lad { position: relative; padding-right: 8px; }
+  .lad-head { display: flex; align-items: center; gap: 16px; }
+  .pick, .mark-label, .history, .dates { display: none; }
+  /* Above the rows' links, so the plot takes the pointer. */
+  td.lad { position: relative; z-index: 2; border-bottom: 0; }
   .lad-in { position: absolute; inset: 0; }
-  .lad svg { position: absolute; top: 0; bottom: 0; left: var(--axis); width: calc(100% - var(--axis)); height: 100%; overflow: visible; }
-  .lad path { fill: none; vector-effect: non-scaling-stroke; }
+  .lad svg { position: absolute; top: 0; height: 100%; overflow: visible; }
+  .rail { left: calc(100% - var(--cv)); width: var(--cv); }
+  .history { left: var(--tl); width: calc(100% - var(--tl) - var(--cv)); cursor: pointer; }
+  .lad path, .lad polyline { fill: none; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--grid); stroke-width: 1; }
   .gap { stroke: var(--text); stroke-width: 2; }
   .lead { stroke: var(--line-other); stroke-opacity: 0.7; stroke-width: 1; transition: stroke 120ms ease; }
   .lead.hov { stroke: var(--text); stroke-opacity: 1; }
+  .lead.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.5; }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .grid.start { stroke: var(--muted); stroke-opacity: 0.7; stroke-dasharray: 3 3; }
+  .marker { stroke: var(--muted); stroke-width: 1; }
+  .line { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; stroke-linejoin: round; }
+  .line.hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 1.5; }
+  .line.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
   .tick {
-    position: absolute; right: calc(100% - var(--axis) + 8px); transform: translateY(-50%);
+    position: absolute; right: calc(100% - var(--tl) + 8px); transform: translateY(-50%);
     font-size: 11px; line-height: 12px; color: var(--muted);
   }
   .tick.start { color: var(--text); font-weight: 500; }
-  .gap-label { white-space: nowrap; }
+  /* Over the chart it keeps a backing, so the lines pass under it. */
+  .gap-label { right: calc(var(--cv) + 6px); padding: 0 2px; white-space: nowrap; background: var(--surface); }
   .dot {
-    position: absolute; left: var(--axis); width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+    position: absolute; left: calc(100% - var(--cv)); width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
     background: var(--bar); box-shadow: 0 0 0 1.5px var(--surface);
   }
   .dot.hov { background: var(--text); }
+  .dot.sel { background: var(--accent); }
+  .mark-label {
+    position: absolute; bottom: 2px; left: calc(var(--tl) + (100% - var(--tl) - var(--cv)) * var(--at));
+    transform: translateX(calc(-100% - 4px)); font-size: 11px; line-height: 16px;
+  }
+  .dates td { height: 20px; padding: 0; border-bottom: 0; }
+  .xs { position: relative; height: 20px; margin: 0 var(--cv) 0 var(--tl); }
+  .xs span {
+    position: absolute; top: 4px; left: calc(var(--at) * 100%); transform: translateX(-50%);
+    font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap;
+  }
+  .xs .first { transform: none; }
+  .xs .last { transform: translateX(-100%); }
+  .stacked { margin-bottom: 16px; }
+
+  /* From a tablet up the scale's cell takes the width the columns leave, so no gap opens between a name and
+     its figures. With the chart stacked above, that width goes to the curves. */
+  @media (min-width: 641px) {
+    .lad { width: 100%; }
+    .lt { --cv: calc(100% - var(--tl)); }
+  }
+  /* From 1000px the chart sits beside the rows in that width, about 410px or more for a season's 240 days, and
+     the stacked chart goes. */
+  @media (min-width: 1000px) {
+    .charted { --cv: 86px; }
+    .charted .stacked { display: none; }
+    .charted .pick, .charted .mark-label, .charted .history { display: block; }
+    .charted .dates { display: table-footer-group; }
+    .charted .lad-label { margin-left: auto; }
+  }
 
   /* Phone: one two-line row per team, with the other figures on the second line. */
   @media (max-width: 640px) {
-    .lt { --row: 48px; --lad: 46px; --axis: 28px; }
-    /* The curves stop short of the rank, which sits flush against the ladder on a phone. */
-    .lad svg { width: calc(100% - var(--axis) - 5px); }
+    .lt { --row: 48px; --tl: 28px; --cv: 18px; }
+    /* The curves stop short of the rank, which sits flush against the scale on a phone. */
+    .rail { width: calc(var(--cv) - 5px); }
     table { table-layout: fixed; }
     th, td { padding: 0 4px; }
     th.lad { font-size: 0; }

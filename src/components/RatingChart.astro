@@ -1,14 +1,16 @@
 ---
-// Every team's daily rating from the 1500 they all start at. The picked team is drawn in the accent and named
-// in the legend, the name linking to its page; a reader picks another by pointing anywhere on the plot, which
-// picks the nearest line (lib/pick.ts), or with the team menu in the legend. The end of every line is labelled
-// with its abbreviation in two staggered columns with short leaders, so labels never collide. `single` draws
-// the same lines with only the picked team labelled, and no legend or picking. The plot stretches with the
-// card; the tick lane and the label lane keep a fixed size, and the height is fixed too, so the label layout
-// worked out here holds at every width. Given a narrowest width per day, a long season scrolls sideways inside
-// the chart instead of squeezing its days together.
+// Every team's daily rating from the 1500 they all start at, with the start of the playoffs marked once they
+// begin. The picked team is drawn in the accent and named in the legend, the name linking to its page; a
+// reader picks another by pointing anywhere on the plot, which picks the nearest line (lib/pick.ts), or with
+// the team menu in the legend. The end of every line is labelled with its abbreviation in two staggered
+// columns with short leaders, so labels never collide. `single` draws the same lines with only the picked team
+// labelled, and no legend or picking. The plot stretches with the card; the tick lane and the label lane keep
+// a fixed size, and the height is fixed too, so the label layout worked out here holds at every width. Given a
+// narrowest width per day, a long season scrolls sideways inside the chart instead of squeezing its days
+// together.
+import { dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START, type Abbr } from "../lib/elo.ts";
-import { monthShort, shortDay } from "../lib/format.ts";
+import { shortDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
 
@@ -18,8 +20,6 @@ interface Props {
   selected: Abbr;
   /** Plot height in px, the same at every width. */
   height?: number;
-  /** A dated marker line with its label above the plot, such as the start of the playoffs. */
-  marker?: { day: string; label: string } | null;
   /** Label only the selected team's line, by its name, with no legend and no picking: a team's own page. */
   single?: boolean;
   /**
@@ -29,7 +29,7 @@ interface Props {
   minDayWidth?: number;
 }
 
-const { season, selected, height: H = 300, marker = null, single = false, minDayWidth = 0 } = Astro.props;
+const { season, selected, height: H = 300, single = false, minDayWidth = 0 } = Astro.props;
 const m = season.model;
 const ser = m.series;
 const n = ser.length;
@@ -57,17 +57,8 @@ const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
 const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
 const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === selected) - Number(q === selected));
 
-// x labels on one step that lands on the last day: month starts for a long season, days for a short one.
-const xLabels: { i: number; text: string }[] = [];
-if (n > 60) {
-  const firsts = ser.flatMap((d, i) => (d.day.endsWith("-01") ? [i] : []));
-  const k = Math.ceil(firsts.length / 4);
-  firsts.forEach((i, j) => { if (j % k === 0) xLabels.push({ i, text: monthShort(ser[i].day.slice(0, 7)) }); });
-} else {
-  const k = Math.max(1, Math.ceil((n - 1) / 4));
-  for (let i = n - 1; i >= 1; i -= k) xLabels.unshift({ i, text: shortDay(ser[i].day) });
-}
-const markerAt = marker ? ser.findIndex((d) => d.day === marker.day) : -1;
+const xLabels = dateTicks(ser.map((d) => d.day));
+const marker = playoffsMark(m);
 
 // The label lane: two columns, so neighbours in the order sit half a label apart. Each cluster of labels
 // that would overlap is spread around its mean and kept inside the plot's height.
@@ -128,13 +119,13 @@ const scroll = minDayWidth > 0;
       data-scroll-end={scroll ? "" : undefined}
       style={`--h: ${H}px; --lane: ${LANE}px${scroll ? `; --plot-min: ${(n - 1) * minDayWidth}px` : ""}`}
     >
-      {marker && markerAt >= 0 && <span class="mark-label" style={`left: ${pct(markerAt)}`}>{marker.label}</span>}
+      {marker && <span class="mark-label" style={`left: ${pct(marker.i)}`}>{marker.label}</span>}
       <svg class="ticks" width="40" height={H} viewBox={`0 0 40 ${H}`}>
         {ticks.map((t) => <text class:list={{ ref: t === START }} x="32" y={y(t) + 4} text-anchor="end">{t}</text>)}
       </svg>
       <svg class="plot" data-plot={single ? undefined : ""} viewBox={`0 0 ${X} ${H}`} preserveAspectRatio="none" height={H}>
         {ticks.map((t) => <path class:list={["grid", { ref: t === START }]} d={`M0,${y(t)}H${X}`} />)}
-        {markerAt >= 0 && <path class="marker" d={`M${x(markerAt).toFixed(1)},0V${H}`} />}
+        {marker && <path class="marker" d={`M${x(marker.i).toFixed(1)},0V${H}`} />}
         <g>
           {drawOrder.map((a) => (
             <polyline class:list={["line", { sel: a === selected }]} data-team={a} data-raise points={points(a)} />
@@ -176,10 +167,7 @@ const scroll = minDayWidth > 0;
   .key::before { content: ""; width: 14px; height: 2px; align-self: center; background: var(--line-other); }
   .key.sel::before { background: var(--accent); }
   .key .nm { color: var(--text); font-weight: 600; }
-  .pick {
-    margin-left: auto; align-self: center; height: 28px; padding: 0 6px; font: inherit; color: var(--text);
-    background: var(--raised); border: 1px solid var(--control); border-radius: 4px; cursor: pointer;
-  }
+  .pick { margin-left: auto; align-self: center; }
   .key .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
 
   .rc { display: grid; grid-template-columns: 40px minmax(var(--plot-min, 0px), 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
@@ -217,9 +205,4 @@ const scroll = minDayWidth > 0;
   /* The dot overhangs the plot's last day, so it lets the pointer through to pick there. */
   .end { display: none; fill: var(--accent); stroke: var(--surface); stroke-width: 2; pointer-events: none; }
   .end.sel { display: inline; }
-
-  @media (max-width: 640px) {
-    /* 44px tall to tap */
-    .pick { height: 44px; }
-  }
 </style>

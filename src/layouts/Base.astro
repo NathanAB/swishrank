@@ -27,7 +27,6 @@ const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
   { label: "Games", kinds: ["games"], to: (s) => ({ kind: "games", season: s }) },
-  { label: "Graph", kinds: ["graph"], to: (s) => ({ kind: "graph", season: s }) },
 ];
 const switcher = !route || route.kind === "about" ? [] : seasonSwitch(route);
 const home = href({ kind: "home", season: currentSeason() });

@@ -6,7 +6,7 @@ import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
 import Base from "../../../layouts/Base.astro";
 import { dayKey, gap, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
-import { finals, playoffsStart } from "../../../lib/facts.ts";
+import { finals } from "../../../lib/facts.ts";
 import { ordinal, pct, rating, record, shortDay, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
 import { href } from "../../../lib/routes.ts";
 import { TODAY, noGamesAhead, team, teamPaths, theTeam, type SeasonView } from "../../../lib/season.ts";
@@ -58,7 +58,6 @@ else if (games.some((g) => g.stage.phase === "play-in")) lede = `The ${me.short}
 else lede = `The ${me.short} missed the playoffs.`;
 
 const log = [...games].reverse();
-const playoffsFrom = playoffsStart(m);
 const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
 // Early in a season the two columns come out within a row or two of each other, so they end level: the plot
 // takes the height of the rows beside it (36px each, with 68px more of frames on the left than on the chart's
@@ -148,7 +147,7 @@ const plotHeight = level ? Math.max(240, 68 + 36 * rows) : 300;
 
     <div class="rail">
       <Panel class="chart" fill={level} title="Rating history">
-        <RatingChart season={season} selected={abbr} single height={plotHeight} marker={playoffsFrom ? { day: playoffsFrom, label: `Playoffs from ${shortDay(playoffsFrom)}` } : null} />
+        <RatingChart season={season} selected={abbr} single height={plotHeight} />
       </Panel>
     </div>
   </div>

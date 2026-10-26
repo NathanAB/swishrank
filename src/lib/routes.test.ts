@@ -20,13 +20,6 @@ test("the season switch keeps the page but not a month, and a team the other sea
   assert.deepEqual(switchTarget({ kind: "team", season: now, abbr: "SEA" }, past, () => false), { kind: "home", season: past });
 });
 
-test("the graph lives under its season, keeps its page across the season switch, and carries a pick in its hash", () => {
-  assert.equal(routePath({ kind: "graph", season: now }), "/graph/");
-  assert.equal(routePath({ kind: "graph", season: past }), "/2025-26/graph/");
-  assert.equal(routePath({ kind: "graph", season: now, abbr: "OKC" }), "/graph/#okc");
-  assert.deepEqual(switchTarget({ kind: "graph", season: past }, now, anyTeam), { kind: "graph", season: now });
-});
-
 test("a hash picks the team it names on the page, and no hash or another hash picks none", () => {
   const onPage = ["MIN", "OKC", "BOS"];
   assert.equal(hashTeam("#okc", onPage), "OKC");

@@ -1,14 +1,8 @@
 ---
-// A season's rating history at full size: every team's daily rating from the 1500 they all start at, with the
-// league table beside it as its key. /graph/ is the current season, /<id>/graph/ every other one. Picking a
-// team in the table or on the chart highlights its line, and /graph/#okc opens with the Thunder picked.
-import Panel from "../../components/Panel.astro";
-import RatingChart from "../../components/RatingChart.astro";
-import Base from "../../layouts/Base.astro";
-import { START, type Abbr } from "../../lib/elo.ts";
-import { playoffsStart } from "../../lib/facts.ts";
-import { rating, shortDay, weekdayDay } from "../../lib/format.ts";
-import { openingDay, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
+// The old graph page: the chart now runs through the home page's league table. A meta refresh would drop the
+// hash that picks a team, so a script carries it across; the link is for a browser without scripts.
+import { href } from "../../lib/routes.ts";
+import { seasonPaths, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
   return seasonPaths();
@@ -19,109 +13,19 @@ interface Props {
 }
 
 const { season } = Astro.props;
-const m = season.model;
-const lead = m.order[0];
-const playoffs = playoffsStart(m);
-// Side by side, the table is the chart's key and the two cards end level: the plot is as tall as the table's
-// rows (ROW, the CSS's 22px) plus its 36px header, less what the chart's card holds besides the plot (a 32px
-// legend, 20px of dates and a marker's 16px label).
-const ROW = 22;
-const plotHeight = m.abbrs.length * ROW + 36 - 52 - (playoffs ? 16 : 0);
-
-// The finding under the title: who climbed furthest from the 1500 every team starts at and who fell furthest,
-// on the displayed ratings, so teams level at either end share the clause.
-const shown = (a: Abbr) => Math.round(m.r[a]);
-const level = (a: Abbr) => m.order.filter((b) => shown(b) === shown(a)).map((b) => team(season, b).short).join(" and ");
-const opens = openingDay(season);
-const [rose, fell] = season.current ? ["have climbed", "have fallen"] : ["climbed", "fell"];
-const lede = m.asOf
-  ? `The ${level(lead)} ${rose} furthest and the ${level(m.order[m.order.length - 1])} ${fell} furthest.`
-  : `Every team starts at ${START}${opens ? `, and the season opens ${weekdayDay(opens)}` : ""}.`;
+const home = href({ kind: "home", season });
 ---
 
-<Base
-  title={`${season.label} rating history`}
-  description={`Every NBA team's daily Elo rating through the ${season.label} season, from the ${START} they all start at.`}
-  route={{ kind: "graph", season }}
->
-  <Fragment slot="lede">{lede}</Fragment>
-
-  <div class="grid">
-    <Panel class="chart" title={`All ${m.abbrs.length} teams`}>
-      <RatingChart
-        season={season}
-        selected={lead}
-        height={plotHeight}
-        minDayWidth={2}
-        marker={playoffs ? { day: playoffs, label: `Playoffs from ${shortDay(playoffs)}` } : null}
-      />
-    </Panel>
-
-    <Panel class="table" title="League table">
-      <table>
-        <thead>
-          <tr>
-            <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
-            <th scope="col">Team</th>
-            <th class="num rating" scope="col">Rating</th>
-          </tr>
-        </thead>
-        <tbody>
-          {m.order.map((a) => (
-            <tr data-team={a} data-pick class:list={{ sel: a === lead }}>
-              <td class="num rank">{m.rank[a]}</td>
-              <td class="team"><span class="name">{m.data.teams[a].short}</span> <span class="ab">{a}</span></td>
-              <td class="num rating">{rating(m.r[a])}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Panel>
-  </div>
-</Base>
-
-<style>
-  /* 896 + 24 + 280 = 1200 at 1440. */
-  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--gap); align-items: start; }
-
-  /* Fixed columns, so on the narrowest phone a long name is cut short rather than pushing the table wide. */
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  th {
-    height: 36px; padding: 0 8px; font-size: var(--fs-small); font-weight: 400; color: var(--muted);
-    text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border);
-  }
-  th abbr { text-decoration: none; }
-  td { height: 32px; padding: 0 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; color: var(--muted); }
-  tbody tr:last-child td { border-bottom: 0; }
-  th:first-child, td:first-child { padding-left: 0; }
-  th:last-child, td:last-child { padding-right: 0; }
-  .num { text-align: right; }
-  .rank { width: 28px; }
-  .rating { width: 56px; }
-  td.rating { color: var(--text); font-weight: 600; }
-
-  /* The whole row picks the team and holds no link, so a click does one thing; the name carries the
-     selection line. */
-  tbody tr { cursor: pointer; }
-  td.team { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
-  .name { position: relative; font-weight: 500; }
-  .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: transparent; }
-  tr:hover .name::after, tr.hov .name::after { background: var(--control); }
-  tr.sel .name::after { background: var(--accent); }
-  tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .ab { margin-left: 4px; font-size: var(--fs-small); color: var(--muted); }
-
-  /* Beside the chart the table takes a key's density, 13px figures on 22px rows, so it ends level with the
-     plot (ROW above). Narrower than the full canvas the chart takes the whole width, so a long season keeps
-     room for its days, and the table follows it at the home page's table density. */
-  @media (min-width: 1240px) {
-    td { height: 22px; font-size: 13px; line-height: 18px; }
-  }
-  @media (max-width: 1239px) {
-    .grid { grid-template-columns: minmax(0, 1fr); }
-  }
-  /* 44px tall rows on a phone, to tap. */
-  @media (max-width: 640px) {
-    td { height: 44px; }
-  }
-</style>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Moved to the ratings page</title>
+    <meta name="robots" content="noindex" />
+    <link rel="canonical" href={home} />
+    <script is:inline define:vars={{ home }}>location.replace(home + location.hash);</script>
+  </head>
+  <body>
+    <p>The graph is now on the <a href={home}>ratings page</a>.</p>
+  </body>
+</html>

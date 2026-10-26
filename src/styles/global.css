@@ -77,6 +77,12 @@ ul, ol { padding: 0; list-style: none; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 svg { display: block; }
+/* The team menus on the rating charts; 44px tall to tap on a phone. */
+select {
+  height: 28px; padding: 0 6px; font: inherit; color: var(--text);
+  background: var(--raised); border: 1px solid var(--control); border-radius: 4px; cursor: pointer;
+}
+@media (max-width: 640px) { select { height: 44px; } }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 
 /* Every figure in a column or a strip lines up digit for digit. */
