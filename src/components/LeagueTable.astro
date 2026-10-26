@@ -242,15 +242,12 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   .xs .mark-label { transform: translateX(calc(-100% - 4px)); }
   .stacked { margin-bottom: 16px; }
 
-  /* With the chart stacked above, on a tablet or a phone, the scale is a narrow strip whose curves stop short of
-     the rank, and the table keeps to the width its columns need, so no gap opens between a name and its
-     figures. Tablet rows are tall enough to tap. */
+  /* With the chart stacked above, on a tablet or a phone, the scale's curves take the width the columns
+     leave, stopping short of the rank, so each name sits by its figures and nothing opens beside the table.
+     Tablet rows are tall enough to tap. */
   @media (max-width: 999px) {
-    .lt { --cv: 18px; }
-    .rail { width: calc(var(--cv) - 5px); }
-  }
-  @media (min-width: 641px) {
-    table { width: auto; min-width: 440px; }
+    .lad { width: 100%; }
+    .rail { left: var(--tl); width: calc(100% - var(--tl) - 5px); }
   }
   @media (min-width: 641px) and (max-width: 999px) {
     .lt { --row: 36px; }
@@ -267,19 +264,16 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   /* Phone: one two-line row per team, with the other figures on the second line. */
   @media (max-width: 640px) {
     .lt { --row: 48px; --tl: 28px; }
-    table { table-layout: fixed; }
     th, td { padding: 0 4px; }
     th.rank { width: 22px; padding: 0 2px; }
     td.rank { padding: 0 2px; }
-    th.num:not(.opt):not(.rank) { width: 76px; }
     th.num:not(.opt):not(.rank), td.rating { padding-right: 0; }
     .opt { display: none; }
-    td.team { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
     td.team, td.rating { line-height: 18px; }
     .go, .name { display: block; }
-    .name { line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
+    .name { line-height: 18px; }
     .name::after { bottom: -2px; }
-    .sub { display: block; color: var(--muted); font-size: 13px; line-height: 17px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+    .sub { display: block; color: var(--muted); font-size: 13px; line-height: 17px; font-weight: 400; }
     th .sub { display: inline; font-size: inherit; }
   }
 </style>
