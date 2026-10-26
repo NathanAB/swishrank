@@ -28,6 +28,14 @@ export function lineColor(team: Pick<Team, "color" | "alternateColor">, theme: T
   return `#${pick.toLowerCase()}`;
 }
 
+/**
+ * `teams` drawn in `now`'s colours wherever `now` has the franchise. ESPN gives each season the colours of its
+ * day, so a past season would draw most teams in other colours than this one: the Warriors blue through
+ * 2023-24 and gold since.
+ */
+export const coloursOf = (teams: Record<Abbr, Team>, now: Record<Abbr, Team>): Record<Abbr, Team> =>
+  Object.fromEntries(Object.entries(teams).map(([a, t]) => [a, now[a] ? { ...t, color: now[a].color, alternateColor: now[a].alternateColor } : t]));
+
 /** Each team's style attribute for what draws it on a chart: its line colour in both themes. */
 export const tintStyles = (teams: Record<Abbr, Team>): Record<Abbr, string> =>
   Object.fromEntries(Object.entries(teams).map(([a, t]) => [a, `--tint-light: ${lineColor(t, "light")}; --tint-dark: ${lineColor(t, "dark")}`]));

@@ -6,6 +6,7 @@ import { seasonLabel } from "./format.ts";
 import { months } from "./results.ts";
 import { conferenceSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
 import { CONFERENCE_ORDER } from "./teams.ts";
+import { coloursOf } from "./tint.ts";
 
 export type SeasonView = SeasonRef & {
   /** "2026–27" */
@@ -81,6 +82,8 @@ function load(entry: Entry): SeasonView {
   if (hit) return hit;
   const raw = GAME_FILES[`../data/games/${entry.id}.json`];
   if (raw === undefined) throw new Error(`src/data/games/${entry.id}.json is missing for season ${entry.id}`);
+  const data = parseSeasonData(raw, entry.id);
+  const teams = entry === ENTRIES.current ? data.teams : coloursOf(data.teams, load(ENTRIES.current).model.data.teams);
   const view: SeasonView = {
     id: entry.id,
     current: entry.end === null,
@@ -88,7 +91,7 @@ function load(entry: Entry): SeasonView {
     start: entry.start,
     end: entry.end,
     note: entry.note,
-    model: compute(parseSeasonData(raw, entry.id)),
+    model: compute({ ...data, teams }),
   };
   cache.set(entry.id, view);
   return view;
