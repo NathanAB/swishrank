@@ -1,4 +1,4 @@
-# NBA Elo Ratings
+# SwishRank
 
 Season-only Elo ratings for the 30 NBA teams: https://nathanab.github.io/nba-elo/
 
