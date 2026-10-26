@@ -1,13 +1,14 @@
 ---
-// The shell every page shares: the top bar (mark, wordmark, nav, and the link to how the ratings work) and
-// the footer. A page with a season carries its h1 and the season menu in its first card's header
-// (Panel.astro, level 1) and says so with `ownHeading`; a page without one, such as the about page, gets its
-// h1 and optional lede from the shell. Pages fill the default slot.
+// The shell every page shares: the head with its canonical link and link-preview tags, the top bar (mark,
+// wordmark, nav, and the link to how the ratings work) and the footer. A page with a season carries its h1
+// and the season menu in its first card's header (Panel.astro, level 1) and says so with `ownHeading`; a
+// page without one, such as the about page, gets its h1 and optional lede from the shell. Pages fill the
+// default slot.
 import { Font } from "astro:assets";
 import "../styles/global.css";
 import { stamp } from "../lib/format.ts";
-import { SITE_NAME } from "../lib/meta.ts";
-import { href, withBase, type Route } from "../lib/routes.ts";
+import { SHARE_SIZE, SITE_NAME } from "../lib/meta.ts";
+import { href, shareImage, sharePath, withBase, type Route } from "../lib/routes.ts";
 import { BUILT_AT, currentSeason, routeSeason, type SeasonView } from "../lib/season.ts";
 
 interface Props {
@@ -34,6 +35,11 @@ const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route
   { label: "Games", kinds: ["games"], to: (s) => ({ kind: "games", season: s }) },
 ];
 const home = href({ kind: "home", season: currentSeason() });
+
+// Link previews and search engines need absolute URLs: the config's site with the base in front of the path.
+if (!Astro.site) throw new Error("astro.config.mjs has no site to make the canonical and share image URLs absolute");
+const canonical = route && new URL(href(route), Astro.site).href;
+const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), Astro.site).href;
 ---
 
 <!doctype html>
@@ -44,6 +50,16 @@ const home = href({ kind: "home", season: currentSeason() });
     <meta name="color-scheme" content="light dark" />
     <title>{docTitle === SITE_NAME ? docTitle : `${docTitle} · ${SITE_NAME}`}</title>
     <meta name="description" content={description} />
+    {canonical && <link rel="canonical" href={canonical} />}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={docTitle} />
+    <meta property="og:description" content={description} />
+    {canonical && <meta property="og:url" content={canonical} />}
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content={SHARE_SIZE.width} />
+    <meta property="og:image:height" content={SHARE_SIZE.height} />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href={withBase("/favicon.svg")} />
     <Font cssVariable="--font-public-sans" preload />
   </head>
