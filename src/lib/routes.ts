@@ -14,15 +14,9 @@ export type Route =
 /** A team's URL segment: its abbreviation in lower case (OKC becomes okc). */
 export const teamSlug = (abbr: string) => abbr.toLowerCase();
 
-/** The team a URL hash such as "#okc" names, among `abbrs`; null for any other hash or none. */
-export const hashTeam = (hash: string, abbrs: Iterable<string>) => {
-  const slug = hash.replace(/^#/, "").toLowerCase();
-  return [...abbrs].find((a) => teamSlug(a) === slug) ?? null;
-};
-
 const prefix = (season: SeasonRef) => (season.current ? "" : `/${season.id}`);
 
-/** The page's path below the site base, always with a trailing slash (before any hash). */
+/** The page's path below the site base, always with a trailing slash. */
 export function routePath(route: Route): string {
   switch (route.kind) {
     case "home":

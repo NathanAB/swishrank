@@ -1,6 +1,5 @@
 ---
-// The old graph page: the chart now runs through the home page's league table. A meta refresh would drop the
-// hash that picks a team, so a script carries it across; the link is for a browser without scripts.
+// The old graph page: the chart now runs through the home page's league table.
 import { href } from "../../lib/routes.ts";
 import { seasonPaths, type SeasonView } from "../../lib/season.ts";
 
@@ -23,7 +22,7 @@ const home = href({ kind: "home", season });
     <title>Moved to the ratings page</title>
     <meta name="robots" content="noindex" />
     <link rel="canonical" href={home} />
-    <script is:inline define:vars={{ home }}>location.replace(home + location.hash);</script>
+    <meta http-equiv="refresh" content={`0;url=${home}`} />
   </head>
   <body>
     <p>The graph is now on the <a href={home}>ratings page</a>.</p>

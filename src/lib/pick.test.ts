@@ -20,13 +20,12 @@ test("the whole plot is the target: a point far from every line still picks the 
   assert.equal(nearestLine([], 0.3, 120), null);
 });
 
-test("lines that coincide go to the picked team, and otherwise to the earlier line", () => {
+test("lines that coincide go to the earlier line", () => {
   const lines = [
     { team: "A", ys: [40, 40] },
     { team: "B", ys: [40, 40] },
     { team: "C", ys: [40, 40] },
   ];
-  assert.equal(nearestLine(lines, 0.5, 40, "B"), "B");
   assert.equal(nearestLine(lines, 0.5, 40), "A");
 });
 

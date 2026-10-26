@@ -35,7 +35,6 @@ export type Season = {
   results: Result[];
   log: Record<Abbr, TeamGame[]>;
   series: Snapshot[];
-  asOf: string | null;
   weekAgo: Snapshot | null;
   stats: Record<Abbr, TeamStats>;
   order: Abbr[];
@@ -124,7 +123,7 @@ export function compute(data: SeasonData): Season {
 
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
   return {
-    data, abbrs, r, rank, log, results, series, asOf, weekAgo, stats, order,
+    data, abbrs, r, rank, log, results, series, weekAgo, stats, order,
     upcoming: data.games.filter((g) => !g.final),
   };
 }

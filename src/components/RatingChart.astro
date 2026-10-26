@@ -1,27 +1,23 @@
 ---
 // Every team's daily rating from the 1500 they all start at, with the start of the playoffs marked once they
-// begin. The picked team is drawn in the accent and named in the legend, the name linking to its page; a
-// reader picks another by pointing anywhere on the plot, which picks the nearest line (lib/pick.ts), or with
-// the team menu in the legend. The end of every line is labelled with its abbreviation in two staggered
-// columns with short leaders, so labels never collide. `single` draws the same lines with only the picked team
-// labelled, and no legend or picking. The plot stretches with the card; the tick lane and the label lane keep
+// begin. Pointing anywhere on the plot previews the nearest line (lib/pick.ts). The end of every line is
+// labelled with its abbreviation in two staggered columns with short leaders, so labels never collide. Given
+// a `team`, a team's own page, the same lines are drawn with only that team's in the accent and labelled, by
+// its name, and pointing at the plot does nothing. The plot stretches with the card; the tick lane and the label lane keep
 // a fixed size, and the height is fixed too, so the label layout worked out here holds at every width. Given a
 // narrowest width per day, a long season scrolls sideways inside the chart instead of squeezing its days
 // together.
 import { dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START, type Abbr } from "../lib/elo.ts";
 import { shortDay } from "../lib/format.ts";
-import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
 
 interface Props {
   season: SeasonView;
-  /** The team drawn in the accent on load. */
-  selected: Abbr;
+  /** The page's own team, on a team's page: its line alone is in the accent and labelled. */
+  team?: Abbr;
   /** Plot height in px, the same at every width. */
   height?: number;
-  /** Label only the selected team's line, by its name, with no legend and no picking: a team's own page. */
-  single?: boolean;
   /**
    * The plot's narrowest width per day in px. Below it the chart scrolls sideways inside itself, opening on
    * the latest days, with the rating ticks held at its left edge. Leave it out to fit the plot to any width.
@@ -29,7 +25,7 @@ interface Props {
   minDayWidth?: number;
 }
 
-const { season, selected, height: H = 300, single = false, minDayWidth = 0 } = Astro.props;
+const { season, team, height: H = 300, minDayWidth = 0 } = Astro.props;
 const m = season.model;
 const ser = m.series;
 const n = ser.length;
@@ -55,7 +51,7 @@ const X = 1000; // the plot's viewBox width, stretched to the card
 const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
 const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
 const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
-const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === selected) - Number(q === selected));
+const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === team) - Number(q === team));
 
 const xLabels = dateTicks(ser.map((d) => d.day));
 const marker = playoffsMark(m);
@@ -64,11 +60,11 @@ const marker = playoffsMark(m);
 // that would overlap is spread around its mean and kept inside the plot's height.
 // A 12px capital is about 8px wide, so a column is the longest abbreviation plus 8px of air; a lone name
 // takes about 7px a letter.
-const text = (a: Abbr) => (single ? m.data.teams[a].short : a);
+const text = (a: Abbr) => (team ? m.data.teams[a].short : a);
 const PITCH = 6, GAP = 22, COL = 8 + 8 * Math.max(...m.abbrs.map((a) => a.length));
-const LANE = single ? GAP + 4 + 7 * text(selected).length : GAP + 2 * COL;
+const LANE = team ? GAP + 4 + 7 * text(team).length : GAP + 2 * COL;
 const last = ser[n - 1];
-const labels = m.order.filter((a) => !single || a === selected).map((a) => ({ a, y: last ? y(last.r[a]) : 0, ly: 0 }));
+const labels = m.order.filter((a) => !team || a === team).map((a) => ({ a, y: last ? y(last.r[a]) : 0, ly: 0 }));
 type Cluster = { list: typeof labels; sum: number; top: number; bot: number };
 const place = (c: Cluster) => {
   const span = (c.list.length - 1) * PITCH;
@@ -99,18 +95,6 @@ const scroll = minDayWidth > 0;
   <p class="empty">No games yet.</p>
 ) : (
   <div class="chart">
-    {!single && (
-      <p class="legend" aria-live="polite">
-        {m.order.map((a) => (
-          <span class:list={["key", { sel: a === selected }]} data-team={a}>
-            <a class="nm" href={href({ kind: "team", season, abbr: a })}>{m.data.teams[a].name}</a>
-          </span>
-        ))}
-        <select class="pick" aria-label="Team shown in the chart" data-pick-select>
-          {m.order.map((a) => <option value={a} selected={a === selected}>{m.rank[a]}. {m.data.teams[a].short}</option>)}
-        </select>
-      </p>
-    )}
     <div
       class:list={["rc", { scroll }]}
       role="img"
@@ -123,12 +107,12 @@ const scroll = minDayWidth > 0;
       <svg class="ticks" width="40" height={H} viewBox={`0 0 40 ${H}`}>
         {ticks.map((t) => <text class:list={{ ref: t === START }} x="32" y={y(t) + 4} text-anchor="end">{t}</text>)}
       </svg>
-      <svg class="plot" data-plot={single ? undefined : ""} viewBox={`0 0 ${X} ${H}`} preserveAspectRatio="none" height={H}>
+      <svg class="plot" data-plot={team ? undefined : ""} viewBox={`0 0 ${X} ${H}`} preserveAspectRatio="none" height={H}>
         {ticks.map((t) => <path class:list={["grid", { ref: t === START }]} d={`M0,${y(t)}H${X}`} />)}
         {marker && <path class="marker" d={`M${x(marker.i).toFixed(1)},0V${H}`} />}
         <g>
           {drawOrder.map((a) => (
-            <polyline class:list={["line", { sel: a === selected }]} data-team={a} data-raise points={points(a)} />
+            <polyline class:list={["line", { own: a === team }]} data-team={a} data-raise points={points(a)} />
           ))}
         </g>
       </svg>
@@ -137,14 +121,14 @@ const scroll = minDayWidth > 0;
           const lx = GAP + (k % 2) * COL;
           return (
             <g>
-              <path class:list={["leader", { sel: l.a === selected }]} data-team={l.a} d={`M2,${l.y.toFixed(1)}L6,${l.y.toFixed(1)}L${GAP - 5},${l.ly.toFixed(1)}L${lx - 3},${l.ly.toFixed(1)}`} />
-              <text class:list={["lab", { sel: l.a === selected }]} data-team={l.a} x={lx} y={(l.ly + 4).toFixed(1)}>
+              <path class:list={["leader", { own: l.a === team }]} data-team={l.a} d={`M2,${l.y.toFixed(1)}L6,${l.y.toFixed(1)}L${GAP - 5},${l.ly.toFixed(1)}L${lx - 3},${l.ly.toFixed(1)}`} />
+              <text class:list={["lab", { own: l.a === team }]} data-team={l.a} x={lx} y={(l.ly + 4).toFixed(1)}>
                 {text(l.a)}
               </text>
             </g>
           );
         })}
-        {labels.map((l) => <circle class:list={["end", { sel: l.a === selected }]} data-team={l.a} cx="0" cy={l.y.toFixed(1)} r="4" />)}
+        {labels.map((l) => <circle class:list={["end", { own: l.a === team }]} data-team={l.a} cx="0" cy={l.y.toFixed(1)} r="4" />)}
       </svg>
       <div class="xs">
         {xLabels.map((l) => (
@@ -161,14 +145,6 @@ const scroll = minDayWidth > 0;
 
 <style>
   .empty { padding: 8px 0 12px; color: var(--muted); }
-  .legend { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 8px; color: var(--muted); }
-  .key { display: none; align-items: baseline; gap: 8px; }
-  .key.sel { display: inline-flex; }
-  .key::before { content: ""; width: 14px; height: 2px; align-self: center; background: var(--line-other); }
-  .key.sel::before { background: var(--accent); }
-  .key .nm { color: var(--text); font-weight: 600; }
-  .pick { margin-left: auto; align-self: center; }
-  .key .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
 
   .rc { display: grid; grid-template-columns: 40px minmax(var(--plot-min, 0px), 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
   /* Scrolling, the tick lane stays at the left edge over a cover down to the dates, so the lines and the
@@ -182,7 +158,6 @@ const scroll = minDayWidth > 0;
   }
   .ticks { grid-row: 2; grid-column: 1; overflow: visible; }
   .plot { grid-row: 2; grid-column: 2; width: 100%; overflow: visible; }
-  .plot[data-plot] { cursor: pointer; }
   .lane { grid-row: 2; grid-column: 3; overflow: visible; }
   .xs { grid-row: 3; grid-column: 2; position: relative; }
   .xs span { position: absolute; top: 4px; transform: translateX(-50%); font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap; }
@@ -197,12 +172,11 @@ const scroll = minDayWidth > 0;
   .marker { stroke: var(--muted); stroke-width: 1; }
   .line { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; stroke-linejoin: round; }
   .line.hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 1.5; }
-  .line.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
+  .line.own { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
   .leader { fill: none; stroke: var(--line-other); stroke-opacity: 0.6; stroke-width: 1; }
-  .leader.sel { stroke: var(--accent); stroke-opacity: 1; }
+  .leader.own { stroke: var(--accent); stroke-opacity: 1; }
   .lab.hov { fill: var(--text); }
-  .lab.sel { fill: var(--text); font-weight: 600; }
-  /* The dot overhangs the plot's last day, so it lets the pointer through to pick there. */
-  .end { display: none; fill: var(--accent); stroke: var(--surface); stroke-width: 2; pointer-events: none; }
-  .end.sel { display: inline; }
+  .lab.own { fill: var(--text); font-weight: 600; }
+  .end { display: none; fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+  .end.own { display: inline; }
 </style>

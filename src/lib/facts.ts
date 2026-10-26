@@ -47,33 +47,8 @@ const swing = (result: Result) => outcome(result).winner.change;
 /** Biggest swing first; games with equal swings keep the order they came in. */
 export const bySwing = (results: readonly Result[]) => [...results].sort((x, y) => swing(y) - swing(x));
 
-const gamesOn = (model: Season, day: string) => model.results.filter((r) => r.day === day);
-
-/** Each team's displayed rating change on one day; teams that did not play are absent. */
-export function dayChanges(model: Season, day: string): Map<Abbr, number> {
-  const out = new Map<Abbr, number>();
-  for (const r of gamesOn(model, day)) {
-    const o = outcome(r);
-    out.set(o.home.abbr, (out.get(o.home.abbr) ?? 0) + o.home.change);
-    out.set(o.away.abbr, (out.get(o.away.abbr) ?? 0) + o.away.change);
-  }
-  return out;
-}
-
 /** Teams that share first place on the displayed ratings, in table order. */
 export const leaders = (model: Season) => model.order.filter((a) => model.rank[a] === 1);
-
-/** The widest gap between neighbours in the table, on the displayed ratings. */
-export function widestGap(model: Season): { points: number; upper: Abbr; lower: Abbr } | null {
-  let best: { points: number; upper: Abbr; lower: Abbr } | null = null;
-  for (let i = 1; i < model.order.length; i++) {
-    const upper = model.order[i - 1];
-    const lower = model.order[i];
-    const points = Math.round(model.r[upper]) - Math.round(model.r[lower]);
-    if (!best || points > best.points) best = { points, upper, lower };
-  }
-  return best;
-}
 
 /**
  * The lowest and highest displayed rating any team has held this season, today included, so a scale over it

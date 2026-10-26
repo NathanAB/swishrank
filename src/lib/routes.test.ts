@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hashTeam, routePath, switchTarget } from "./routes.ts";
+import { routePath, switchTarget } from "./routes.ts";
 
 const now = { id: "2026-27", current: true };
 const past = { id: "2025-26", current: false };
@@ -18,13 +18,4 @@ test("the season switch keeps the page but not a month, and a team the other sea
   assert.deepEqual(switchTarget({ kind: "team", season: now, abbr: "OKC" }, past, anyTeam), { kind: "team", season: past, abbr: "OKC" });
   assert.deepEqual(switchTarget({ kind: "games", season: past, month: "2026-06" }, now, anyTeam), { kind: "games", season: now });
   assert.deepEqual(switchTarget({ kind: "team", season: now, abbr: "SEA" }, past, () => false), { kind: "home", season: past });
-});
-
-test("a hash picks the team it names on the page, and no hash or another hash picks none", () => {
-  const onPage = ["MIN", "OKC", "BOS"];
-  assert.equal(hashTeam("#okc", onPage), "OKC");
-  assert.equal(hashTeam("#OKC", onPage), "OKC");
-  assert.equal(hashTeam("", onPage), null);
-  assert.equal(hashTeam("#lal", onPage), null);
-  assert.equal(hashTeam("#h-league-table", onPage), null);
 });

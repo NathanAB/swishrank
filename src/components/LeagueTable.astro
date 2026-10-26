@@ -10,8 +10,8 @@
 import RatingChart from "./RatingChart.astro";
 import { dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START } from "../lib/elo.ts";
-import { dayChanges, ratingRange, widestGap } from "../lib/facts.ts";
-import { DASH, rating, record, shortDay, signed } from "../lib/format.ts";
+import { ratingRange } from "../lib/facts.ts";
+import { rating, record } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
 
@@ -21,10 +21,6 @@ interface Props {
 
 const { season } = Astro.props;
 const m = season.model;
-// The latest game day's changes get their own column, headed by its date: for a finished season, its last game.
-const changeDay = m.asOf;
-const changes = changeDay ? dayChanges(m, changeDay) : null;
-const changeLabel = changeDay ? shortDay(changeDay) : "";
 
 const shown = Object.fromEntries(m.order.map((a) => [a, Math.round(m.r[a])]));
 const { lo, hi } = ratingRange(m);
@@ -42,67 +38,39 @@ const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 6
 const marks: number[] = [];
 for (let v = START - Math.floor((START - lo) / step) * step; v <= hi; v += step) marks.push(v);
 
-// The widest gap is a bar on the axis with its size just left of it, centred on the longest stretch of the
-// bar that stays 14px clear of every tick (the bar's middle when no stretch does).
-const gap = widestGap(m);
-const gapBar = gap && gap.points > 0 ? { top: valY(shown[gap.upper]), bottom: valY(shown[gap.lower]), text: `${gap.points} pts` } : null;
-const CLEAR = 14 / 960;
-let clear: [number, number][] = gapBar ? [[gapBar.top, gapBar.bottom]] : [];
-for (const t of marks.map(valY)) {
-  clear = clear.flatMap(([a, b]): [number, number][] => {
-    if (t + CLEAR <= a || t - CLEAR >= b) return [[a, b]];
-    const parts: [number, number][] = [[a, t - CLEAR], [t + CLEAR, b]];
-    return parts.filter(([x, y]) => y > x);
-  });
-}
-const longest = clear.sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
-const gapLabelY = gapBar && (longest ? (longest[0] + longest[1]) / 2 : (gapBar.top + gapBar.bottom) / 2);
-
-// The picked team, the top one until the reader picks another, is drawn last so it sits on top.
-const lead = m.order[0];
-const onTop = <T extends { a: string }>(list: T[]) => [...list].sort((p, q) => Number(p.a === lead) - Number(q.a === lead));
-const curves = onTop(m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) })));
+// Curves and lines are drawn bottom team first, so the top team's sit on top.
+const curves = m.order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) })).reverse();
 
 // The chart, from the day before opening night on its left edge to the latest day on the scale's axis.
 const ser = m.series;
 const charted = ser.length >= 2;
 const X = 1000; // the plot's viewBox width
 const at = (i: number) => i / (ser.length - 1);
-const lines = onTop(m.order.map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(d.r[a]))}`).join(" ") })));
+const lines = m.order.map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(d.r[a]))}`).join(" ") })).reverse();
 const dates = dateTicks(ser.map((d) => d.day));
 const playoffs = playoffsMark(m);
-const cols = changeDay ? 6 : 5;
 ---
 
 <div class:list={["lt", { charted }]}>
-  <div class="stacked"><RatingChart season={season} selected={lead} height={400} minDayWidth={2} /></div>
+  <div class="stacked"><RatingChart season={season} height={400} minDayWidth={2} /></div>
   <table>
     <thead>
       <tr>
         <th class="lad" scope="col">
-          <div class="lad-head">
-            {charted && (
-              <select class="pick" aria-label="Team picked in the chart" data-pick-select>
-                {m.order.map((a) => <option value={a} selected={a === lead}>{m.rank[a]}. {m.data.teams[a].short}</option>)}
-              </select>
-            )}
-            <span class="lad-label">Rating to scale</span>
-          </div>
+          Rating to scale
           {charted && playoffs && <span class="mark-label" style={`--at: ${at(playoffs.i).toFixed(4)}`}>{playoffs.label}</span>}
         </th>
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
         <th class="team" scope="col">Team<span class="sub"> · W–L</span></th>
         <th class="num" scope="col">Rating</th>
-        {changeDay && <th class="num opt" scope="col">{changeLabel}</th>}
         <th class="num opt" scope="col">W–L</th>
       </tr>
     </thead>
     <tbody>
       {m.order.map((a, i) => {
         const s = m.stats[a];
-        const c = changes?.get(a);
         return (
-          <tr data-team={a} class:list={{ sel: a === lead }}>
+          <tr data-team={a}>
             {i === 0 && (
               <td class="lad" rowspan={n} aria-hidden="true">
                 <div class="lad-in">
@@ -115,35 +83,29 @@ const cols = changeDay ? 6 : 5;
                       {playoffs && <path class="marker" d={`M${(at(playoffs.i) * X).toFixed(1)},0V${Y}`} />}
                       <g>
                         {lines.map((l) => (
-                          <polyline class:list={["line", { sel: l.a === lead }]} data-team={l.a} data-raise points={l.points} />
+                          <polyline class="line" data-team={l.a} data-raise points={l.points} />
                         ))}
                       </g>
                     </svg>
                   )}
-                  {gapBar && gapLabelY !== null && <span class="tick gap-label" style={`top: ${(gapLabelY * 100).toFixed(2)}%`}>{gapBar.text}</span>}
                   <svg class="rail" viewBox={`0 0 100 ${Y}`} preserveAspectRatio="none">
                     <path class="axis" d={`M0,${f(valY(hi))}V${f(valY(lo))}`} />
-                    {gapBar && <path class="gap" d={`M0,${f(gapBar.top)}V${f(gapBar.bottom)}`} />}
                     {curves.map((c) => (
-                      <path class:list={["lead", { sel: c.a === lead }]} data-team={c.a} data-raise d={`M0,${f(c.from)}C50,${f(c.from)} 50,${f(c.to)} 100,${f(c.to)}`} />
+                      <path class="lead" data-team={c.a} data-raise d={`M0,${f(c.from)}C50,${f(c.from)} 50,${f(c.to)} 100,${f(c.to)}`} />
                     ))}
                   </svg>
                   {curves.map((c) => (
-                    <i class:list={["dot", { sel: c.a === lead }]} data-team={c.a} data-preview style={`top: ${(c.from * 100).toFixed(2)}%`} />
+                    <i class="dot" data-team={c.a} data-preview style={`top: ${(c.from * 100).toFixed(2)}%`} />
                   ))}
                 </div>
               </td>
             )}
             <td class="num rank">{m.rank[a]}</td>
             <td class="team">
-              <a class="go" href={href({ kind: "team", season, abbr: a })} data-team={a} data-preview><span class="name">{m.data.teams[a].name}</span></a>
+              <a class="go" href={href({ kind: "team", season, abbr: a })} data-team={a} data-preview><span class="name">{m.data.teams[a].short}</span></a>
               <span class="sub">{record(s.W, s.L)}</span>
             </td>
-            <td class="num rating">
-              {rating(m.r[a])}
-              {c !== undefined && <span class="sub">{signed(c)} {changeLabel}</span>}
-            </td>
-            {changes && <td class:list={["num opt", { quiet: !c }]}>{c === undefined ? DASH : signed(c)}</td>}
+            <td class="num rating">{rating(m.r[a])}</td>
             <td class="num opt">{record(s.W, s.L)}</td>
           </tr>
         );
@@ -159,7 +121,7 @@ const cols = changeDay ? 6 : 5;
               ))}
             </div>
           </td>
-          <td colspan={cols - 1} />
+          <td colspan="4" />
         </tr>
       </tfoot>
     )}
@@ -192,48 +154,39 @@ const cols = changeDay ? 6 : 5;
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
   .go:hover .name { text-decoration: underline; text-underline-offset: 3px; }
   .go:hover .name::after, tr.hov .name::after { background: var(--control); }
-  tr.sel .name::after { background: var(--accent); }
   td.rating { color: var(--text); font-weight: 600; }
-  td.quiet { color: var(--muted); }
-  td.opt:not(.quiet) { color: var(--text); }
+  td.opt { color: var(--text); }
   .sub { display: none; }
 
   /* the scale, and the chart on it */
   .lad { width: calc(var(--tl) + var(--cv)); padding: 0; }
   th.lad { position: relative; padding-right: 8px; }
-  .lad-head { display: flex; align-items: center; gap: 16px; }
-  .pick, .mark-label, .history, .dates { display: none; }
+  .mark-label, .history, .dates { display: none; }
   /* Above the rows' links, so the plot takes the pointer. */
   td.lad { position: relative; z-index: 2; border-bottom: 0; }
   .lad-in { position: absolute; inset: 0; }
   .lad svg { position: absolute; top: 0; height: 100%; overflow: visible; }
   .rail { left: calc(100% - var(--cv)); width: var(--cv); }
-  .history { left: var(--tl); width: calc(100% - var(--tl) - var(--cv)); cursor: pointer; }
+  .history { left: var(--tl); width: calc(100% - var(--tl) - var(--cv)); }
   .lad path, .lad polyline { fill: none; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--grid); stroke-width: 1; }
-  .gap { stroke: var(--text); stroke-width: 2; }
   .lead { stroke: var(--line-other); stroke-opacity: 0.7; stroke-width: 1; transition: stroke 120ms ease; }
   .lead.hov { stroke: var(--text); stroke-opacity: 1; }
-  .lead.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.5; }
   .grid { stroke: var(--grid); stroke-width: 1; }
   .grid.start { stroke: var(--muted); stroke-opacity: 0.7; stroke-dasharray: 3 3; }
   .marker { stroke: var(--muted); stroke-width: 1; }
   .line { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; stroke-linejoin: round; }
   .line.hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 1.5; }
-  .line.sel { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
   .tick {
     position: absolute; right: calc(100% - var(--tl) + 8px); transform: translateY(-50%);
     font-size: 11px; line-height: 12px; color: var(--muted);
   }
   .tick.start { color: var(--text); font-weight: 500; }
-  /* Over the chart it keeps a backing, so the lines pass under it. */
-  .gap-label { right: calc(var(--cv) + 6px); padding: 0 2px; white-space: nowrap; background: var(--surface); }
   .dot {
     position: absolute; left: calc(100% - var(--cv)); width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
     background: var(--bar); box-shadow: 0 0 0 1.5px var(--surface);
   }
   .dot.hov { background: var(--text); }
-  .dot.sel { background: var(--accent); }
   .mark-label {
     position: absolute; bottom: 2px; left: calc(var(--tl) + (100% - var(--tl) - var(--cv)) * var(--at));
     transform: translateX(calc(-100% - 4px)); font-size: 11px; line-height: 16px;
@@ -259,9 +212,9 @@ const cols = changeDay ? 6 : 5;
   @media (min-width: 1000px) {
     .charted { --cv: 86px; }
     .charted .stacked { display: none; }
-    .charted .pick, .charted .mark-label, .charted .history { display: block; }
+    .charted .mark-label, .charted .history { display: block; }
     .charted .dates { display: table-footer-group; }
-    .charted .lad-label { margin-left: auto; }
+    .charted th.lad { text-align: right; }
   }
 
   /* Phone: one two-line row per team, with the other figures on the second line. */
