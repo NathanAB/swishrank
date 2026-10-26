@@ -6,11 +6,11 @@ on:
   push:
     branches: [main]
   schedule:
-    # Around midnight Eastern, once most games have ended, so the night's results are up before morning;
-    # after the last West Coast game ends (about 6 AM Eastern); and an afternoon retry because GitHub can
-    # delay or drop scheduled runs. Minutes off the hour avoid its busiest time. A run with no new scores
-    # commits nothing.
-    - cron: "17 4 * * *"
+    # Once most games have ended (12:17 AM Eastern in winter, 1:17 AM in summer), so the night's results are
+    # up before morning; after the last West Coast game ends (about 6 AM Eastern); and an afternoon retry
+    # because GitHub can delay or drop scheduled runs. Minutes off the hour avoid its busiest time. A run with
+    # no new scores commits nothing.
+    - cron: "17 5 * * *"
     - cron: "17 10 * * *"
     - cron: "17 15 * * *"
   workflow_dispatch:
@@ -41,7 +41,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/data/games
-          git diff --cached --quiet || { git commit -m "Update scores" && git push; }
+          # A run that waited in the queue may be behind a push made since, which would reject its own.
+          git diff --cached --quiet || { git commit -m "Update scores" && git pull --rebase && git push; }
       - name: Install, build, and upload the site
         uses: withastro/action@v6
 
