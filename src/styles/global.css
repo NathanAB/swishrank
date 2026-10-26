@@ -1,8 +1,8 @@
 /* Tokens from the data-terminal prototype: a true neutral palette, Public Sans, and basketball-leather
-   orange as the one accent. The accent marks a selection (a 1px line as wide as its label) and a team
-   page's own team in its chart; everything else is ink and greys, but for the home chart's lines, which
-   carry a hint of each team's colour. Light follows the system's light mode with
-   its own values, not an inversion of dark. Grid at 1440: a 1200 column, 744 + 24 + 432 = 1200. */
+   orange as the one accent. The accent marks the mark, a selection (a 1px line as wide as its label), focus
+   and the about page's worked examples; everything else is ink and greys, but for the charts' lines, which
+   carry each team's colour. Light follows the system's light mode with its own values, not an inversion of
+   dark. At 1440 the page is a 1200px column. */
 :root {
   color-scheme: light dark;
   --ground: #ffffff;
