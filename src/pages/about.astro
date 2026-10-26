@@ -232,7 +232,7 @@ const chanceTicks = [0.5, 0.75, 1];
   .steps { display: grid; gap: var(--gap); }
   /* A step's words at a fixed measure beside its drawing, so every drawing starts at the same edge; stacked
      where the two do not fit side by side. */
-  .step { display: grid; grid-template-columns: 380px minmax(0, 1fr); align-items: start; gap: 16px 56px; padding-bottom: 8px; }
+  .step { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; gap: 16px 56px; padding-bottom: 8px; }
   @media (max-width: 1023px) { .step { grid-template-columns: minmax(0, 1fr); } }
 
   .say { line-height: 22px; }
