@@ -25,3 +25,18 @@ export function playoffsMark(model: Season): { i: number; label: string } | null
   const i = day ? model.series.findIndex((d) => d.day === day) : -1;
   return day && i >= 0 ? { i, label: `Playoffs from ${shortDay(day)}` } : null;
 }
+
+/**
+ * The date labels that keep clear of the playoffs label, where both share the plot's top edge: that label
+ * ends just left of its marker. Places and widths are fractions of the plot's width; give the widths at the
+ * narrowest plot that shows the labels, so they stay apart at every wider one.
+ */
+export function clearOfMark<T extends { i: number }>(ticks: readonly T[], n: number, mark: { i: number } | null, widths: { mark: number; tick: number }): T[] {
+  if (!mark || n < 2) return [...ticks];
+  const end = mark.i / (n - 1);
+  const start = end - widths.mark;
+  return ticks.filter((t) => {
+    const at = t.i / (n - 1);
+    return at + widths.tick / 2 < start || at - widths.tick / 2 > end;
+  });
+}

@@ -1,6 +1,6 @@
 ---
-// Headline figures in one container split by hairlines: label over value, with an optional grey unit after
-// the value.
+// Headline figures in a row across a card, split by hairlines: label over value, with an optional grey unit
+// after the value.
 import type { HTMLAttributes } from "astro/types";
 
 export type Kpi = {
@@ -30,11 +30,9 @@ const { items, label, class: cls, ...rest } = Astro.props;
 </dl>
 
 <style>
-  .kpis {
-    display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr));
-    background: var(--surface); border: var(--panel-edge); box-shadow: var(--shadow); border-radius: var(--radius-card);
-  }
-  .kpi { min-width: 0; padding: 14px var(--card-pad) 16px; }
+  /* Inside a card: its first figure starts on the card's left edge, under the card's title. */
+  .kpis { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); margin: 0 calc(-1 * var(--card-pad)); border-top: 1px solid var(--border); }
+  .kpi { min-width: 0; padding: 12px var(--card-pad) 4px; }
   .kpi + .kpi { border-left: 1px solid var(--border); }
   dt { color: var(--muted); font-weight: 500; }
   .value { margin-top: 4px; font-size: var(--fs-kpi); line-height: 34px; letter-spacing: -0.01em; white-space: nowrap; }

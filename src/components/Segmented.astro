@@ -21,7 +21,7 @@ const { label, options } = Astro.props;
   .seg { display: inline-flex; flex: none; border-radius: 8px; background: var(--seg-track); }
   /* The transparent border insets the pill inside its link, so the whole link stays the target. */
   a {
-    flex: 1 0 auto; display: flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px;
+    flex: 1 0 auto; display: flex; align-items: center; justify-content: center; height: var(--control-h); padding: 0 12px;
     border: 3px solid transparent; border-radius: 8px; background-clip: padding-box;
     color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap;
     transition: color 150ms ease, background-color 150ms ease;
@@ -30,9 +30,8 @@ const { label, options } = Astro.props;
   a[aria-current="page"] { background-color: var(--seg-pill); color: var(--text); }
   a:focus-visible { outline-offset: -1px; border-radius: 8px; }
 
-  /* On a phone the track spans its line, with 44px tall targets. */
+  /* On a phone the track spans what its line leaves. */
   @media (max-width: 640px) {
-    .seg { display: flex; }
-    a { height: 44px; }
+    .seg { display: flex; flex: 1 1 auto; }
   }
 </style>

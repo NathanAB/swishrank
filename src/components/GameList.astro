@@ -1,94 +1,50 @@
 ---
-// Final games, two lines each (away, then home): the teams, the score and each side's rating change as
+// One day's final games, two lines each (away, then home): the team, the score and its rating change as
 // displayed, the winner in ink.
-import type { Abbr, Result } from "../lib/elo.ts";
+import GameDay from "./GameDay.astro";
+import { heads } from "../lib/columns.ts";
 import { outcome, type Line } from "../lib/facts.ts";
-import { signed } from "../lib/format.ts";
+import { longDay, signed, weekdayDay } from "../lib/format.ts";
+import type { Day } from "../lib/results.ts";
 import { href } from "../lib/routes.ts";
 import { team, type SeasonView } from "../lib/season.ts";
 
 interface Props {
   season: SeasonView;
-  /** The games, in the order to show them. */
-  results: readonly Result[];
-  /** The list's accessible name, such as "Last night's games". */
-  label: string;
-  /** The sentence shown when there are no games. */
-  empty?: string;
+  day: Day;
+  /** Label the columns: the first day of a section does. */
+  labels?: boolean;
 }
 
-const { season, results, label, empty = "No games yet." } = Astro.props;
-const rows = results.map((r) => {
-  const o = outcome(r);
-  return { r, lines: [o.away, o.home] as [Line, Line] };
-});
-const at = (r: Result) => (r.game.neutral ? "vs" : "at");
-const teamHref = (abbr: Abbr) => href({ kind: "team", season, abbr });
+const { season, day, labels = false } = Astro.props;
+const games = day.results.map((r) => ({ r, lines: [outcome(r).away, outcome(r).home] as [Line, Line] }));
+
+// What the games were part of when every one has a note, such as "NBA Finals · Game 5" for a lone game or
+// "East 1st Round · West 1st Round" for several.
+const notes = day.results.map((r) => r.game.note);
+const meta = notes.every((n) => n !== null) && notes.length
+  ? (notes.length === 1 ? notes[0].split(" - ") : [...new Set(notes.map((n) => n.split(" - ")[0]))]).join(" · ")
+  : undefined;
 ---
 
-{rows.length === 0 ? (
-  <p class="empty">{empty}</p>
-) : (
-  <div class="games" role="table" aria-label={label}>
-    <div class="hds">
-      {rows.slice(0, 3).map((_, i) => {
-        const role = i === 0 ? "columnheader" : undefined;
-        return (
-          <div class="hd" role={i === 0 ? "row" : undefined} aria-hidden={i === 0 ? undefined : "true"}>
-            <span role={role}>Game</span>
-            <span role={role} class="r">Score</span>
-            <span role={role} class="r">Change</span>
-          </div>
-        );
-      })}
-    </div>
-    <div class="rows" role="rowgroup">
-      {rows.map(({ r, lines }) => (
-        <div class="game" role="row">
-          <div class="who" role="cell">
-            {lines.map((l) => (
-              <span class:list={{ win: l.won }}>
-                {l.side === "h" && `${at(r)} `}
-                <a class="nm" href={teamHref(l.abbr)}>{team(season, l.abbr).short}</a>
-              </span>
-            ))}
-          </div>
-          <div class="n num" role="cell">
-            {lines.map((l) => <span class:list={{ win: l.won }}>{l.score}</span>)}
-          </div>
-          <div class="n num" role="cell">
-            {lines.map((l) => <span class:list={{ win: l.won }}>{signed(l.change)}</span>)}
-          </div>
+<GameDay heading={weekdayDay(day.day)} meta={meta} label={`Games on ${longDay(day.day)}`} count={games.length} cols="minmax(0, 1fr) 36px 48px" labels={labels ? ["Score", "Change"] : []}>
+  {games.map(({ r, lines }, i) => (
+    <li class:list={["g", heads(i, games.length)]}>
+      {lines.map((l) => (
+        <div class:list={["ln", { win: l.won }]}>
+          <span class="who">{l.side === "h" && (r.game.neutral ? "vs " : "at ")}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a></span>
+          <span class="n num">{l.score}</span>
+          <span class="n num">{signed(l.change)}</span>
         </div>
       ))}
-    </div>
-  </div>
-)}
+    </li>
+  ))}
+</GameDay>
 
 <style>
-  .empty { padding: 4px 0 8px; color: var(--muted); }
-  .games { container-type: inline-size; --across: 1; }
-  .hds, .rows { display: grid; grid-template-columns: repeat(var(--across), minmax(0, 1fr)); column-gap: var(--gap); }
-  .hd, .game { display: grid; grid-template-columns: minmax(0, 1fr) 36px 48px; column-gap: 10px; }
-  .hd { height: 32px; align-items: center; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .hd:nth-child(n + 2) { display: none; }
-  .r, .n { text-align: right; }
-  .game { height: 41px; padding: 3px 0; align-items: start; }
-  .game + .game { border-top: 1px solid var(--rule); }
-  .game > div { display: grid; line-height: 17px; min-width: 0; color: var(--muted); }
-  .game span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .game .win { color: var(--text); font-weight: 500; }
+  .ln { color: var(--muted); }
+  .ln span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n { text-align: right; }
+  .win { color: var(--text); font-weight: 500; }
   .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
-
-  /* A wide card sets two or three games across, read left to right. */
-  @container (min-width: 680px) {
-    .rows, .hds { --across: 2; }
-    .hd:nth-child(2) { display: grid; }
-    .game:nth-child(2) { border-top: 0; }
-  }
-  @container (min-width: 1040px) {
-    .rows, .hds { --across: 3; }
-    .hd:nth-child(3) { display: grid; }
-    .game:nth-child(3) { border-top: 0; }
-  }
 </style>

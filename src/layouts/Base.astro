@@ -1,35 +1,37 @@
 ---
-// The shell every page shares: the top bar (mark, wordmark, nav), the title row (the page's h1, its
-// optional lede and the season menu) and the footer. Pages fill the default slot.
+// The shell every page shares: the top bar (mark, wordmark, nav, and the link to how the ratings work) and
+// the footer. A page with a season carries its h1 and the season menu in its first card's header
+// (Panel.astro, level 1) and says so with `ownHeading`; a page without one, such as the about page, gets its
+// h1 and optional lede from the shell. Pages fill the default slot.
 import { Font } from "astro:assets";
 import "../styles/global.css";
-import SeasonMenu from "../components/SeasonMenu.astro";
 import { stamp } from "../lib/format.ts";
 import { href, withBase, type Route } from "../lib/routes.ts";
-import { BUILT_AT, currentSeason, routeSeason, seasonSwitch, type SeasonView } from "../lib/season.ts";
+import { BUILT_AT, currentSeason, routeSeason, type SeasonView } from "../lib/season.ts";
 
 interface Props {
-  /** The page's one h1. */
+  /** The page's h1, unless it draws its own; and the document title, unless `docTitle` says otherwise. */
   title: string;
   /** The document title before " · NBA Elo Ratings"; defaults to `title`. */
   docTitle?: string;
   /** The meta description; defaults to the site's. */
   description?: string;
   /**
-   * Which page this is: it decides the active nav item, the season and the season menu's targets. Leave it
-   * out for a page that is none of them, such as the not-found page: no nav item is active and no menu shows.
+   * Which page this is: it decides the active nav item and the season the nav links to. Leave it out for a
+   * page that is none of them, such as the not-found page: no nav item is active.
    */
   route?: Route;
+  /** The page draws its h1 in its first card's header, so the shell draws none. */
+  ownHeading?: boolean;
 }
 
-const { title, docTitle = title, description = "Season-only Elo ratings for all 30 NBA teams. Every team starts the season at 1500.", route } = Astro.props;
+const { title, docTitle = title, description = "Season-only Elo ratings for all 30 NBA teams. Every team starts the season at 1500.", route, ownHeading = false } = Astro.props;
 
 const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
   { label: "Games", kinds: ["games"], to: (s) => ({ kind: "games", season: s }) },
 ];
-const switcher = route && routeSeason(route) ? seasonSwitch(route) : [];
 const home = href({ kind: "home", season: currentSeason() });
 ---
 
@@ -58,18 +60,18 @@ const home = href({ kind: "home", season: currentSeason() });
           {NAV.map((item) => (
             <a href={href(item.to(season))} aria-current={route && item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
           ))}
+          <a class="elo" href={href({ kind: "about" })} aria-current={route?.kind === "about" ? "page" : undefined}>What's Elo?</a>
         </nav>
       </div>
     </header>
 
     <main class="canvas">
-      <div class="title-row">
+      {!ownHeading && (
         <div class="title">
           <h1>{title}</h1>
           {Astro.slots.has("lede") && <p class="lede"><slot name="lede" /></p>}
         </div>
-        {switcher.length > 1 && <SeasonMenu options={switcher.map((s) => ({ label: s.season.label, href: s.href, current: s.active }))} />}
-      </div>
+      )}
       <slot />
     </main>
 
@@ -95,16 +97,16 @@ const home = href({ kind: "home", season: currentSeason() });
   .brand svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
   /* On a screen too narrow for every item the row scrolls inside itself, never the page. It reaches 1px
      past the bar onto its rule, so the scroller does not clip the accent line that marks the page. */
-  .nav { display: flex; gap: 24px; height: calc(100% + 1px); margin-bottom: -1px; min-width: 0; overflow: auto hidden; scrollbar-width: none; }
+  .nav { flex: 1 1 auto; display: flex; gap: 24px; height: calc(100% + 1px); margin-bottom: -1px; min-width: 0; overflow: auto hidden; scrollbar-width: none; }
   .nav a { position: relative; flex: none; display: flex; align-items: center; color: var(--muted); transition: color 150ms ease; }
   .nav a:hover { color: var(--text); }
+  .nav .elo { margin-left: auto; }
   .nav a[aria-current="page"] { color: var(--text); }
   .nav a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--accent); }
 
-  .canvas { max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 32px var(--pad) 48px; }
-  .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: var(--gap); }
-  .title { min-width: 0; }
-  h1 { font-size: var(--fs-title); line-height: 32px; font-weight: 700; letter-spacing: -0.015em; }
+  .canvas { max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 10px var(--pad) 48px; }
+  .title { min-width: 0; margin: 12px 0 var(--gap); }
+  h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
   .lede { margin-top: 6px; max-width: 72ch; font-size: 15px; line-height: 22px; color: var(--muted); }
   .lede :global(b) { color: var(--text); font-weight: 500; }
 
@@ -116,11 +118,10 @@ const home = href({ kind: "home", season: currentSeason() });
   }
   .foot a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
 
+  /* A 390px phone fits the wordmark and all three links. */
   @media (max-width: 640px) {
-    .bar-in { gap: 16px; }
-    .canvas { padding-top: 20px; }
-    h1 { line-height: 28px; }
-    .title-row { flex-direction: column; align-items: stretch; gap: 16px; }
+    .bar-in, .nav { gap: 14px; }
+    .brand { font-size: 14px; }
   }
   @media (max-width: 374px) {
     .bar-in, .nav { gap: 12px; }

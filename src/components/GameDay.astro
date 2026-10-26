@@ -1,0 +1,60 @@
+---
+// One day of games on the games page: a heading row with the day (and, on a section's first day, the column
+// labels over the first column), then the games, which fill the card's columns down the first, then the
+// next (lib/columns.ts). Each game is an li of the "g" class with two lines (away, then home) of the "ln"
+// class, laid out on the `cols` grid; the caller marks the column heads with lib/columns.ts heads().
+import { rowVars } from "../lib/columns.ts";
+
+interface Props {
+  /** The day as shown: "Sun, Oct 25". */
+  heading: string;
+  /** Grey context after the day, such as "NBA Finals · Game 5". */
+  meta?: string;
+  /** The list's accessible name. */
+  label: string;
+  /** How many games the day has. */
+  count: number;
+  /** The grid each line of a game sits on. */
+  cols: string;
+  /** Labels over the trailing columns, shown on a section's first day only. */
+  labels?: readonly string[];
+}
+
+const { heading, meta, label, count, cols, labels = [] } = Astro.props;
+---
+
+<section class="gday" aria-label={label} style={`--cols: ${cols}; ${rowVars(count)}`}>
+  <div class="dh">
+    <div class="ln">
+      <h3 style={`grid-column: 1 / ${labels.length ? -1 - labels.length : -1}`}>{heading}{meta && <span class="meta"> · {meta}</span>}</h3>
+      {labels.map((l) => <span class="lab" aria-hidden="true">{l}</span>)}
+    </div>
+  </div>
+  <ol class="gs"><slot /></ol>
+</section>
+
+<style>
+  .gday { --across: 1; --rows: var(--r1); }
+  .gday + :global(.gday) { margin-top: 14px; }
+  .dh, .gs { display: grid; grid-template-columns: repeat(var(--across), minmax(0, 1fr)); column-gap: var(--gap); }
+  .dh { border-bottom: 1px solid var(--border); }
+  .gs { grid-template-rows: repeat(var(--rows), auto); grid-auto-flow: column; }
+  .gday :global(.ln) { display: grid; grid-template-columns: var(--cols); column-gap: 10px; align-items: baseline; min-width: 0; }
+  .dh .ln { height: 28px; align-items: center; }
+  h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); font-weight: 600; }
+  .meta { color: var(--muted); font-weight: 400; }
+  .lab { font-size: var(--fs-small); color: var(--muted); text-align: right; white-space: nowrap; }
+  .gs :global(.g) { padding: 4px 0; border-top: 1px solid var(--rule); line-height: 17px; }
+  .gs :global(.g:first-child) { border-top-color: transparent; }
+
+  /* A wide card sets two or three columns, each read top to bottom. */
+  @container games (min-width: 680px) {
+    .gday { --across: 2; --rows: var(--r2); }
+    .gs :global(.g.h2) { border-top-color: transparent; }
+  }
+  @container games (min-width: 1040px) {
+    .gday { --across: 3; --rows: var(--r3); }
+    .gs :global(.g.h2) { border-top-color: var(--rule); }
+    .gs :global(.g.h3) { border-top-color: transparent; }
+  }
+</style>

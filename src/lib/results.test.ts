@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { compute } from "./elo.ts";
-import { gamesIn, monthRoute, months } from "./results.ts";
+import { gamesIn, monthRoute, months, recentDays } from "./results.ts";
 import { routePath } from "./routes.ts";
 
 const last = compute(JSON.parse(readFileSync(new URL("../data/games/2025-26.json", import.meta.url), "utf8")));
@@ -25,6 +25,12 @@ test("a month lists its days newest first and each day's games in tip-off order"
       assert.ok(d.results.every((r) => r.day === d.day && d.day.startsWith(m.key)), d.day);
     }
   }
+});
+
+test("the latest results are the game days in the week that ends on the newest one, newest first", () => {
+  // The 2025-26 Finals ended on June 13 after games on June 5, 8 and 10.
+  assert.deepEqual(recentDays(last, 7).map((d) => d.day), ["2026-06-13", "2026-06-10", "2026-06-08"]);
+  assert.deepEqual(recentDays(compute({ season: "x", teams: {}, games: [] }), 7), []);
 });
 
 test("every month links to its own page, the newest month included", () => {

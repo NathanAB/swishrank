@@ -1,7 +1,7 @@
 // A season's final games as the games pages show them: one page per US Eastern calendar month, each
 // day's games together. Every month has its own URL that never changes, and the games index shows the newest
 // month as well, so the page a reader reaches from the nav always holds the latest games.
-import type { Result, Season } from "./elo.ts";
+import { addDays, type Result, type Season } from "./elo.ts";
 import type { Route, SeasonRef } from "./routes.ts";
 
 /** One game day: its US Eastern day key and its games in tip-off order. */
@@ -22,6 +22,13 @@ export function months(model: Season): Month[] {
     out.set(key, month);
   }
   return [...out.values()].reverse();
+}
+
+/** The game days in the `count` calendar days that end on the newest one, newest first: the latest results. */
+export function recentDays(model: Season, count: number): Day[] {
+  const days = months(model).reverse().flatMap((m) => m.days);
+  const from = days[0] ? addDays(days[0].day, 1 - count) : "";
+  return days.filter((d) => d.day >= from);
 }
 
 /** Every game in a month, newest day first. */
