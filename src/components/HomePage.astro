@@ -31,10 +31,9 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   docTitle={homeTitle(season, conference)}
   description={homeDescription(season, conference)}
   route={route}
-  wide
   ownHeading
 >
-  <Panel level={1} fill title={conference ? `${season.label} · ${conference}ern Conference` : `${season.label} ratings`} meta={season.note ?? undefined}>
+  <Panel level={1} title={conference ? `${season.label} · ${conference}ern Conference` : `${season.label} ratings`} meta={season.note ?? undefined}>
     <Fragment slot="aside">
       <Segmented label="Conference" options={views} />
       <SeasonMenu route={route} />

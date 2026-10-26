@@ -69,7 +69,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
 
 <div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-wide: ${ROW_WIDE}px`}>
   <div class="stacked"><RatingChart season={season} teams={order} height={400} /></div>
-  <div class="fit">
   <table>
     <thead>
       <tr>
@@ -158,16 +157,15 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
       })}
     </tbody>
   </table>
-  </div>
 </div>
 
 <style>
   /* --tl is the tick lane on the scale's left and --cv the curves' lane on its right; the axis runs between
      them, and on a wide screen the chart's plot fills the space between the two. */
-  .lt { --row: var(--row-wide); --head: 18px; --tl: 38px; --cv: 86px; }
+  .lt { --row: var(--row-wide); --tl: 38px; --cv: 86px; }
   table { width: 100%; border-collapse: collapse; }
   th {
-    height: var(--head); padding: 0 8px 2px; vertical-align: bottom; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted);
+    height: 18px; padding: 0 8px 2px; vertical-align: bottom; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted);
     text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border);
   }
   th abbr { text-decoration: none; }
@@ -244,15 +242,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
     .charted .lad { width: 100%; }
     .charted .stacked { display: none; }
     .charted .xs, .charted .history { display: block; }
-    /* The table fills the card's height as well as its width: the rows share what the header leaves, never
-       less than the wide row, and the chart drawn on them stretches with them. The table sits in a box pinned
-       to the grown card, so the box's height is settled before its rows are laid out; Chrome reads a
-       container's height as 0 while the flex item itself is still being sized. */
-    .charted.lt { flex: 1 0 auto; position: relative; min-height: calc(var(--head) + var(--rows) * var(--row-wide)); }
-    .charted .fit {
-      position: absolute; inset: 0; container-type: size;
-      --row: max(var(--row-wide), (100cqh - var(--head)) / var(--rows));
-    }
   }
 
   /* Phone: one two-line row per team, with the other figures on the second line. */

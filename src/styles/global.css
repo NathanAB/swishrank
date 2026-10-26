@@ -2,7 +2,7 @@
    orange as the one accent. The accent marks the mark, a selection (a 1px line as wide as its label), focus
    and the about page's worked examples; everything else is ink and greys, but for the charts' lines, which
    carry each team's colour. Dark has its own values, not an inversion of light, and applies when the root's
-   data-theme is dark: the system's setting until the reader picks one with the switch in the top bar. Every page but the ratings chart keeps to a 1200px column. */
+   data-theme is dark: the system's setting until the reader picks one with the switch in the top bar. Every page keeps to a 1400px column. */
 :root {
   color-scheme: light;
   /* Cards sit lighter than the page in both themes, edged by a border a step darker than either, so every
@@ -39,7 +39,7 @@
   --fs-body: 14px;
   --fs-small: 12px;
 
-  --col: 1200px;
+  --col: 1400px;
   /* Gutters grow with the screen, so a wide page does not crowd its edges. */
   --pad: clamp(24px, 1.5vw + 8px, 48px);
   --gap: 24px;
