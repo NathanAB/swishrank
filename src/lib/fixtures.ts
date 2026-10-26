@@ -23,8 +23,9 @@ export type FixtureDay = { day: string; fixtures: Fixture[] };
 /** The days the site looks ahead: today and the six after it. The data holds a day more than this. */
 export const WEEK = 7;
 
-export function fixture(game: Game, r: Record<Abbr, number>): Fixture {
-  const p = winProb(gap(game, r));
+/** A game priced on ratings `r` and a home edge `home`, both in Elo points. */
+export function fixture(game: Game, r: Record<Abbr, number>, home: number): Fixture {
+  const p = winProb(gap(game, r, home));
   return {
     game,
     lines: [
@@ -40,6 +41,6 @@ export function nextDays(model: Season, today: string, count: number): FixtureDa
   const games = [...model.upcoming].sort((x, y) => x.t.localeCompare(y.t));
   return Array.from({ length: count }, (_, i) => {
     const day = addDays(today, i);
-    return { day, fixtures: games.filter((g) => dayKey(g.t) === day).map((g) => fixture(g, model.r)) };
+    return { day, fixtures: games.filter((g) => dayKey(g.t) === day).map((g) => fixture(g, model.r, model.home)) };
   });
 }

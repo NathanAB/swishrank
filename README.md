@@ -2,7 +2,7 @@
 
 Season-only Elo ratings for the 30 NBA teams: https://nathanab.github.io/nba-elo/
 
-Every team starts each season at 1500 and nothing carries over from last year. After each game the winner takes points from the loser, using FiveThirtyEight's NBA formula (K = 20, 100 points for home court, a margin-of-victory multiplier). The site has the league table with every team's rating by day drawn into it, for the whole league or one conference (`/east/`, `/west/`), a games page with every result and the week ahead's win chances, a page per team, and the same views for last season.
+Every team starts each season at 1500, the league average, and nothing carries over from last year. Each morning the ratings are fitted again to every game so far by least squares, like SRS or Massey ratings: margins count with diminishing returns, home court is worth a fixed edge measured over past seasons, and each team is pulled toward average until its games say otherwise. [docs/model.md](docs/model.md) holds the pre-registered backtest that chose every setting. The site has the league table with every team's rating by day drawn into it, for the whole league or one conference (`/east/`, `/west/`), a games page with every result and the week ahead's win chances, a page per team, and the same views for last season.
 
 ## How it updates
 
@@ -13,7 +13,8 @@ A GitHub Action ([deploy.yml](.github/workflows/deploy.yml)) runs every morning 
 ```sh
 npm install
 npm run fetch   # pull the current season from ESPN
-npm test        # Elo math and page logic
+npm test        # the model, its guard against the old Elo, and page logic
+npm run backtest  # rerun the backtest and rewrite docs/model.md's results
 npm run dev     # http://localhost:4321/nba-elo/
 ```
 
@@ -22,6 +23,7 @@ npm run dev     # http://localhost:4321/nba-elo/
 ## Where things live
 
 - `src/lib/elo.ts` is the rating model. Everything else reads from what it computes.
+- `scripts/backtest.ts` scores the model against the old Elo (`scripts/elo538.ts`) on past seasons.
 - `src/data/seasons.json` lists the seasons. The one without an `end` date is the current season and lives at the site root; older seasons live under their id, such as `/2025-26/`.
 - `scripts/fetch-season.mjs` turns ESPN's scoreboard into `src/data/games/<season>.json`.
 - `src/pages/` holds the routes, and `src/components/` the table, chart and game lists they share.

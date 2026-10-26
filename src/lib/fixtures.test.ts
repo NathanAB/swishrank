@@ -39,7 +39,7 @@ test("the week ahead is seven US Eastern days from today, in tip-off order, empt
 test("the favourite is the side at 50% or more, home court counted", () => {
   const r = { STRONG: 1650, EVEN: 1500, WEAK: 1500 };
   const fav = (g: Game) => {
-    const f = fixture(g, r);
+    const f = fixture(g, r, 100);
     return f.lines.find((l) => l.side === f.fav)?.abbr;
   };
   // Level teams: home court makes the home side the favourite.

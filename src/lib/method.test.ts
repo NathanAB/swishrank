@@ -1,16 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, type Game } from "./elo.ts";
+import type { Game, Result } from "./elo.ts";
 import { examples } from "./method.ts";
 
-// Every team plays once, on opening night, so each home team is the same 64% favourite and only the
-// margin and who won tell the games apart.
-const abbrs = "ABCDEFGHIJKLMN".split("");
-const teams = Object.fromEntries(abbrs.map((a) => [a, { name: `Team ${a}`, short: a, color: "000000", alternateColor: "ffffff" }]));
+// Every home team is the same 60% favourite and a neutral game is even, so only the margin and who won tell
+// the games apart.
 const game = (id: string, away: string, home: string, as: number, hs: number, neutral = false): Game => ({
   id, t: "2026-10-20T23:00Z", home, away, hs, as, final: true, neutral, note: null,
 });
-const results = (games: Game[]) => compute({ season: "x", teams, games }).results;
+const results = (games: Game[]): Result[] =>
+  games.map((g) => ({
+    game: g, day: "2026-10-20", p: g.neutral ? 0.5 : 0.6,
+    pre: { h: 1500, a: 1500 }, post: { h: 1500, a: 1500 }, rankPre: { h: 1, a: 1 }, rankPost: { h: 1, a: 1 },
+  }));
 
 test("picks the favourite's narrowest win, the underdog's narrowest and the favourite's widest, earliest first on a tie", () => {
   const { opener, contrasts } = examples(results([

@@ -1,9 +1,10 @@
 ---
 // How the ratings work, for a fan who has never heard of Elo: four steps, each one sentence and one small
-// drawing of real games. Every figure comes from elo.ts, so the page cannot disagree with the ratings.
+// drawing of real games. Every figure comes from elo.ts, so the page cannot disagree with the ratings, and
+// docs/model.md holds the backtest behind each setting.
 import Panel from "../components/Panel.astro";
 import Base from "../layouts/Base.astro";
-import { HCA, START, winProb } from "../lib/elo.ts";
+import { counted, PARAMS, PROVISIONAL, START, winProb } from "../lib/elo.ts";
 import { int, pct, signed, weekdayDay } from "../lib/format.ts";
 import { examples, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
@@ -57,13 +58,15 @@ const game = opener && {
   })),
 };
 
-// Step 3: the three wins as bars of the winner's gain on one scale, and how many times the favourite's
-// close win the underdog's close win earns.
+// Step 3: how much more a big win counts than a 1-point win, the three wins as bars of the winner's gain on one
+// scale, and how many times the favourite's close win the underdog's close win earns.
 const LABEL: Record<ContrastKind, (margin: number) => string> = {
   close: (m) => `Favourite wins by ${m}`,
   upset: (m) => `Underdog wins by ${m}`,
   blowout: (m) => `Favourite wins by ${m}`,
 };
+const blowout = contrasts.find((c) => c.kind === "blowout")?.margin ?? 43;
+const blowoutTimes = (counted(blowout, PARAMS.margin) / counted(1, PARAMS.margin)).toFixed(1);
 const most = Math.max(1, ...contrasts.map((c) => c.game.winner.change));
 const bars = contrasts.map(({ kind, game: o, margin }) => ({
   label: LABEL[kind](margin),
@@ -74,30 +77,32 @@ const gain = (kind: ContrastKind) => contrasts.find((c) => c.kind === kind)?.gam
 const times = gain("close") > 0 ? Math.round(gain("upset") / gain("close")) : 0;
 const TIMES: Record<number, string> = { 2: "twice", 3: "three times", 4: "four times", 5: "five times" };
 const upsetSay = times >= 2
-  ? `A close win by the underdog earns about ${TIMES[times] ?? `${times} times`} what a close win by the favourite does.`
-  : "A favourite that edges a close game gains a few points, but a blowout or an upset is worth more.";
+  ? `A close win by the underdog earns about ${TIMES[times] ?? `${times} times`} what a close win by the favourite does, as it beat what the ratings expected.`
+  : "A win the ratings did not expect, or a bigger one, earns more than a favourite's close win.";
 
-// Step 4: the favourite's chance against the rating gap, 0 to 400 points, on a 50% to 100% scale.
+// Step 4: the favourite's chance against the rating gap, 0 to 400 points, on a 50% to 100% scale, and home
+// court's place on it.
 const GAP_MAX = 400;
 const y = (p: number) => (1 - (p - 0.5) / 0.5) * 100;
 const curve = Array.from({ length: GAP_MAX / 5 + 1 }, (_, i) => `${i ? "L" : "M"}${i * 5} ${y(winProb(i * 5)).toFixed(2)}`).join(" ");
-const home = { x: at(HCA, 0, GAP_MAX), y: `${y(winProb(HCA))}%`, chance: pct(winProb(HCA)) };
+const edge = Math.round(model?.home ?? 0);
+const home = { x: at(edge, 0, GAP_MAX), y: `${y(winProb(edge))}%`, chance: pct(winProb(edge)) };
 const gapTicks = [0, 100, 200, 300, 400];
 const chanceTicks = [0.5, 0.75, 1];
 
-const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirtyeight.com/features/how-we-calculate-nba-elo-ratings/";
+const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md";
 ---
 
 <Base
   title="How the ratings work"
-  description={`Every NBA team starts each season at ${START}, and each game moves points from the loser to the winner, after FiveThirtyEight's NBA Elo.`}
+  description={`Every NBA team starts each season at ${START}, the league average, and each morning the ratings are fitted again to every game so far.`}
   route={{ kind: "about" }}
 >
-  <Fragment slot="lede">Elo is a rating that goes up when a team wins and down when it loses. Beating a strong team, or winning big, earns more.</Fragment>
+  <Fragment slot="lede">Each rating says how well a team has played this season, on Elo's scale, where {START} is the league average. Beating a strong team, or winning big, lifts it more.</Fragment>
 
   <div class="steps">
     <Panel title={`Everyone starts at ${START}`}>
-      <p class="say">Nothing carries over from last season, so every team opens at {START} and the games spread them out.</p>
+      <p class="say">Nothing carries over from last season, so every team opens at {START}, the league average, and the games spread them out.</p>
       {lines && (
         <figure
           class="lines"
@@ -124,10 +129,11 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
           <p class="start">Opening night, all at {START}</p>
         </figure>
       )}
+      <p class="note">A ? after a rating in the table marks it provisional. Its team has played fewer than {PROVISIONAL} games, about how many it took in past seasons for a team's chances to settle.</p>
     </Panel>
 
-    <Panel title="Win, and you take points" meta={game?.day}>
-      <p class="say">The winner takes points from the loser, as in the season's first game.</p>
+    <Panel title="Every morning, every game again" meta={game?.day}>
+      <p class="say">Each morning the ratings are worked out again from every game so far, as the ones that best explain every margin, like SRS or Massey ratings. Here are the first game's two teams, before and after opening night.</p>
       {game && (
         <div class="game">
           <p class="score">{game.score}</p>
@@ -146,8 +152,8 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
       )}
     </Panel>
 
-    <Panel title="Upsets and blowouts move more">
-      <p class="say">{upsetSay}</p>
+    <Panel title="Bigger wins count, less and less">
+      <p class="say">A {blowout}-point win counts {blowoutTimes} times what a 1-point win does, not {blowout} times, so one blowout cannot swing a rating. {upsetSay}</p>
       {bars.length > 0 && (
         <div class="bars">
           <span></span>
@@ -167,7 +173,7 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
       <figure
         class="curve"
         role="img"
-        aria-label={`A rating gap of ${int(HCA)} points gives the higher-rated team a ${home.chance} chance, and ${int(GAP_MAX)} points gives ${pct(winProb(GAP_MAX))}.`}
+        aria-label={`A rating gap of ${int(edge)} points gives the higher-rated team a ${home.chance} chance, and ${int(GAP_MAX)} points gives ${pct(winProb(GAP_MAX))}.`}
       >
         <p class="axis-title">Chance the higher-rated team wins</p>
         <div class="plot">
@@ -183,17 +189,17 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
             <path d={curve} vector-effect="non-scaling-stroke" />
           </svg>
           <span class="dot accent" style={`left: ${home.x}; top: ${home.y}`}></span>
-          <span class="mark" style={`left: ${home.x}; top: ${home.y}`}>{int(HCA)} points, {home.chance}</span>
+          <span class="mark" style={`left: ${home.x}; top: ${home.y}`}>{int(edge)} points, {home.chance}</span>
           {gapTicks.map((g) => <span class="xtick" style={`left: ${at(g, 0, GAP_MAX)}`}>{int(g)}</span>)}
         </div>
         <p class="axis-title x">Rating gap, in points</p>
       </figure>
-      <p class="note">Home court counts as {int(HCA)} points, so a home team facing an equal rival is a {home.chance} favourite.</p>
+      <p class="note">Home court counts as {int(edge)} points, measured over eight past seasons, so a home team facing an equal rival is a {home.chance} favourite.</p>
     </Panel>
   </div>
 
   <Panel class="counts" title="Which games count">
-    <p class="say">Regular-season, play-in and playoff games count, but preseason games and the All-Star Game don't. Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN</a> each morning, and the method follows <a href={methodLink}>FiveThirtyEight's NBA Elo</a>.</p>
+    <p class="say">Regular-season, play-in and playoff games count, but preseason games and the All-Star Game don't. Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN</a> each morning. Every setting was chosen by testing it on past seasons, as <a href={methodLink}>the model notes</a> show.</p>
   </Panel>
 </Base>
 

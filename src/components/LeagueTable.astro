@@ -13,7 +13,7 @@
 // same league-wide scale, so a rating sits at the same height in every view.
 import RatingChart from "./RatingChart.astro";
 import { dateTicks, playoffsMark } from "../lib/chart.ts";
-import { START } from "../lib/elo.ts";
+import { PROVISIONAL, START, provisional } from "../lib/elo.ts";
 import { ratingRange } from "../lib/facts.ts";
 import { rating, record } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
@@ -121,7 +121,7 @@ const playoffs = playoffsMark(m);
               <a class="go" href={href({ kind: "team", season, abbr: a })} data-team={a} data-preview><span class="name">{m.data.teams[a].short}</span></a>
               <span class="sub">{record(s.W, s.L)}</span>
             </td>
-            <td class="num rating">{rating(m.r[a])}</td>
+            <td class="num rating">{rating(m.r[a])}{provisional(s) && <abbr class="prov" title={`Provisional: fewer than ${PROVISIONAL} games played`}>?</abbr>}</td>
             <td class="num opt">{record(s.W, s.L)}</td>
           </tr>
         );
@@ -170,7 +170,9 @@ const playoffs = playoffsMark(m);
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
   .go:hover .name { text-decoration: underline; text-underline-offset: 3px; }
   .go:hover .name::after, tr.hov .name::after { background: var(--control); }
-  td.rating { color: var(--text); font-weight: 600; }
+  td.rating { position: relative; color: var(--text); font-weight: 600; }
+  /* Out of flow, so a provisional rating's digits line up with the rest. */
+  .prov { position: absolute; margin-left: 1px; color: var(--muted); font-weight: 400; text-decoration: none; cursor: help; }
   td.opt { color: var(--text); }
   .sub { display: none; }
 

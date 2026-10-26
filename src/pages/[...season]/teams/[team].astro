@@ -37,7 +37,7 @@ const kpis: Kpi[] = [
 // The games in the week ahead, each with the win chance today's ratings give this team.
 const fixtures = nextGames(m, abbr, TODAY).map((g: Game) => {
   const home = g.home === abbr;
-  const p = winProb(gap(g, m.r));
+  const p = winProb(gap(g, m.r, m.home));
   const venue: Venue = g.neutral ? "neutral" : home ? "home" : "away";
   return { g, day: dayKey(g.t), venue, opp: home ? g.away : g.home, chance: home ? p : 1 - p, tag: stage(g.note).label };
 });
