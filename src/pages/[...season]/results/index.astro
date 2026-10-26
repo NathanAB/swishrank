@@ -1,6 +1,7 @@
 ---
-// A season's results index, /results/ for the current season and /<id>/results/ for the rest: its newest month.
-import ResultsPage from "../../../components/ResultsPage.astro";
+// The old results index, now part of the games page. Astro's config redirects drop the site base, so this
+// page redirects through href(), which keeps it.
+import { href } from "../../../lib/routes.ts";
 import { seasonPaths, type SeasonView } from "../../../lib/season.ts";
 
 export function getStaticPaths() {
@@ -12,6 +13,5 @@ interface Props {
 }
 
 const { season } = Astro.props;
+return Astro.redirect(href({ kind: "games", season }));
 ---
-
-<ResultsPage season={season} />

@@ -1,25 +1,8 @@
-// One team's season as the team pages show it, and the conference each team plays in. Every change is the
-// displayed one (facts.ts outcome), so a team's log agrees with the league's lists.
+// One team's season as the team pages show it. Every change is the displayed one (facts.ts outcome), so a
+// team's log agrees with the league's lists.
 import { addDays, dayKey, type Abbr, type Game, type Result, type Season } from "./elo.ts";
 import { outcome, type Line } from "./facts.ts";
 import { WEEK } from "./fixtures.ts";
-
-export type Conference = "East" | "West";
-
-export const CONFERENCE_ORDER: readonly Conference[] = ["East", "West"];
-
-/**
- * The two conferences, which seed the playoffs. The game data has no conference field, so this is the one
- * place it lives, under ESPN's abbreviations; teams.test.ts checks it against the data's Cup groups and
- * playoff rounds.
- */
-export const CONFERENCES: Record<Conference, readonly Abbr[]> = {
-  East: ["ATL", "BKN", "BOS", "CHA", "CHI", "CLE", "DET", "IND", "MIA", "MIL", "NY", "ORL", "PHI", "TOR", "WSH"],
-  West: ["DAL", "DEN", "GS", "HOU", "LAC", "LAL", "MEM", "MIN", "NO", "OKC", "PHX", "POR", "SA", "SAC", "UTAH"],
-};
-
-/** A team's conference, or null for a team the map does not know yet (an expansion team). */
-export const conferenceOf = (abbr: Abbr): Conference | null => CONFERENCE_ORDER.find((c) => CONFERENCES[c].includes(abbr)) ?? null;
 
 export type Phase = "regular" | "play-in" | "playoffs";
 /** What kind of game it was, and a short tag for it ("Finals game 3", "Cup", "Berlin"), if any. */
@@ -71,22 +54,10 @@ export const tally = (games: readonly TeamGame[]): WinLoss => {
   return { w, l: games.length - w };
 };
 
-/**
- * The first game after which the team stood at `rating` (its season high or low, from compute()'s stats),
- * or null when that value is the 1500 every team starts at.
- */
-export const firstAt = (games: readonly TeamGame[], rating: number) => games.find((g) => g.us.rating === rating) ?? null;
-
-/** The team's games in the week ahead (the fixtures page's WEEK from `today`), in tip-off order. */
+/** The team's games in the week ahead (the games page's WEEK from `today`), in tip-off order. */
 export const nextGames = (model: Season, abbr: Abbr, today: string): Game[] => {
   const end = addDays(today, WEEK);
   return model.upcoming
     .filter((g) => (g.home === abbr || g.away === abbr) && dayKey(g.t) >= today && dayKey(g.t) < end)
     .sort((x, y) => x.t.localeCompare(y.t));
 };
-
-/** The table split by conference, each in rating order; teams the map does not know go last, under null. */
-export function byConference(model: Season): { conference: Conference | null; teams: Abbr[] }[] {
-  const groups = [...CONFERENCE_ORDER, null].map((conference) => ({ conference, teams: model.order.filter((a) => conferenceOf(a) === conference) }));
-  return groups.filter((g) => g.teams.length > 0);
-}

@@ -4,13 +4,11 @@
 import Base from "../layouts/Base.astro";
 import { href } from "../lib/routes.ts";
 import { currentSeason } from "../lib/season.ts";
-
-const season = currentSeason();
 ---
 
 <Base title="Page not found">
   <Fragment slot="lede">
-    There is no page at this address, so try the <a href={href({ kind: "home", season })}>ratings</a> or the <a href={href({ kind: "teams", season })}>list of teams</a>.
+    There is no page here. Try the <a href={href({ kind: "home", season: currentSeason() })}>ratings</a>.
   </Fragment>
 </Base>
 

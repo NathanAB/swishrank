@@ -29,6 +29,6 @@ test("a month lists its days newest first and each day's games in tip-off order"
 
 test("every month links to its own page, the newest month included", () => {
   const past = { id: "2025-26", current: false };
-  assert.equal(routePath(monthRoute(past, "2026-06")), "/2025-26/results/2026-06/");
-  assert.equal(routePath(monthRoute(past, "2026-03")), "/2025-26/results/2026-03/");
+  assert.equal(routePath(monthRoute(past, "2026-06")), "/2025-26/games/2026-06/");
+  assert.equal(routePath(monthRoute(past, "2026-03")), "/2025-26/games/2026-03/");
 });

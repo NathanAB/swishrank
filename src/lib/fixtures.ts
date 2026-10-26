@@ -1,6 +1,6 @@
 // Games still to play, priced on the ratings as they stand now: nothing here moves a rating before tip-off,
 // so a game five days out gets the same chances it would get if it were played tonight.
-import { addDays, dayKey, gap, spreadPoints, winProb, type Abbr, type Game, type Season } from "./elo.ts";
+import { addDays, dayKey, gap, winProb, type Abbr, type Game, type Season } from "./elo.ts";
 import type { Side } from "./facts.ts";
 
 export type FixtureLine = {
@@ -16,8 +16,6 @@ export type Fixture = {
   lines: readonly [FixtureLine, FixtureLine];
   /** The side given 50% or more; the home side when the two are dead level. */
   fav: Side;
-  /** Points the favourite should win by, to the half point; 0 is a pick'em. */
-  spread: number;
 };
 
 export type FixtureDay = { day: string; fixtures: Fixture[] };
@@ -26,8 +24,7 @@ export type FixtureDay = { day: string; fixtures: Fixture[] };
 export const WEEK = 7;
 
 export function fixture(game: Game, r: Record<Abbr, number>): Fixture {
-  const diff = gap(game, r);
-  const p = winProb(diff);
+  const p = winProb(gap(game, r));
   return {
     game,
     lines: [
@@ -35,7 +32,6 @@ export function fixture(game: Game, r: Record<Abbr, number>): Fixture {
       { side: "h", abbr: game.home, chance: p },
     ],
     fav: p >= 0.5 ? "h" : "a",
-    spread: spreadPoints(diff),
   };
 }
 
@@ -47,13 +43,3 @@ export function nextDays(model: Season, today: string, count: number): FixtureDa
     return { day, fixtures: games.filter((g) => dayKey(g.t) === day).map((g) => fixture(g, model.r)) };
   });
 }
-
-const lean = (f: Fixture) => Math.abs(f.lines[1].chance - 0.5);
-const pick = (fixtures: readonly Fixture[], better: (x: number, y: number) => boolean) =>
-  fixtures.reduce<Fixture | null>((best, f) => (!best || better(lean(f), lean(best)) ? f : best), null);
-
-/** The game nearest a coin flip; the earliest on a tie. */
-export const closest = (fixtures: readonly Fixture[]) => pick(fixtures, (x, y) => x < y);
-
-/** The game with the clearest favourite; the earliest on a tie. */
-export const mostOneSided = (fixtures: readonly Fixture[]) => pick(fixtures, (x, y) => x > y);

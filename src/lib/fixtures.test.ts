@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compute, type Game } from "./elo.ts";
-import { closest, fixture, mostOneSided, nextDays } from "./fixtures.ts";
+import { fixture, nextDays } from "./fixtures.ts";
 
 const game = (id: string, t: string, away: string, home: string, more: Partial<Game> = {}): Game => ({
   id, t, home, away, hs: null, as: null, final: false, neutral: false, note: null, ...more,
@@ -36,27 +36,14 @@ test("the week ahead is seven US Eastern days from today, in tip-off order, empt
   );
 });
 
-test("the spread sits with the favourite: home court counts, except at a neutral site", () => {
+test("the favourite is the side at 50% or more, home court counted", () => {
   const r = { STRONG: 1650, EVEN: 1500, WEAK: 1500 };
-  const call = (g: Game) => {
+  const fav = (g: Game) => {
     const f = fixture(g, r);
-    return { fav: f.lines.find((l) => l.side === f.fav)?.abbr, spread: f.spread };
+    return f.lines.find((l) => l.side === f.fav)?.abbr;
   };
-  // Level teams: 100 points of home court is 3.6 points, 3.5 to the half point.
-  assert.deepEqual(call(game("1", "2026-10-25T23:00Z", "WEAK", "EVEN")), { fav: "EVEN", spread: 3.5 });
-  // 150 points better on the road: 50 net, 1.8 points, 2 to the half point.
-  assert.deepEqual(call(game("2", "2026-10-25T23:00Z", "STRONG", "EVEN")), { fav: "STRONG", spread: 2 });
-  // The same teams on neutral ground: 150 net, 5.4 points, 5.5.
-  assert.deepEqual(call(game("3", "2026-10-25T23:00Z", "STRONG", "EVEN", { neutral: true })), { fav: "STRONG", spread: 5.5 });
-});
-
-test("the closest and the most one-sided game, by how far the favourite leans", () => {
-  const r = { A: 1500, B: 1580, C: 1700 };
-  const fixtures = [
-    fixture(game("home edge", "2026-10-25T23:00Z", "A", "B"), r), // 180 net
-    fixture(game("near even", "2026-10-25T23:30Z", "B", "A"), r), // 20 net, to the home side
-    fixture(game("road favourite", "2026-10-26T00:00Z", "C", "A"), r), // 100 net, to the road side
-  ];
-  assert.deepEqual([closest(fixtures)?.game.id, mostOneSided(fixtures)?.game.id], ["near even", "home edge"]);
-  assert.equal(closest([]), null);
+  // Level teams: home court makes the home side the favourite.
+  assert.equal(fav(game("1", "2026-10-25T23:00Z", "WEAK", "EVEN")), "EVEN");
+  // 150 points better on the road outweighs 100 of home court.
+  assert.equal(fav(game("2", "2026-10-25T23:00Z", "STRONG", "EVEN")), "STRONG");
 });

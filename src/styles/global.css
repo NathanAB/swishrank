@@ -82,25 +82,4 @@ svg { display: block; }
 /* Every figure in a column or a strip lines up digit for digit. */
 .num, table { font-variant-numeric: tabular-nums; }
 
-/* A list given `fit` (GameList, FixtureList) shows only the whole rows that fit the height its card is
-   given, so the card can end level with its neighbour. A page turns it on for a breakpoint by setting
-   --fit-contain: size and giving the list's Panel `fill`; the list then adds no height of its own and the
-   queries below drop each row that would not fit whole (32px header, 41px rows).
-   Without --fit-contain the list shows every row. Dropped rows are display: none, so they take no focus.
-   The rules name .fit as well so they outrank a component's scoped `display` on its rows, which comes later. */
-.fit { flex: 1 1 auto; min-height: 0; container-name: fit; container-type: var(--fit-contain, normal); }
-@container fit (height < 155px) { .fit > .fit-rows > :nth-child(n + 3) { display: none; } }
-@container fit (height < 196px) { .fit > .fit-rows > :nth-child(n + 4) { display: none; } }
-@container fit (height < 237px) { .fit > .fit-rows > :nth-child(n + 5) { display: none; } }
-@container fit (height < 278px) { .fit > .fit-rows > :nth-child(n + 6) { display: none; } }
-@container fit (height < 319px) { .fit > .fit-rows > :nth-child(n + 7) { display: none; } }
-@container fit (height < 360px) { .fit > .fit-rows > :nth-child(n + 8) { display: none; } }
-@container fit (height < 401px) { .fit > .fit-rows > :nth-child(n + 9) { display: none; } }
-@container fit (height < 442px) { .fit > .fit-rows > :nth-child(n + 10) { display: none; } }
-@container fit (height < 483px) { .fit > .fit-rows > :nth-child(n + 11) { display: none; } }
-@container fit (height < 524px) { .fit > .fit-rows > :nth-child(n + 12) { display: none; } }
-@container fit (height < 565px) { .fit > .fit-rows > :nth-child(n + 13) { display: none; } }
-@container fit (height < 606px) { .fit > .fit-rows > :nth-child(n + 14) { display: none; } }
-@container fit (height < 647px) { .fit > .fit-rows > :nth-child(n + 15) { display: none; } }
-
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }

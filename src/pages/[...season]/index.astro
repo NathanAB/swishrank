@@ -1,19 +1,16 @@
 ---
-// A season's home: who is best right now, and who moved on the latest game day. / is the current
-// season, /<id>/ every other one.
+// A season's home: who is best right now, who moved on the latest game day, and who plays next. / is the
+// current season, /<id>/ every other one.
 import FixtureList from "../../components/FixtureList.astro";
 import GameList from "../../components/GameList.astro";
-import KpiStrip, { type Kpi } from "../../components/KpiStrip.astro";
 import LeagueTable from "../../components/LeagueTable.astro";
 import Panel from "../../components/Panel.astro";
-import RatingChart from "../../components/RatingChart.astro";
 import Base from "../../layouts/Base.astro";
-import { addDays, dayKey, START, type Abbr } from "../../lib/elo.ts";
-import { biggestSwing, bySwing, gamesOn, leaders, outcome, playoffsStart, swing, underdogWins, widestGap } from "../../lib/facts.ts";
-import { WEEK } from "../../lib/fixtures.ts";
-import { DASH, int, ordinal, rating, record, shortDay, weekdayDay } from "../../lib/format.ts";
-import { href } from "../../lib/routes.ts";
-import { TODAY, noGamesAhead, openingDay, seasonPaths, theTeam, winPhrase, type SeasonView } from "../../lib/season.ts";
+import { addDays, START, type Abbr } from "../../lib/elo.ts";
+import { bySwing, gamesOn, leaders } from "../../lib/facts.ts";
+import { nextDays, WEEK } from "../../lib/fixtures.ts";
+import { int, weekdayDay } from "../../lib/format.ts";
+import { TODAY, noGamesAhead, openingDay, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
   return seasonPaths();
@@ -25,142 +22,63 @@ interface Props {
 
 const { season } = Astro.props;
 const m = season.model;
-const lead = m.order[0];
-const bottom = m.order[m.order.length - 1];
-const top = leaders(m);
-const R = (a: Abbr) => rating(m.r[a]);
-const count = (n: number, noun: string) => `${int(n)} ${noun}${n === 1 ? "" : "s"}`;
-const theTeams = (abbrs: Abbr[]) => abbrs.map((a) => theTeam(season, a)).join(" and ");
-const resultsLink = { href: href({ kind: "results", season }), label: "All results" };
+const short = (a: Abbr) => team(season, a).short;
+const opens = openingDay(season);
 
 // The latest game day's games, biggest swing first: last night's while a season is being played, the last
 // day of a finished one.
-const yesterday = addDays(TODAY, -1);
 const latestDay = m.asOf;
 const latestGames = latestDay ? bySwing(gamesOn(m, latestDay)) : [];
-const latest = {
-  title: latestDay === yesterday ? "Last night" : "Latest games",
-  meta: latestDay ? `${weekdayDay(latestDay)} · ${count(latestGames.length, "game")}` : "",
-};
-const opens = openingDay(season);
+const latestTitle = latestDay === addDays(TODAY, -1) ? "Last night" : "Latest games";
 
-// The finding under the title, one sentence built from the same values the blocks below show: who leads, and
-// the latest game day's biggest swing. Strings are plain text, { b } parts are the figures set in ink and
-// { keep } parts never break across lines.
-type Part = string | { b: string } | { keep: string };
-const headline = latestGames.at(0);
-let lede: Part[];
-if (latestDay && headline) {
-  const o = outcome(headline);
-  const { winner: w, loser: l } = o;
-  const when = latestDay === yesterday ? "last night's biggest swing" : `the biggest swing on ${weekdayDay(latestDay)}`;
-  const leading = top.length > 1
-    ? `${theTeams(top)} ${season.current ? "share the lead" : "finished level"} at `
-    : `${theTeam(season, lead)} ${season.current ? "lead" : "finished top"} at `;
-  lede = [
-    `After ${count(m.results.length, "game")}, ${leading}`, { b: R(lead) }, `, and ${when} was `, { b: int(w.change) },
-    ` ${w.change === 1 ? "point" : "points"} to ${theTeam(season, w.abbr)} for a `, { keep: record(w.score, l.score) }, ` ${winPhrase(season, o)}.`,
-  ];
-} else {
-  lede = [`Every team starts at ${START}${opens ? `, and the season opens ${weekdayDay(opens)}.` : "."}`];
-}
+const next = nextDays(m, TODAY, WEEK).find((d) => d.fixtures.length) ?? null;
 
-const first = m.results[0]?.day;
-const big = biggestSwing(m);
-const kpis: Kpi[] = [
-  { label: "Games counted", value: int(m.results.length), caption: first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : "No games yet" },
-  { label: "Top to bottom", value: int(Math.round(m.r[lead]) - Math.round(m.r[bottom])), unit: "pts", caption: `${lead} ${R(lead)} to ${bottom} ${R(bottom)}` },
-  { label: "Underdog wins", value: int(underdogWins(m)), unit: `of ${int(m.results.length)}`, caption: "Under 50% to win at tip" },
-  big
-    ? { label: "Biggest swing", value: int(swing(big)), unit: "pts", caption: `${big.game.away} ${big.game.neutral ? "vs" : "at"} ${big.game.home}, ${shortDay(big.day)}` }
-    : { label: "Biggest swing", value: DASH, caption: "No games yet" },
-];
-
-const gap = widestGap(m);
-const tableMeta = m.asOf
-  ? `As of ${weekdayDay(m.asOf)} · all started at ${START}${gap && gap.points > 0 ? ` · widest gap ${gap.points} pts, ${ordinal(m.rank[gap.upper])} to ${ordinal(m.rank[gap.lower])}` : ""}`
-  : `Before opening night · all at ${START}`;
-
-const playoffs = playoffsStart(m);
-
-// The third card: the next game day's fixtures in the week ahead.
-const nextDay = m.upcoming.map((g) => dayKey(g.t)).filter((d) => d >= TODAY && d < addDays(TODAY, WEEK)).sort()[0] ?? null;
-const nextGames = nextDay ? m.upcoming.filter((g) => dayKey(g.t) === nextDay) : [];
+const top = leaders(m);
+const verb = season.current ? (top.length > 1 ? "share the lead" : "lead") : top.length > 1 ? "finished level on top" : "finished top";
+const lede = m.results.length
+  ? `The ${top.map(short).join(" and ")} ${verb} after ${int(m.results.length)} games.`
+  : `Every team starts at ${START}${opens ? `, and the season opens ${weekdayDay(opens)}` : ""}.`;
 ---
 
 <Base title={`${season.label} ratings`} route={{ kind: "home", season }}>
-  <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : "b" in p ? <b>{p.b}</b> : <span class="keep">{p.keep}</span>))}</Fragment>
+  <Fragment slot="lede">{lede}</Fragment>
 
   <div class="grid">
-    <div class="main">
-      <KpiStrip class="kpis" items={kpis} label="The season in numbers" />
-      <Panel class="table" title="League table" meta={tableMeta}>
-        <LeagueTable season={season} selected={lead} />
-      </Panel>
-    </div>
+    <Panel class="table" title="League table">
+      <LeagueTable season={season} />
+    </Panel>
 
     <div class="rail">
-      <Panel class="latest" title={latest.title} meta={latest.meta} link={resultsLink}>
-        <GameList
-          season={season}
-          results={latestGames}
-          label={`${latest.title}, biggest swing first`}
-          empty={opens ? `No games yet. The season opens ${weekdayDay(opens)}.` : "No games yet."}
-        />
-      </Panel>
+      {latestDay && latestGames.length > 0 && (
+        <Panel class="latest" title={latestTitle} meta={weekdayDay(latestDay)}>
+          <GameList season={season} results={latestGames} label={`${latestTitle}, biggest swing first`} />
+        </Panel>
+      )}
 
-      <Panel
-        class="chart"
-        title="Rating history"
-        meta={first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : ""}
-        link={{ href: href({ kind: "graph", season }), label: "Full graph" }}
-      >
-        <RatingChart season={season} selected={lead} marker={playoffs ? { day: playoffs, label: `Playoffs from ${shortDay(playoffs)}` } : null} />
-      </Panel>
-
-      <Panel
-        class="next"
-        fill
-        title={nextDay === TODAY ? "Tonight" : "Next up"}
-        meta={nextDay ? `${weekdayDay(nextDay)} · ${count(nextGames.length, "game")}` : ""}
-        link={{ href: href({ kind: "fixtures", season }), label: "All fixtures" }}
-      >
-        <FixtureList season={season} games={nextGames} label="The next day's games" fit empty={noGamesAhead(season)} />
-      </Panel>
+      {season.current && (
+        <Panel class="next" title={next?.day === TODAY ? "Tonight" : "Next up"} meta={next ? weekdayDay(next.day) : undefined}>
+          <FixtureList season={season} fixtures={next?.fixtures ?? []} label="The next day's games" empty={noGamesAhead(season)} />
+        </Panel>
+      )}
     </div>
   </div>
 </Base>
 
 <style>
-  /* 744 + 24 + 432 = 1200 at 1440; the KPI strip is 4 x 186 = 744. */
-  .keep { white-space: nowrap; }
-  .grid { display: grid; grid-template-columns: minmax(0, 744fr) minmax(0, 432fr); gap: var(--gap); }
-  .main, .rail { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
-  /* The rail ends level with the table: its last card takes what height is left and shows the whole
-     games that fit it, never fewer than two. */
-  .grid { --fit-contain: size; }
-  .next { min-height: 200px; }
+  /* 744 + 24 + 432 = 1200 at 1440. */
+  .grid { display: grid; grid-template-columns: minmax(0, 744fr) minmax(0, 432fr); gap: var(--gap); align-items: start; }
+  .rail { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
 
-  /* Tablet: the latest games and the next card share the top row, then the strip, the table and the chart. */
+  /* Narrower, the rail's cards come first, side by side, and the table runs the full width under them. */
   @media (max-width: 1239px) {
     .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .main, .rail { display: contents; }
-    .latest { order: 1; }
-    .next { order: 2; }
-    .kpis { order: 3; grid-column: 1 / -1; }
-    .table { order: 4; grid-column: 1 / -1; }
-    .chart { order: 5; grid-column: 1 / -1; }
+    .rail { display: contents; }
+    .table { order: 1; grid-column: 1 / -1; }
   }
-
-  /* Below 900 two lists side by side would cut team names, so everything stacks: the latest games
-     straight under the title, then the table, and every list shows all its rows. */
+  /* Below 900 everything stacks: the latest games, the table, then the next games. */
   @media (max-width: 899px) {
-    .grid { grid-template-columns: minmax(0, 1fr); --fit-contain: normal; }
-    .next { min-height: 0; }
-    .latest { order: 1; }
-    .table { order: 2; }
-    .chart { order: 3; }
-    .next { order: 4; }
-    .kpis { order: 5; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .latest { order: 0; }
+    .next { order: 2; }
   }
 </style>

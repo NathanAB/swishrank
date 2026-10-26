@@ -42,7 +42,7 @@ export function outcome(result: Result): Outcome {
 }
 
 /** The points the winner took, as displayed. */
-export const swing = (result: Result) => outcome(result).winner.change;
+const swing = (result: Result) => outcome(result).winner.change;
 
 /** Biggest swing first; games with equal swings keep the order they came in. */
 export const bySwing = (results: readonly Result[]) => [...results].sort((x, y) => swing(y) - swing(x));
@@ -62,31 +62,6 @@ export function dayChanges(model: Season, day: string): Map<Abbr, number> {
 
 /** Teams that share first place on the displayed ratings, in table order. */
 export const leaders = (model: Season) => model.order.filter((a) => model.rank[a] === 1);
-
-/** The widest gap between neighbours in the table, on the displayed ratings. */
-export function widestGap(model: Season): { points: number; upper: Abbr; lower: Abbr } | null {
-  let best: { points: number; upper: Abbr; lower: Abbr } | null = null;
-  for (let i = 1; i < model.order.length; i++) {
-    const upper = model.order[i - 1];
-    const lower = model.order[i];
-    const points = Math.round(model.r[upper]) - Math.round(model.r[lower]);
-    if (!best || points > best.points) best = { points, upper, lower };
-  }
-  return best;
-}
-
-/** Games won by the side given under 50% before tip-off. */
-export const underdogWins = (model: Season) => model.results.filter((r) => outcome(r).winner.chance < 0.5).length;
-
-/** The game whose winner took the most points; the earliest on a tie. */
-export const biggestSwing = (model: Season): Result | null => bySwing(model.results)[0] ?? null;
-
-/** The biggest upsets among `results`: winners with the lowest pre-game chance first. */
-export const upsets = (results: readonly Result[], count: number) =>
-  results
-    .filter((r) => outcome(r).winner.chance < 0.5)
-    .sort((x, y) => outcome(x).winner.chance - outcome(y).winner.chance)
-    .slice(0, count);
 
 export type Finals = { champion: Abbr; runnerUp: Abbr; wins: number; losses: number; games: Result[] };
 

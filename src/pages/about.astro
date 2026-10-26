@@ -4,18 +4,16 @@
 // figure comes from elo.ts, so the page cannot disagree with the ratings it explains.
 import Panel from "../components/Panel.astro";
 import Base from "../layouts/Base.astro";
-import { ELO_PER_POINT, HCA, K, START, winProb } from "../lib/elo.ts";
-import { int, MINUS, pct, rating, signed, stamp, weekdayDay } from "../lib/format.ts";
-import { gapRow, stageCounts, winWorth, worked, type Step } from "../lib/method.ts";
+import { HCA, K, START } from "../lib/elo.ts";
+import { int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
+import { gapRow, winWorth, worked, type Step } from "../lib/method.ts";
 import { href } from "../lib/routes.ts";
-import { allSeasons, BUILT_AT, team } from "../lib/season.ts";
+import { allSeasons, team } from "../lib/season.ts";
 
 const seasons = allSeasons();
 // The worked game is the first of the newest season that has one: an opener, so both teams start level.
 const season = seasons.find((s) => s.model.results.length > 0) ?? null;
 const ex = season ? worked(season.model.results[0]) : null;
-const finished = seasons.find((s) => !s.current) ?? null;
-const counted = finished ? stageCounts(finished.model) : [];
 
 const signedTo = (n: number, digits: number) => `${n < 0 ? MINUS : "+"}${Math.abs(n).toFixed(digits)}`;
 const signedPct = (p: number) => `${p < 0 ? MINUS : "+"}${pct(Math.abs(p))}`;
@@ -33,26 +31,26 @@ if (season && ex) {
   const as = ex.gap === 0 ? "between level teams" : w === fav ? "as the favourite" : "as the underdog";
   matchup = `${short(away)} ${ex.result.game.neutral ? "vs" : "at"} ${short(home)}`;
   ledger = {
-    meta: `${matchup} · ${weekdayDay(ex.result.day)}, the first game of ${season.label}`,
+    meta: `${matchup}, ${weekdayDay(ex.result.day)}`,
     teams: [away, home].map((s) => ({ name: short(s), href: href({ kind: "team", season, abbr: s.abbr }) })),
     rows: [
       {
         label: "Rating before",
-        why: `The season's first game, so both teams started at ${START}.`,
+        why: `The season's first game, so both started at ${START}.`,
         away: rating(away.before), home: rating(home.before),
       },
       {
         label: "Home court",
         why: ex.result.game.neutral
           ? `A neutral site, so neither team got the ${HCA}-point home edge.`
-          : `The ${short(home)} were at home, worth ${HCA} points for this game only.`,
+          : `Worth ${HCA} points to the ${short(home)} for this game only.`,
         away: away.edge ? `+${away.edge}` : "0", home: home.edge ? `+${home.edge}` : "0",
       },
       {
         label: "Win chance",
         why: ex.gap === 0
           ? `Level ratings made it an even game, ${pct(0.5)} each.`
-          : `The ${int(Math.abs(ex.gap))}-point gap made the ${short(fav)} ${pct(fav.chance)} favourites, or ${ex.spread} points on the spread.`,
+          : `The ${int(Math.abs(ex.gap))}-point gap made the ${short(fav)} ${pct(fav.chance)} favourites.`,
         away: pct(away.chance), home: pct(home.chance),
       },
       {
@@ -62,12 +60,12 @@ if (season && ex) {
       },
       {
         label: "Surprise",
-        why: `A win scores ${pct(1)} and a loss ${pct(0)}, less the team's chance. An upset scores high.`,
+        why: `A win scores ${pct(1)} and a loss ${pct(0)}, less the team's chance, so an upset scores high.`,
         away: signedPct(away.surprise), home: signedPct(home.surprise),
       },
       {
         label: "Margin multiplier",
-        why: `For winning by ${ex.margin} ${as}. Wider wins raise it, each extra point by a little less, and an upset raises it too.`,
+        why: `For winning by ${ex.margin} ${as}. A wider win or an upset raises it.`,
         away: `× ${mult}`, home: `× ${mult}`,
       },
       {
@@ -77,12 +75,12 @@ if (season && ex) {
       },
       {
         label: "Points moved",
-        why: `${K} × ${mult} × ${pct(w.surprise)} is ${w.moved.toFixed(2)} points, taken from the ${short(l)} and given to the ${short(w)}.`,
+        why: `${K} × ${mult} × ${pct(w.surprise)} is ${w.moved.toFixed(2)} points, from the ${short(l)} to the ${short(w)}.`,
         away: signedTo(away.moved, 2), home: signedTo(home.moved, 2),
       },
       {
         label: "Rating after",
-        why: `Rounded from ${w.rating.toFixed(2)} for the ${short(w)} and ${l.rating.toFixed(2)} for the ${short(l)}. The site lists the game as ${signed(w.change)} and ${signed(l.change)}.`,
+        why: `Rounded from ${w.rating.toFixed(2)} and ${l.rating.toFixed(2)}, so the site shows the game as ${signed(w.change)} and ${signed(l.change)}.`,
         away: rating(away.rating), home: rating(home.rating), key: true,
       },
     ],
@@ -93,7 +91,6 @@ if (season && ex) {
 const gaps = withRow([0, 50, 100, 150, 200, 300], ex ? Math.abs(ex.gap) : null).map(gapRow);
 const margins = withRow([1, 5, 10, 20, 30], ex?.margin ?? null).map(winWorth);
 const isExample = { gap: (g: number) => ex !== null && Math.abs(ex.gap) === g, margin: (m: number) => ex?.margin === m };
-const total = counted.reduce((n, c) => n + c.games, 0);
 
 const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirtyeight.com/features/how-we-calculate-nba-elo-ratings/";
 ---
@@ -103,15 +100,14 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
   description={`Every NBA team starts each season at ${START}, and each game moves points from the loser to the winner, after FiveThirtyEight's NBA Elo.`}
   route={{ kind: "about" }}
 >
-  <Fragment slot="lede">Every team starts the season at <b>{START}</b>, and each game moves points from the loser to the winner, more for a wide margin or an upset.</Fragment>
+  <Fragment slot="lede">Every team starts the season at {START}, and each game moves points from the loser to the winner.</Fragment>
 
   <div class="grid">
     <div class="main">
       <Panel class="fresh" title={`Why every team starts at ${START}`}>
         <div class="prose">
-          <p>Nothing carries over from last season. Rosters change over the summer through trades, the draft and free agency, so last season's rating would describe a different team.</p>
-          <p>FiveThirtyEight kept three-quarters of a team's rating from one season to the next. This site keeps none of it, so a rating says only how a team has played this season. The cost is that early ratings rest on a few games each.</p>
-          <p>{START} is also the league average, and it stays the average all season, because every point one team gains, another loses.</p>
+          <p>Trades, the draft and free agency change rosters over the summer, so nothing carries over from last season. FiveThirtyEight kept three-quarters of a rating; this site keeps none, so early ratings rest on a few games each.</p>
+          <p>{START} stays the league average all season, because every point one team gains, another loses.</p>
         </div>
       </Panel>
 
@@ -143,18 +139,18 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
 
       <Panel class="sources" fill title="Sources">
         <div class="prose">
-          <p>The method is FiveThirtyEight's NBA Elo, as Nate Silver and Reuben Fischer-Baum set it out in <a href={methodLink}>How We Calculate NBA Elo Ratings</a> (2015). K, the home edge, the margin multiplier and the {ELO_PER_POINT} points to a point of spread all come from it. The one change is the fresh start each season.</p>
-          <p>Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN's scoreboard</a>. Every morning, after the last West Coast game has finished, the site pulls the whole season again, rebuilds every rating from the first game and republishes. A score ESPN corrects is fixed at the next pull. The last pull was {stamp(BUILT_AT)}.</p>
+          <p>The method is FiveThirtyEight's NBA Elo from <a href={methodLink}>How We Calculate NBA Elo Ratings</a> (2015), with one change, the fresh start each season.</p>
+          <p>Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN's scoreboard</a>. Every morning the site pulls the whole season again and rebuilds every rating from the first game, so a score ESPN corrects is fixed the next day.</p>
         </div>
       </Panel>
     </div>
 
     <div class="rail">
       <Panel class="gaps" title="What a rating gap means">
-        <p class="note">The favourite's chance to win, and its edge on the spread at {ELO_PER_POINT} rating points to a point. Home court is part of the gap, {HCA} points to the home team and none at a neutral site.</p>
+        <p class="note">The gap includes home court, {HCA} points to the home team and none at a neutral site.</p>
         <table class="ref">
           <thead>
-            <tr><th scope="col">Gap</th><th class="num" scope="col">Win chance</th><th class="num" scope="col">Spread</th></tr>
+            <tr><th scope="col">Gap</th><th class="num" scope="col">Favourite's chance</th></tr>
           </thead>
           <tbody>
             {gaps.map((g) => (
@@ -164,7 +160,6 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
                   {isExample.gap(g.points) && <span class="tag">{matchup}</span>}
                 </th>
                 <td class="num">{pct(g.chance)}</td>
-                <td class="num">{g.spread.toFixed(1)}</td>
               </tr>
             ))}
           </tbody>
@@ -172,7 +167,7 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
       </Panel>
 
       <Panel class="worth" title="What a win is worth">
-        <p class="note">Points the winner gains when both teams start at {START}. On a neutral floor they are level, and at home the home team is a {pct(winProb(HCA))} favourite.</p>
+        <p class="note">Points the winner gains when both teams start at {START}. A home win gains less, because the home team was favoured.</p>
         <table class="ref">
           <thead>
             <tr>
@@ -201,22 +196,8 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
 
       <Panel class="counts" fill title="Which games count">
         <div class="prose">
-          <p>The regular season, the play-in, the playoffs and the NBA Cup final all count. Cup games before the final are regular-season games anyway. The NBA leaves the final out of its standings, but it is a real game between two teams, so it counts here.</p>
-          <p>Preseason games and the All-Star Game do not count. A postponed game counts on the day it is made up.</p>
+          <p>The regular season, the play-in, the playoffs and the NBA Cup final count. The NBA leaves the Cup final out of its standings, but it is a real game, so it counts here. Preseason games and the All-Star Game do not.</p>
         </div>
-        {finished && counted.length > 0 && (
-          <table class="kv">
-            <caption>Counted in {finished.label}</caption>
-            <tbody>
-              {counted.map((c) => (
-                <tr><th scope="row">{c.stage}</th><td class="num">{int(c.games)}</td></tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr><th scope="row">All games</th><td class="num">{int(total)}</td></tr>
-            </tfoot>
-          </table>
-        )}
       </Panel>
     </div>
   </div>
@@ -265,12 +246,6 @@ const methodLink = "https://web.archive.org/web/20241217142935/https://fivethirt
   .fig { position: relative; display: inline-block; font-variant-numeric: tabular-nums; }
   .fig.sel::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px; background: var(--accent); }
   .tag { margin-left: 10px; color: var(--muted); font-size: var(--fs-small); white-space: nowrap; }
-
-  /* the counts */
-  .kv { margin-top: 12px; }
-  .kv caption { text-align: left; height: 32px; line-height: 32px; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); }
-  .kv tbody th, .kv tbody td { height: 32px; }
-  .kv tfoot th, .kv tfoot td { height: 36px; border-top: 1px solid var(--border); font-weight: 600; }
 
   /* Below 900 the columns stack into one reading order: the fresh start, the game, the two tables, then
      which games count and the sources. */

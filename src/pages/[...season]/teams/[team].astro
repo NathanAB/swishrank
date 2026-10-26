@@ -5,12 +5,12 @@ import KpiStrip, { type Kpi } from "../../../components/KpiStrip.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
 import Base from "../../../layouts/Base.astro";
-import { addDays, dayKey, gap, START, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
+import { dayKey, gap, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
 import { finals, playoffsStart } from "../../../lib/facts.ts";
-import { int, monthName, ordinal, pct, rating, record, shortDay, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
+import { ordinal, pct, rating, record, shortDay, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
 import { href } from "../../../lib/routes.ts";
 import { TODAY, noGamesAhead, team, teamPaths, theTeam, type SeasonView } from "../../../lib/season.ts";
-import { firstAt, nextGames, stage, tally, teamGames, type TeamGame, type Venue, type WinLoss } from "../../../lib/teams.ts";
+import { nextGames, stage, tally, teamGames, type Venue } from "../../../lib/teams.ts";
 
 export function getStaticPaths() {
   return teamPaths();
@@ -26,36 +26,13 @@ const m = season.model;
 const me = team(season, abbr);
 const s = m.stats[abbr];
 const games = teamGames(m, abbr);
-const n = m.abbrs.length;
-const R = rating(m.r[abbr]);
-const count = (k: number, noun: string) => `${int(k)} ${noun}${k === 1 ? "" : "s"}`;
-const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-const placeOf = (ranks: Record<Abbr, number>) => `${Object.values(ranks).filter((r) => r === ranks[abbr]).length > 1 ? "tied " : ""}${ordinal(ranks[abbr])}`;
-const place = placeOf(m.rank);
-const wl = (r: WinLoss) => record(r.w, r.l);
+const tied = m.order.filter((a) => m.rank[a] === m.rank[abbr]).length > 1;
 const prep = (v: Venue) => (v === "away" ? "at" : "vs");
 
-// The figures, with labels and captions short enough for five across a tablet. A season high or low is
-// dated by the game that set it; when it is still the 1500 every team starts at, it says so. The record's
-// caption is the postseason once there is one, the current streak before that.
-const set = (value: number) => {
-  const g = firstAt(games, value);
-  return g ? `${shortDay(g.result.day)} ${prep(g.venue)} ${g.them.abbr}` : `The ${START} start`;
-};
-const postseason = ([["Play-In", "play-in"], ["playoffs", "playoffs"]] as const)
-  .map(([label, phase]) => ({ label, games: games.filter((g) => g.stage.phase === phase) }))
-  .filter((x) => x.games.length);
-const latest = games.at(-1);
-const run = latest ? games.length - 1 - games.findLastIndex((g) => g.us.won !== latest.us.won) : 0;
-const recordCaption = postseason.length
-  ? cap(postseason.map((x) => `${x.label} ${wl(tally(x.games))}`).join(" · "))
-  : !latest ? "No games yet" : `${latest.us.won ? "Won" : "Lost"} ${run === 1 ? "last game" : `${run} straight`}`;
 const kpis: Kpi[] = [
-  { label: "Rating", value: R, caption: `${cap(place)} of ${n}` },
-  { label: "Record", value: record(s.W, s.L), caption: recordCaption },
-  { label: "Season high", value: rating(s.hi), caption: set(s.hi) },
-  { label: "Season low", value: rating(s.lo), caption: set(s.lo) },
-  { label: "Season avg", value: rating(m.avg[abbr]), caption: m.asOf ? `${cap(placeOf(m.avgRank))} of ${n}` : "Before opening night" },
+  { label: "Rating", value: rating(m.r[abbr]), unit: `${tied ? "tied " : ""}${ordinal(m.rank[abbr])}` },
+  { label: "Record", value: record(s.W, s.L) },
+  { label: "High / low", value: `${rating(s.hi)} / ${rating(s.lo)}` },
 ];
 
 // The games in the week ahead, each with the win chance today's ratings give this team.
@@ -66,44 +43,30 @@ const fixtures = nextGames(m, abbr, TODAY).map((g: Game) => {
   return { g, day: dayKey(g.t), venue, opp: home ? g.away : g.home, chance: home ? p : 1 - p, tag: stage(g.note).label };
 });
 
-// The finding under the name: where the team stands, and what it plays next or how its season ended.
-type Part = string | { b: string };
-const when = (day: string) => (day === TODAY ? "today" : day === addDays(TODAY, 1) ? "tomorrow" : `on ${weekdayDay(day)}`);
-const VERB: Record<Venue, string> = { home: "host", away: "visit", neutral: "play" };
-const nx = fixtures[0];
-const nextClause: Part[] = nx
-  ? [`, and ${games.length ? "next" : "first"} ${VERB[nx.venue]} ${theTeam(season, nx.opp)} ${when(nx.day)} with a `, { b: pct(nx.chance) }, " chance to win"]
-  : [];
+// The finding under the name: the current run while the season is on, how it ended once it is over.
+const latest = games.at(-1);
+const run = latest ? games.length - 1 - games.findLastIndex((g) => g.us.won !== latest.us.won) : 0;
 const f = finals(m);
-const finalsClause = !f ? "" : f.champion === abbr
-  ? ` and won the Finals ${record(f.wins, f.losses)} over ${theTeam(season, f.runnerUp)}`
-  : f.runnerUp === abbr ? ` and lost the Finals ${record(f.wins, f.losses)} to ${theTeam(season, f.champion)}` : "";
-const lede: Part[] = !games.length
-  ? [`The ${me.short} start at `, { b: String(START) }, " like every team", ...nextClause, "."]
-  : season.current
-    ? [`The ${me.short} are ${place} at `, { b: R }, " after going ", { b: record(s.W, s.L) }, ...nextClause, "."]
-    : [`The ${me.short} finished ${place} at `, { b: R }, " after going ", { b: record(s.W, s.L) }, finalsClause, "."];
+const playoffs = games.filter((g) => g.stage.phase === "playoffs");
+let lede: string;
+if (!latest) lede = `The ${me.short} have not played yet.`;
+else if (season.current) lede = run === 1 ? `The ${me.short} ${latest.us.won ? "won" : "lost"} their last game.` : `The ${me.short} have ${latest.us.won ? "won" : "lost"} ${run} straight.`;
+else if (f?.champion === abbr) lede = `The ${me.short} won the Finals ${record(f.wins, f.losses)} over ${theTeam(season, f.runnerUp)}.`;
+else if (f?.runnerUp === abbr) lede = `The ${me.short} lost the Finals ${record(f.wins, f.losses)} to ${theTeam(season, f.champion)}.`;
+else if (playoffs.length) lede = `The ${me.short} went ${record(tally(playoffs).w, tally(playoffs).l)} in the playoffs.`;
+else if (games.some((g) => g.stage.phase === "play-in")) lede = `The ${me.short} went out in the play-in.`;
+else lede = `The ${me.short} missed the playoffs.`;
 
-// The log, newest first, in months: each month's record and the points it moved (the sum of the displayed
-// changes, so it matches the ratings shown).
-const months: { key: string; games: TeamGame[] }[] = [];
-for (const g of [...games].reverse()) {
-  const key = g.result.day.slice(0, 7);
-  const last = months.at(-1);
-  if (last?.key === key) last.games.push(g);
-  else months.push({ key, games: [g] });
-}
-
-const first = m.results[0]?.day;
-const playoffs = playoffsStart(m);
+const log = [...games].reverse();
+const playoffsFrom = playoffsStart(m);
 const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
 // Early in a season the two columns come out within a row or two of each other, so they end level: the plot
-// takes the height of the rows beside it (36px each, with 100px more of frames on the left than on the chart's
+// takes the height of the rows beside it (36px each, with 68px more of frames on the left than on the chart's
 // card) and the last cards stretch to absorb what is left. A longer log runs on past the chart, which then
 // stays in view beside it.
-const rows = fixtures.length + months.length + games.length;
+const rows = fixtures.length + log.length;
 const level = rows <= 7;
-const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
+const plotHeight = level ? Math.max(240, 68 + 36 * rows) : 300;
 ---
 
 <Base
@@ -112,47 +75,42 @@ const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
   description={`${season.label} Elo rating, game log${season.current ? " and next games" : ""} for the ${me.name}.`}
   route={{ kind: "team", season, abbr }}
 >
-  <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : <b>{p.b}</b>))}</Fragment>
+  <Fragment slot="lede">{lede}</Fragment>
 
-  <KpiStrip class="kpis" lead items={kpis} label={`The ${me.short} in numbers`} />
+  <KpiStrip class="kpis" items={kpis} label={`The ${me.short} in numbers`} />
 
   <div class:list={["grid", { level }]}>
     <div class="main">
-      <Panel
-        class="next"
-        title="Next games"
-        meta={fixtures.length ? `Through ${shortDay(fixtures[fixtures.length - 1].day)}` : ""}
-        link={{ href: href({ kind: "fixtures", season }), label: "All fixtures" }}
-      >
-        {fixtures.length === 0 ? (
-          <p class="empty">{noGamesAhead(season)}</p>
-        ) : (
-          <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
-            <div class="hd" role="row">
-              <span role="columnheader">Date</span>
-              <span role="columnheader">Opponent</span>
-              <span role="columnheader" class="r">Their rating</span>
-              <span role="columnheader" class="r">Tip-off, ET</span>
-              <span role="columnheader" class="r" title="From today's ratings">Win chance</span>
-            </div>
-            {fixtures.map((x) => (
-              <div class="row" role="row">
-                <span role="cell" class="when">{weekdayDay(x.day)}</span>
-                <span role="cell" class="who" data-team={x.opp}>
-                  {prep(x.venue)} <a class="nm" data-team={x.opp} data-preview href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
-                  {x.tag && <span class="tag">{x.tag}</span>}
-                  <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)} · rated {rating(m.r[x.opp])}{x.tag ? ` · ${x.tag}` : ""}</span>
-                </span>
-                <span role="cell" class="r num opt">{rating(m.r[x.opp])}</span>
-                <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
-                <span role="cell" class:list={["r num chance", { fav: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
+      {season.current && (
+        <Panel class="next" title="Next games">
+          {fixtures.length === 0 ? (
+            <p class="empty">{noGamesAhead(season)}</p>
+          ) : (
+            <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
+              <div class="hd" role="row">
+                <span role="columnheader">Date</span>
+                <span role="columnheader">Opponent</span>
+                <span role="columnheader" class="r">Tip-off, ET</span>
+                <span role="columnheader" class="r">Win chance</span>
               </div>
-            ))}
-          </div>
-        )}
-      </Panel>
+              {fixtures.map((x) => (
+                <div class="row" role="row">
+                  <span role="cell" class="when">{weekdayDay(x.day)}</span>
+                  <span role="cell" class="who" data-team={x.opp}>
+                    {prep(x.venue)} <a class="nm" data-team={x.opp} data-preview href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
+                    {x.tag && <span class="tag">{x.tag}</span>}
+                    <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)}{x.tag ? ` · ${x.tag}` : ""}</span>
+                  </span>
+                  <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
+                  <span role="cell" class:list={["r num chance", { fav: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      )}
 
-      <Panel class="log" fill={level} title="Game log" meta={games.length ? `${count(games.length, "game")} · newest first` : ""}>
+      <Panel class="log" fill={level} title="Game log">
         {games.length === 0 ? (
           <p class="empty">No games yet.</p>
         ) : (
@@ -161,63 +119,43 @@ const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
               <span role="columnheader">Date</span>
               <span role="columnheader">Opponent</span>
               <span role="columnheader" class="res">Result</span>
-              <span role="columnheader" class="r" title="Win chance before tip-off">Chance</span>
               <span role="columnheader" class="r">Change</span>
               <span role="columnheader" class="r">Rating</span>
             </div>
-            {months.map((mo) => {
-              const net = mo.games.reduce((sum, g) => sum + g.us.change, 0);
-              return (
-                <div role="rowgroup">
-                  <div class="row month" role="row">
-                    <span role="rowheader" class="mname">{monthName(mo.key)} <span class="num">{wl(tally(mo.games))}</span></span>
-                    <span role="cell" class="r num net" title={`Rating change in ${monthName(mo.key)}`}>{signed(net)}</span>
-                  </div>
-                  {mo.games.map((g) => (
-                    <div class="row" role="row">
-                      <span role="cell" class="when num">{shortDay(g.result.day)}</span>
-                      <span role="cell" class="who" data-team={g.them.abbr}>
-                        {prep(g.venue)} <a class="nm" data-team={g.them.abbr} data-preview href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
-                        {g.stage.label && <span class="tag">{g.stage.label}</span>}
-                        <span class="sub">{shortDay(g.result.day)}{g.stage.label ? ` · ${g.stage.label}` : ""}</span>
-                      </span>
-                      <span role="cell" class:list={["res num", { won: g.us.won }]}>
-                        <b>{g.us.won ? "W" : "L"}</b>
-                        <span>{g.us.score}–{g.them.score}</span>
-                        <span class="sub">{pct(g.us.chance)} to win</span>
-                      </span>
-                      <span role="cell" class="r num opt">{pct(g.us.chance)}</span>
-                      <span role="cell" class="r num opt chg">{signed(g.us.change)}</span>
-                      <span role="cell" class="r num rt">
-                        {rating(g.us.rating)}
-                        <span class="sub">{signed(g.us.change)}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
+            {log.map((g) => (
+              <div class="row" role="row">
+                <span role="cell" class="when num">{shortDay(g.result.day)}</span>
+                <span role="cell" class="who" data-team={g.them.abbr}>
+                  {prep(g.venue)} <a class="nm" data-team={g.them.abbr} data-preview href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
+                  {g.stage.label && <span class="tag">{g.stage.label}</span>}
+                  <span class="sub">{shortDay(g.result.day)}{g.stage.label ? ` · ${g.stage.label}` : ""}</span>
+                </span>
+                <span role="cell" class:list={["res num", { won: g.us.won }]}>
+                  <b>{g.us.won ? "W" : "L"}</b>
+                  <span>{g.us.score}–{g.them.score}</span>
+                </span>
+                <span role="cell" class="r num opt chg">{signed(g.us.change)}</span>
+                <span role="cell" class="r num rt">
+                  {rating(g.us.rating)}
+                  <span class="sub">{signed(g.us.change)}</span>
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </Panel>
     </div>
 
     <div class="rail">
-      <Panel
-        class="chart"
-        fill={level}
-        title="Rating history"
-        meta={first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)}` : ""}
-        link={{ href: href({ kind: "graph", season, abbr }), label: "Full graph" }}
-      >
-        <RatingChart season={season} selected={abbr} bareKey height={plotHeight} marker={playoffs ? { day: playoffs, label: `Playoffs from ${shortDay(playoffs)}` } : null} />
+      <Panel class="chart" fill={level} title="Rating history">
+        <RatingChart season={season} selected={abbr} single height={plotHeight} marker={playoffsFrom ? { day: playoffsFrom, label: `Playoffs from ${shortDay(playoffsFrom)}` } : null} />
       </Panel>
     </div>
   </div>
 </Base>
 
 <style>
-  /* At 1440 the strip runs the 1200 column (5 x 240); below it 744 + 24 + 432 = 1200. The rail holds
+  /* At 1440 the strip runs the 1200 column (3 x 400); below it 744 + 24 + 432 = 1200. The rail holds
      the chart in view while the log scrolls past it. */
   .kpis { margin-bottom: var(--gap); }
   .grid { display: grid; grid-template-columns: minmax(0, 744fr) minmax(0, 432fr); gap: var(--gap); align-items: start; }
@@ -228,11 +166,11 @@ const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
   .empty { padding: 4px 0 8px; color: var(--muted); }
 
   .sheet .hd, .sheet .row { display: grid; grid-template-columns: var(--cols); column-gap: 12px; align-items: center; }
-  .fx { --cols: 96px minmax(0, 1fr) 88px 80px 80px; }
-  .gl { --cols: 56px minmax(0, 1fr) 84px 60px 60px 56px; }
+  .fx { --cols: 96px minmax(0, 1fr) 80px 80px; }
+  .gl { --cols: 56px minmax(0, 1fr) 84px 60px 56px; }
   .hd { height: 32px; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
   .row { height: 36px; border-bottom: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
-  .sheet > .row:last-child, .sheet > [role="rowgroup"]:last-child > .row:last-child { border-bottom: 0; }
+  .sheet > .row:last-child { border-bottom: 0; }
   .r { text-align: right; }
   .row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
@@ -246,10 +184,6 @@ const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
   .sub { display: none; }
   .chance.fav { color: var(--text); font-weight: 500; }
 
-  .month { height: 36px; border-bottom-color: var(--border); }
-  .mname { grid-column: 1 / 5; color: var(--text); font-weight: 600; }
-  .mname .num { margin-left: 6px; color: var(--muted); font-weight: 400; }
-  .net { grid-column: 5; color: var(--text); font-weight: 500; }
   .row .res { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 4px; }
   .res b { font-weight: 600; }
   .res span { text-align: right; color: var(--text); }
@@ -266,20 +200,16 @@ const plotHeight = level ? Math.max(240, 100 + 36 * rows) : 300;
     .log { order: 3; }
   }
 
-  /* Phone: two-line rows. The opponent and the result on the first line; date, chance and stage under the
+  /* Phone: two-line rows. The opponent and the result on the first line; the date and stage under the
      opponent, and the change under the rating. */
   @media (max-width: 640px) {
     .fx { --cols: minmax(0, 1fr) 64px; }
     .gl { --cols: minmax(0, 1fr) 84px 48px; }
     .sheet .hd, .sheet .row { column-gap: 8px; }
     .sheet .row { height: 48px; align-items: start; padding-top: 6px; line-height: 18px; }
-    .sheet .month { height: 36px; align-items: center; padding-top: 0; }
-    .res .sub { grid-column: 1 / -1; color: var(--muted); }
     .opt, .when, .hd > :first-child, .hd > .r:not(:last-child), .tag { display: none; }
     .sub { display: block; font-size: 13px; color: var(--muted); }
     .who .sub { overflow: hidden; text-overflow: ellipsis; }
     .rt .sub { color: var(--text); }
-    .mname { grid-column: 1 / 3; }
-    .net { grid-column: 3; }
   }
 </style>

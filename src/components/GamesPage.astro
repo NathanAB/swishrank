@@ -1,0 +1,122 @@
+---
+// One page of a season's games. The index has the week ahead on top, then the newest month's final games by
+// US Eastern day, newest first; every month also has its own page, reached by the month switch.
+import Base from "../layouts/Base.astro";
+import FixtureList from "./FixtureList.astro";
+import GameList from "./GameList.astro";
+import Panel from "./Panel.astro";
+import { bySwing, outcome } from "../lib/facts.ts";
+import { nextDays, WEEK } from "../lib/fixtures.ts";
+import { longDay, monthName, monthShort, weekdayDay } from "../lib/format.ts";
+import { gamesIn, monthRoute, months, type Day } from "../lib/results.ts";
+import { href } from "../lib/routes.ts";
+import { TODAY, noGamesAhead, openingDay, theTeam, winPhrase, type SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  /** The month this page shows, "YYYY-MM"; leave it out for the index. */
+  month?: string;
+}
+
+const { season, month } = Astro.props;
+const m = season.model;
+const all = months(m);
+const shown = month === undefined ? all.at(-1) : all.find((x) => x.key === month);
+if (month !== undefined && !shown) throw new Error(`${season.id} has no games in ${month}`);
+
+// The week ahead, on the index of the season in progress; days without games are left out.
+const ahead = month === undefined && season.current ? nextDays(m, TODAY, WEEK).filter((d) => d.fixtures.length) : null;
+
+// A day's heading meta: what the games were part of when every one has a note, such as "NBA Finals · Game 5"
+// for a lone game or "East 1st Round · West 1st Round" for several.
+function dayMeta(d: Day) {
+  const notes = d.results.map((r) => r.game.note);
+  if (!notes.every((n) => n !== null)) return undefined;
+  return (notes.length === 1 ? notes[0].split(" - ") : [...new Set(notes.map((n) => n.split(" - ")[0]))]).join(" · ");
+}
+
+let lede: string;
+if (month === undefined && !season.current) {
+  lede = noGamesAhead(season);
+} else if (shown) {
+  const o = outcome(bySwing(gamesIn(shown))[0]);
+  const soFar = season.current && shown === all.at(-1) ? " so far" : "";
+  lede = `${monthName(shown.key)}'s biggest swing${soFar} went to ${theTeam(season, o.winner.abbr)}, for a ${winPhrase(season, o)}.`;
+} else {
+  const opens = openingDay(season);
+  lede = opens ? `The season opens ${weekdayDay(opens)}.` : "No games yet.";
+}
+
+const title = `${season.label} games`;
+const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.key)), active: x === shown }));
+---
+
+<Base
+  title={title}
+  docTitle={month ? `${title}, ${monthName(month)}` : title}
+  route={{ kind: "games", season, month }}
+  description={`Scores and Elo changes for every ${season.label} NBA game${season.current ? ", and the week ahead with win chances" : ""}.`}
+>
+  <Fragment slot="lede">{lede}</Fragment>
+
+  {ahead && (
+    <Panel class="ahead" title={`Next ${WEEK} days`}>
+      {ahead.length === 0 ? (
+        <p class="empty">{noGamesAhead(season)}</p>
+      ) : (
+        ahead.map((d, i) => (
+          <section class="day" aria-label={longDay(d.day)}>
+            <h3>{weekdayDay(d.day)}</h3>
+            <FixtureList season={season} fixtures={d.fixtures} label={`Games on ${longDay(d.day)}`} head={i === 0} />
+          </section>
+        ))
+      )}
+    </Panel>
+  )}
+
+  {switcher.length > 1 && (
+    <nav class="months" aria-label="Month">
+      {switcher.map((x) => (
+        <a href={x.href} aria-current={x.active ? "page" : undefined} aria-label={monthName(x.key)}>{monthShort(x.key)}</a>
+      ))}
+    </nav>
+  )}
+
+  {shown && (
+    <div class="days">
+      {shown.days.map((d) => (
+        <Panel id={d.day} title={longDay(d.day)} meta={dayMeta(d)}>
+          <GameList season={season} results={d.results} label={`Games on ${longDay(d.day)}`} />
+        </Panel>
+      ))}
+    </div>
+  )}
+</Base>
+
+<style>
+  .ahead { margin-bottom: var(--gap); }
+  .day + .day { margin-top: 16px; }
+  h3 { font-size: var(--fs-body); line-height: 20px; font-weight: 600; margin-bottom: 2px; }
+  .empty { padding: 4px 0 8px; color: var(--muted); }
+
+  /* The month switch: a 1px accent line as wide as the label, on a full-width rule. */
+  .months {
+    display: flex; gap: 24px; margin-bottom: var(--gap); overflow-x: auto;
+    box-shadow: inset 0 -1px var(--border);
+  }
+  .months a {
+    position: relative; flex: none; padding: 6px 0 7px; color: var(--muted); font-weight: 500;
+    transition: color 150ms ease;
+  }
+  .months a:hover { color: var(--text); }
+  .months a[aria-current="page"] { color: var(--text); }
+  .months a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--accent); }
+
+  .days { display: flex; flex-direction: column; gap: var(--gap); }
+
+  @media (max-width: 640px) {
+    /* Nine months fit a phone's width as 44px tall targets. */
+    .months { gap: 12px; justify-content: space-between; }
+    .months a { padding: 12px 0 11px; }
+  }
+</style>

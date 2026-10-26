@@ -1,9 +1,9 @@
 ---
-// The shell every page shares: the top bar (mark, wordmark, nav, freshness), the title row (the page's
-// h1, its one-sentence lede and the season switch) and the footer. Pages fill the default slot.
+// The shell every page shares: the top bar (mark, wordmark, nav), the title row (the page's h1, its
+// one-sentence lede and the season switch) and the footer. Pages fill the default slot.
 import { Font } from "astro:assets";
 import "../styles/global.css";
-import { shortDay, stamp, weekdayDay } from "../lib/format.ts";
+import { stamp } from "../lib/format.ts";
 import { href, withBase, type Route } from "../lib/routes.ts";
 import { BUILT_AT, currentSeason, routeSeason, seasonSwitch, type SeasonView } from "../lib/season.ts";
 
@@ -26,16 +26,10 @@ const { title, docTitle = title, description = "Season-only Elo ratings for all 
 const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
-  { label: "Results", kinds: ["results"], to: (s) => ({ kind: "results", season: s }) },
-  { label: "Fixtures", kinds: ["fixtures"], to: (s) => ({ kind: "fixtures", season: s }) },
-  { label: "Teams", kinds: ["teams", "team"], to: (s) => ({ kind: "teams", season: s }) },
+  { label: "Games", kinds: ["games"], to: (s) => ({ kind: "games", season: s }) },
   { label: "Graph", kinds: ["graph"], to: (s) => ({ kind: "graph", season: s }) },
-  { label: "About", kinds: ["about"], to: () => ({ kind: "about" }) },
 ];
 const switcher = !route || route.kind === "about" ? [] : seasonSwitch(route);
-const pulled = stamp(BUILT_AT);
-const asOf = season.model.asOf;
-const freshness = `${asOf ? `Scores through ${weekdayDay(asOf)}` : "No games yet"} · pulled ${pulled}`;
 const home = href({ kind: "home", season: currentSeason() });
 ---
 
@@ -65,7 +59,6 @@ const home = href({ kind: "home", season: currentSeason() });
             <a href={href(item.to(season))} aria-current={route && item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
           ))}
         </nav>
-        <p class="stamp">{freshness}</p>
       </div>
     </header>
 
@@ -88,11 +81,8 @@ const home = href({ kind: "home", season: currentSeason() });
 
     <footer class="foot">
       <div class="foot-in">
-        <p>
-          Scores from <a href="https://www.espn.com/nba/scoreboard">ESPN</a>, last pulled {pulled}.
-          {asOf ? ` Games through ${shortDay(asOf)}.` : ""}
-        </p>
-        <p>Every team starts each season at 1500 and nothing carries over. <a href={href({ kind: "about" })}>How the ratings work</a></p>
+        <p>Scores from <a href="https://www.espn.com/nba/scoreboard">ESPN</a>, pulled {stamp(BUILT_AT)}.</p>
+        <p><a href={href({ kind: "about" })}>How the ratings work</a></p>
       </div>
     </footer>
     <script>
@@ -116,7 +106,6 @@ const home = href({ kind: "home", season: currentSeason() });
   .nav a:hover { color: var(--text); }
   .nav a[aria-current="page"] { color: var(--text); }
   .nav a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--accent); }
-  .stamp { margin-left: auto; color: var(--muted); font-size: var(--fs-small); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
   .canvas { max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 32px var(--pad) 48px; }
   .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: var(--gap); }
@@ -138,17 +127,8 @@ const home = href({ kind: "home", season: currentSeason() });
   }
   .foot a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
 
-  /* The stamp gives way before the nav would have to scroll. */
-  @media (max-width: 999px) {
-    .stamp { display: none; }
-  }
-  /* A phone keeps the mark, which is the link home and carries the product's name for assistive tech, and the
-     five season pages; About, a sixth, is in the footer of every page. */
   @media (max-width: 640px) {
     .bar-in { gap: 16px; }
-    .brand > span { display: none; }
-    .nav { gap: 14px; }
-    .nav a:last-child { display: none; }
     .canvas { padding-top: 20px; }
     h1 { line-height: 28px; }
     .title-row { flex-direction: column; align-items: stretch; gap: 16px; }

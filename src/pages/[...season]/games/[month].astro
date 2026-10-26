@@ -1,0 +1,18 @@
+---
+// A month of final games, such as /2025-26/games/2026-03/. The newest month is also on the games index.
+import GamesPage from "../../../components/GamesPage.astro";
+import { monthPaths, type SeasonView } from "../../../lib/season.ts";
+
+export function getStaticPaths() {
+  return monthPaths();
+}
+
+interface Props {
+  season: SeasonView;
+  month: string;
+}
+
+const { season, month } = Astro.props;
+---
+
+<GamesPage season={season} month={month} />

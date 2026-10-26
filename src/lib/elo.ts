@@ -4,7 +4,6 @@
 export const K = 20;
 export const HCA = 100;
 export const START = 1500;
-export const ELO_PER_POINT = 28;
 export const TZ = "America/New_York";
 
 export type Abbr = string;
@@ -26,7 +25,7 @@ type Pair = { h: number; a: number };
 export type Result = { game: Game; day: string; p: number; shift: number; pre: Pair; post: Pair; rankPre: Pair; rankPost: Pair };
 export type Snapshot = { day: string; r: Record<Abbr, number>; rank: Record<Abbr, number> };
 export type TeamGame = { result: Result; side: "h" | "a" };
-export type TeamStats = { T: number; H: number; A: number; N: number; W: number; L: number; F: number; Ag: number; hi: number; lo: number };
+export type TeamStats = { W: number; L: number; hi: number; lo: number };
 
 export type Season = {
   data: SeasonData;
@@ -37,8 +36,6 @@ export type Season = {
   log: Record<Abbr, TeamGame[]>;
   series: Snapshot[];
   asOf: string | null;
-  avg: Record<Abbr, number>;
-  avgRank: Record<Abbr, number>;
   weekAgo: Snapshot | null;
   stats: Record<Abbr, TeamStats>;
   order: Abbr[];
@@ -49,9 +46,6 @@ export const winProb = (diff: number) => 1 / (1 + 10 ** (-diff / 400));
 
 /** Home-court-adjusted rating gap, home minus away. */
 export const gap = (game: Game, r: Record<Abbr, number>) => r[game.home] + (game.neutral ? 0 : HCA) - r[game.away];
-
-/** Points a spread of `diff` Elo is worth, rounded to the half point. */
-export const spreadPoints = (diff: number) => Math.round((Math.abs(diff) / ELO_PER_POINT) * 2) / 2;
 
 /** Rating points moved to the home team by one final game (negative when the home team loses them). */
 export function exchange(diff: number, homeScore: number, awayScore: number) {
@@ -109,24 +103,18 @@ export function compute(data: SeasonData): Season {
     }
   }
   const asOf = series.at(-1)?.day ?? null;
-  const played = series.slice(1);
 
-  const avg = Object.fromEntries(abbrs.map((a) => [a, played.length ? played.reduce((s, x) => s + x.r[a], 0) / played.length : START]));
   const target = asOf ? addDays(asOf, -7) : null;
   const weekAgo = target && target >= series[1].day ? [...series].reverse().find((x) => x.day <= target) ?? null : null;
 
   const stats = Object.fromEntries(
     abbrs.map((a) => {
-      const s: TeamStats = { T: 0, H: 0, A: 0, N: 0, W: 0, L: 0, F: 0, Ag: 0, hi: START, lo: START };
+      const s: TeamStats = { W: 0, L: 0, hi: START, lo: START };
       for (const { result, side } of log[a]) {
         const g = result.game;
         const mine = side === "h" ? g.hs! : g.as!;
         const theirs = side === "h" ? g.as! : g.hs!;
-        s.T++;
-        s[g.neutral ? "N" : side === "h" ? "H" : "A"]++;
         s[mine > theirs ? "W" : "L"]++;
-        s.F += mine;
-        s.Ag += theirs;
         s.hi = Math.max(s.hi, result.post[side]);
         s.lo = Math.min(s.lo, result.post[side]);
       }
@@ -136,7 +124,7 @@ export function compute(data: SeasonData): Season {
 
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
   return {
-    data, abbrs, r, rank, log, results, series, asOf, avg, avgRank: ranksOf(avg), weekAgo, stats, order,
+    data, abbrs, r, rank, log, results, series, asOf, weekAgo, stats, order,
     upcoming: data.games.filter((g) => !g.final),
   };
 }

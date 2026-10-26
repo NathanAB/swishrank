@@ -4,6 +4,7 @@ import list from "../data/seasons.json" with { type: "json" };
 import { compute, dayKey, type Abbr, type Game, type Season, type SeasonData, type Team } from "./elo.ts";
 import type { Outcome } from "./facts.ts";
 import { seasonLabel } from "./format.ts";
+import { months } from "./results.ts";
 import { href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
 
 export type SeasonView = SeasonRef & {
@@ -94,10 +95,16 @@ export const allSeasons = (): SeasonView[] => ENTRIES.all.map(load);
 export const currentSeason = (): SeasonView => load(ENTRIES.current);
 
 /** The URL param for a season in a [...season] route: undefined for the current season, else its id. */
-export const seasonParam = (season: SeasonRef) => (season.current ? undefined : season.id);
+const seasonParam = (season: SeasonRef) => (season.current ? undefined : season.id);
 
 /** getStaticPaths for a page under src/pages/[...season]/: one page per season. */
 export const seasonPaths = () => allSeasons().map((season) => ({ params: { season: seasonParam(season) }, props: { season } }));
+
+/** getStaticPaths for a page per month of games: one per month with a final game, per season. */
+export const monthPaths = () =>
+  allSeasons().flatMap((season) =>
+    months(season.model).map((month) => ({ params: { season: seasonParam(season), month: month.key }, props: { season, month: month.key } })),
+  );
 
 /** getStaticPaths for src/pages/[...season]/teams/[team].astro: one page per team per season. */
 export const teamPaths = () =>
@@ -123,7 +130,7 @@ export const team = (season: SeasonView, abbr: Abbr): Team => season.model.data.
 export const theTeam = (season: SeasonView, abbr: Abbr) => `the ${team(season, abbr).name}`;
 
 /** The city part of a team's name: "Oklahoma City" for the Thunder, "LA" for the Clippers. */
-export const city = (season: SeasonView, abbr: Abbr) => {
+const city = (season: SeasonView, abbr: Abbr) => {
   const t = team(season, abbr);
   return t.name.slice(0, t.name.length - t.short.length).trim() || t.name;
 };

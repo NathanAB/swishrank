@@ -19,9 +19,6 @@ export const rating = (v: number) => String(Math.round(v));
 /** A probability as a whole percentage: 64%. */
 export const pct = (p: number) => `${Math.round(p * 100)}%`;
 
-/** Points per game to one decimal, or a dash before a team has played. */
-export const perGame = (total: number, games: number) => (games ? (total / games).toFixed(1) : DASH);
-
 export const ordinal = (n: number) => {
   const tens = n % 100;
   const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");

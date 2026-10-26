@@ -1,67 +1,57 @@
 ---
-// Games still to play, two lines each (away, then home): tip-off in US Eastern, each team with its rating
-// now, and each side's win chance from today's ratings, the favourite in ink.
-import { dayKey, gap, winProb, type Game } from "../lib/elo.ts";
-import { pct, rating, shortDay, tipTime } from "../lib/format.ts";
+// Games still to play, two lines each (away, then home): tip-off in US Eastern and each side's win chance
+// from today's ratings, the favourite in ink.
+import type { Fixture } from "../lib/fixtures.ts";
+import { pct, tipTime } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
-import { city, team, type SeasonView } from "../lib/season.ts";
+import { team, type SeasonView } from "../lib/season.ts";
 
 interface Props {
   season: SeasonView;
   /** The games, in tip-off order. */
-  games: readonly Game[];
+  fixtures: readonly Fixture[];
   /** The list's accessible name, such as "Tonight's games". */
   label: string;
-  /** Put the date above each tip-off time, for a list that spans several days. */
-  dated?: boolean;
-  /** As GameList's `fit`: only the whole games that fit the height the page gives the list. */
-  fit?: boolean;
   /** The sentence shown when there are no games. */
   empty?: string;
+  /** Show the column headings; a list under another one with the same columns can leave them out. */
+  head?: boolean;
 }
 
-const { season, games, label, dated = false, fit = false, empty = "No games scheduled." } = Astro.props;
-const m = season.model;
-const rows = games.map((g) => {
-  const p = winProb(gap(g, m.r));
-  const where = g.neutral ? "Neutral site" : `At ${city(season, g.home)}`;
-  return {
-    g,
-    title: g.note ? `${g.note}. ${where}` : where,
-    lines: [
-      { abbr: g.away, prefix: "", chance: 1 - p, fav: p < 0.5 },
-      { abbr: g.home, prefix: g.neutral ? "vs " : "at ", chance: p, fav: p >= 0.5 },
-    ],
-  };
-});
+const { season, fixtures, label, empty = "No games scheduled.", head = true } = Astro.props;
 ---
 
-{rows.length === 0 ? (
+{fixtures.length === 0 ? (
   <p class="empty">{empty}</p>
 ) : (
-  <div class:list={["fix", { fit }]} role="table" aria-label={label}>
-    <div class="hd" role="row">
-      <span role="columnheader">Tip-off, ET</span>
-      <span role="columnheader">Game and rating</span>
-      <span role="columnheader" class="r">Win chance</span>
-    </div>
-    <div class="fit-rows" role="rowgroup">
-      {rows.map(({ g, title, lines }) => (
-        <div class="fx" role="row" title={title}>
-          <div class="when num" role="cell">
-            {dated && <span>{shortDay(dayKey(g.t))}</span>}
-            <span>{tipTime(g.t)}</span>
-          </div>
+  <div class="fix" role="table" aria-label={label}>
+    {head && (
+      <div class="hds">
+        {[0, 1, 2].map((i) => {
+          const role = i === 0 ? "columnheader" : undefined;
+          return (
+            <div class="hd" role={i === 0 ? "row" : undefined} aria-hidden={i === 0 ? undefined : "true"}>
+              <span role={role}>Tip-off, ET</span>
+              <span role={role}>Game</span>
+              <span role={role} class="r">Win chance</span>
+            </div>
+          );
+        })}
+      </div>
+    )}
+    <div class="rows" role="rowgroup">
+      {fixtures.map((f) => (
+        <div class="fx" role="row">
+          <div class="when num" role="cell">{tipTime(f.game.t)}</div>
           <div class="who" role="cell">
-            {lines.map((l) => (
-              <span class:list={{ fav: l.fav }}>
-                {l.prefix}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a>
-                <span class="rt num">{rating(m.r[l.abbr])}</span>
+            {f.lines.map((l) => (
+              <span class:list={{ fav: l.side === f.fav }}>
+                {l.side === "h" && (f.game.neutral ? "vs " : "at ")}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a>
               </span>
             ))}
           </div>
-          <div class="pc num" role="cell">
-            {lines.map((l) => <span class:list={{ fav: l.fav }}>{pct(l.chance)}</span>)}
+          <div class="r num" role="cell">
+            {f.lines.map((l) => <span class:list={{ fav: l.side === f.fav }}>{pct(l.chance)}</span>)}
           </div>
         </div>
       ))}
@@ -71,20 +61,28 @@ const rows = games.map((g) => {
 
 <style>
   .empty { padding: 4px 0 8px; color: var(--muted); }
-  .fix { --row: 41px; }
-  .hd, .fx { display: grid; grid-template-columns: 64px minmax(0, 1fr) 72px; column-gap: 10px; }
+  .fix { container-type: inline-size; --across: 1; }
+  .hds, .rows { display: grid; grid-template-columns: repeat(var(--across), minmax(0, 1fr)); column-gap: var(--gap); }
+  .hd, .fx { display: grid; grid-template-columns: 72px minmax(0, 1fr) 72px; column-gap: 10px; }
   .hd { height: 32px; align-items: center; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .hd:nth-child(n + 2) { display: none; }
   .r { text-align: right; }
-  .fx { height: var(--row); padding: 3px 0; align-items: start; }
-  /* Rules go between rows, so a list cut short by `fit` ends on its last shown row with no rule under it. */
+  .fx { height: 41px; padding: 3px 0; align-items: start; }
   .fx + .fx { border-top: 1px solid var(--rule); }
-  .fx > div { display: grid; line-height: 17px; min-width: 0; }
-  .fx span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .when { color: var(--muted); }
-  .who { color: var(--muted); }
-  .who .fav { color: var(--text); font-weight: 500; }
-  .rt { margin-left: 6px; color: var(--muted); font-weight: 400; }
+  .fx > div { display: grid; line-height: 17px; min-width: 0; color: var(--muted); }
+  .fx span, .when { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fx .fav { color: var(--text); font-weight: 500; }
   .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
-  .pc { text-align: right; color: var(--muted); }
-  .pc .fav { color: var(--text); font-weight: 500; }
+
+  /* A wide card sets two or three games across, read left to right, as GameList does. */
+  @container (min-width: 680px) {
+    .rows, .hds { --across: 2; }
+    .hd:nth-child(2) { display: grid; }
+    .fx:nth-child(2) { border-top: 0; }
+  }
+  @container (min-width: 1040px) {
+    .rows, .hds { --across: 3; }
+    .hd:nth-child(3) { display: grid; }
+    .fx:nth-child(3) { border-top: 0; }
+  }
 </style>

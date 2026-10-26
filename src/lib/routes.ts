@@ -6,9 +6,8 @@ export type SeasonRef = { readonly id: string; readonly current: boolean };
 
 export type Route =
   | { kind: "home"; season: SeasonRef }
-  | { kind: "results"; season: SeasonRef; month?: string }
-  | { kind: "fixtures"; season: SeasonRef }
-  | { kind: "teams"; season: SeasonRef }
+  /** `month` ("YYYY-MM") is that month's results alone; without it, the week ahead and the newest month. */
+  | { kind: "games"; season: SeasonRef; month?: string }
   | { kind: "team"; season: SeasonRef; abbr: string }
   /** `abbr` opens the graph with that team picked, through the URL's hash. */
   | { kind: "graph"; season: SeasonRef; abbr?: string }
@@ -30,12 +29,8 @@ export function routePath(route: Route): string {
   switch (route.kind) {
     case "home":
       return `${prefix(route.season)}/`;
-    case "results":
-      return `${prefix(route.season)}/results/${route.month ? `${route.month}/` : ""}`;
-    case "fixtures":
-      return `${prefix(route.season)}/fixtures/`;
-    case "teams":
-      return `${prefix(route.season)}/teams/`;
+    case "games":
+      return `${prefix(route.season)}/games/${route.month ? `${route.month}/` : ""}`;
     case "team":
       return `${prefix(route.season)}/teams/${teamSlug(route.abbr)}/`;
     case "graph":
@@ -57,23 +52,19 @@ export const href = (route: Route) => withBase(routePath(route));
 
 /**
  * The page a reader lands on when they pick season `to` from `route`: the same page in that season. A month
- * of results does not carry over, and a team that `to` lacks falls back to that season's team list.
+ * of games does not carry over, and a team that `to` lacks falls back to that season's home.
  */
 export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string) => boolean): Route {
   switch (route.kind) {
     case "home":
     case "about":
       return { kind: "home", season: to };
-    case "results":
-      return { kind: "results", season: to };
-    case "fixtures":
-      return { kind: "fixtures", season: to };
-    case "teams":
-      return { kind: "teams", season: to };
+    case "games":
+      return { kind: "games", season: to };
     case "graph":
       return { kind: "graph", season: to };
     case "team":
-      return hasTeam(route.abbr) ? { kind: "team", season: to, abbr: route.abbr } : { kind: "teams", season: to };
+      return hasTeam(route.abbr) ? { kind: "team", season: to, abbr: route.abbr } : { kind: "home", season: to };
     default: {
       const _exhaustive: never = route;
       return _exhaustive;

@@ -7,8 +7,8 @@ import RatingChart from "../../components/RatingChart.astro";
 import Base from "../../layouts/Base.astro";
 import { START, type Abbr } from "../../lib/elo.ts";
 import { playoffsStart } from "../../lib/facts.ts";
-import { int, rating, shortDay, signed, weekdayDay } from "../../lib/format.ts";
-import { openingDay, seasonPaths, theTeam, type SeasonView } from "../../lib/season.ts";
+import { rating, shortDay, weekdayDay } from "../../lib/format.ts";
+import { openingDay, seasonPaths, team, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
   return seasonPaths();
@@ -21,12 +21,6 @@ interface Props {
 const { season } = Astro.props;
 const m = season.model;
 const lead = m.order[0];
-const last = m.order[m.order.length - 1];
-// Changes come from the ratings as displayed, so they agree with the rows.
-const shown = (a: Abbr) => Math.round(m.r[a]);
-const change = (a: Abbr) => shown(a) - START;
-const count = (n: number, noun: string) => `${int(n)} ${noun}${n === 1 ? "" : "s"}`;
-const first = m.results[0]?.day;
 const playoffs = playoffsStart(m);
 // Side by side, the table is the chart's key and the two cards end level: the plot is as tall as the table's
 // rows (ROW, the CSS's 22px) plus its 36px header, less what the chart's card holds besides the plot (a 32px
@@ -35,18 +29,14 @@ const ROW = 22;
 const plotHeight = m.abbrs.length * ROW + 36 - 52 - (playoffs ? 16 : 0);
 
 // The finding under the title: who climbed furthest from the 1500 every team starts at and who fell furthest,
-// the two lines the eye goes to first. Teams level at either end share the clause. { b } parts are set in ink.
-type Part = string | { b: string };
-const level = (a: Abbr) => m.order.filter((b) => shown(b) === shown(a));
-const named = (abbrs: Abbr[]) => abbrs.map((a) => theTeam(season, a)).join(" and ");
+// on the displayed ratings, so teams level at either end share the clause.
+const shown = (a: Abbr) => Math.round(m.r[a]);
+const level = (a: Abbr) => m.order.filter((b) => shown(b) === shown(a)).map((b) => team(season, b).short).join(" and ");
 const opens = openingDay(season);
-const [since, rose, fell] = season.current ? ["Since opening night", "have climbed", "have fallen"] : ["Over the season", "climbed", "fell"];
-const lede: Part[] = m.asOf
-  ? [
-      `${since} ${named(level(lead))} ${rose} furthest, `, { b: signed(change(lead)) }, ` to ${rating(m.r[lead])}, and `,
-      `${named(level(last))} ${fell} furthest, `, { b: signed(change(last)) }, ` to ${rating(m.r[last])}.`,
-    ]
-  : [`Every team starts at ${START}${opens ? `, and the season opens ${weekdayDay(opens)}.` : "."}`];
+const [rose, fell] = season.current ? ["have climbed", "have fallen"] : ["climbed", "fell"];
+const lede = m.asOf
+  ? `The ${level(lead)} ${rose} furthest and the ${level(m.order[m.order.length - 1])} ${fell} furthest.`
+  : `Every team starts at ${START}${opens ? `, and the season opens ${weekdayDay(opens)}` : ""}.`;
 ---
 
 <Base
@@ -54,10 +44,10 @@ const lede: Part[] = m.asOf
   description={`Every NBA team's daily Elo rating through the ${season.label} season, from the ${START} they all start at.`}
   route={{ kind: "graph", season }}
 >
-  <Fragment slot="lede">{lede.map((p) => (typeof p === "string" ? p : <b>{p.b}</b>))}</Fragment>
+  <Fragment slot="lede">{lede}</Fragment>
 
   <div class="grid">
-    <Panel class="chart" title={`All ${m.abbrs.length} teams`} meta={first && m.asOf ? `${shortDay(first)} to ${shortDay(m.asOf)} · ${count(m.series.length - 1, "day")}` : ""}>
+    <Panel class="chart" title={`All ${m.abbrs.length} teams`}>
       <RatingChart
         season={season}
         selected={lead}
@@ -67,14 +57,13 @@ const lede: Part[] = m.asOf
       />
     </Panel>
 
-    <Panel class="table" title="League table" meta={m.asOf ? `As of ${weekdayDay(m.asOf)}` : "Before opening night"}>
+    <Panel class="table" title="League table">
       <table>
         <thead>
           <tr>
             <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
             <th scope="col">Team</th>
             <th class="num rating" scope="col">Rating</th>
-            <th class="num change" scope="col" title={`Change since every team started at ${START}`}>From {START}</th>
           </tr>
         </thead>
         <tbody>
@@ -83,7 +72,6 @@ const lede: Part[] = m.asOf
               <td class="num rank">{m.rank[a]}</td>
               <td class="team"><span class="name">{m.data.teams[a].short}</span> <span class="ab">{a}</span></td>
               <td class="num rating">{rating(m.r[a])}</td>
-              <td class="num">{signed(change(a))}</td>
             </tr>
           ))}
         </tbody>
@@ -93,8 +81,8 @@ const lede: Part[] = m.asOf
 </Base>
 
 <style>
-  /* 840 + 24 + 336 = 1200 at 1440. */
-  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 336px; gap: var(--gap); align-items: start; }
+  /* 896 + 24 + 280 = 1200 at 1440. */
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--gap); align-items: start; }
 
   /* Fixed columns, so on the narrowest phone a long name is cut short rather than pushing the table wide. */
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -110,7 +98,6 @@ const lede: Part[] = m.asOf
   .num { text-align: right; }
   .rank { width: 28px; }
   .rating { width: 56px; }
-  .change { width: 72px; }
   td.rating { color: var(--text); font-weight: 600; }
 
   /* The whole row picks the team and holds no link, so a click does one thing; the name carries the
