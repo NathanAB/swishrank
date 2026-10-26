@@ -100,117 +100,125 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
 >
   <Fragment slot="lede">Each rating says how well a team has played this season, on Elo's scale, where {START} is the league average. Beating a strong team, or winning big, lifts it more.</Fragment>
 
-  <div class="steps">
-    <Panel title={`Everyone starts at ${START}`}>
-      <p class="say">Nothing carries over from last season, so every team opens at {START}, the league average, and the games spread them out.</p>
-      {lines && (
-        <figure
-          class="lines"
-          role="img"
-          aria-label={`Every team's rating by day: all ${lines.count} start at ${START} on opening night and now run from ${lines.ends[1].text}, the lowest, to ${lines.ends[0].text}, the highest.`}
-          style={`--h: ${LINES_H}px; --lane: ${lines.lane}`}
-        >
-          <div class="ticks">
-            {lines.ticks.map((t) => <span class:list={{ ref: t.t === START }} style={`top: ${t.y}px`}>{t.t}</span>)}
-          </div>
-          <div class="field">
-            <svg viewBox={`0 0 1000 ${LINES_H}`} preserveAspectRatio="none" aria-hidden="true">
-              {lines.ticks.map((t) => <path class:list={["rule", { ref: t.t === START }]} d={`M0,${t.y}H1000`} />)}
-              {lines.others.map((pts) => <polyline class="other" points={pts} />)}
-              {lines.ends.map((e) => <polyline class="named" points={e.points} />)}
-            </svg>
-            <span class="stem" style={`top: ${lines.start}px`}></span>
-            <span class="dot accent" style={`left: 0; top: ${lines.start}px`}></span>
-            {lines.ends.map((e) => <span class="dot" style={`left: 100%; top: ${e.y}px`}></span>)}
-          </div>
-          <div class="lane">
-            {lines.ends.map((e) => <span style={`top: ${e.ly}px`}>{e.text}</span>)}
-          </div>
-          <p class="start">Opening night, all at {START}</p>
-        </figure>
-      )}
-    </Panel>
+  <ol class="steps">
+    <li><Panel title={`Everyone starts at ${START}`}>
+      <div class="step">
+        <p class="say">Nothing carries over from last season, so every team opens at {START}, the league average, and the games spread them out.</p>
+        {lines && (
+          <figure
+            class="lines"
+            role="img"
+            aria-label={`Every team's rating by day: all ${lines.count} start at ${START} on opening night and now run from ${lines.ends[1].text}, the lowest, to ${lines.ends[0].text}, the highest.`}
+            style={`--h: ${LINES_H}px; --lane: ${lines.lane}`}
+          >
+            <div class="ticks">
+              {lines.ticks.map((t) => <span class:list={{ ref: t.t === START }} style={`top: ${t.y}px`}>{t.t}</span>)}
+            </div>
+            <div class="field">
+              <svg viewBox={`0 0 1000 ${LINES_H}`} preserveAspectRatio="none" aria-hidden="true">
+                {lines.ticks.map((t) => <path class:list={["rule", { ref: t.t === START }]} d={`M0,${t.y}H1000`} />)}
+                {lines.others.map((pts) => <polyline class="other" points={pts} />)}
+                {lines.ends.map((e) => <polyline class="named" points={e.points} />)}
+              </svg>
+              <span class="stem" style={`top: ${lines.start}px`}></span>
+              <span class="dot accent" style={`left: 0; top: ${lines.start}px`}></span>
+              {lines.ends.map((e) => <span class="dot" style={`left: 100%; top: ${e.y}px`}></span>)}
+            </div>
+            <div class="lane">
+              {lines.ends.map((e) => <span style={`top: ${e.ly}px`}>{e.text}</span>)}
+            </div>
+            <p class="start">Opening night, all at {START}</p>
+          </figure>
+        )}
+      </div>
+    </Panel></li>
 
-    <Panel title="Every morning, every game again" meta={game?.day}>
-      <p class="say">Each morning the ratings are worked out again from every game so far, as the ones that best explain every margin, like SRS or Massey ratings. Here are the first game's two teams, before and after opening night.</p>
-      {game && (
-        <div class="game">
-          <p class="score">{game.score}</p>
-          <table class="moves">
-            {game.rows.map((r) => (
-              <tr>
-                <th scope="row">{r.name}</th>
-                <td>{r.before}</td>
-                <td class="to">→</td>
-                <td>{r.after}</td>
-                <td class:list={["change", r.change > 0 ? "up" : "down"]}>{signed(r.change)}</td>
-              </tr>
+    <li><Panel title="Every morning, every game again">
+      <div class="step">
+        <p class="say">Each morning the ratings are worked out again from every game so far, as the ones that best explain every margin, like SRS or Massey ratings. Here are the first game's two teams, before and after opening night.</p>
+        {game && (
+          <div class="game">
+            <p class="day">{game.day}</p>
+            <p class="score">{game.score}</p>
+            <table class="moves">
+              {game.rows.map((r) => (
+                <tr>
+                  <th scope="row">{r.name}</th>
+                  <td>{r.before}</td>
+                  <td class="to">→</td>
+                  <td>{r.after}</td>
+                  <td class:list={["change", r.change > 0 ? "up" : "down"]}>{signed(r.change)}</td>
+                </tr>
+              ))}
+            </table>
+          </div>
+        )}
+      </div>
+    </Panel></li>
+
+    <li><Panel title="Bigger wins count, less and less">
+      <div class="step">
+        <p class="say">A {blowout}-point win counts {blowoutTimes} times what a 1-point win does, not {blowout} times, so one blowout cannot swing a rating. {upsetSay}</p>
+        {bars.length > 0 && (
+          <div class="bars">
+            <span></span>
+            <span class="head">Winner gains</span>
+            {bars.map((b) => (
+              <Fragment>
+                <span class="label">{b.label}</span>
+                <span class="bar"><span class="fill" style={`width: ${b.width}`}></span><b class="v">{signed(b.change)}</b></span>
+              </Fragment>
             ))}
-          </table>
-        </div>
-      )}
-    </Panel>
+          </div>
+        )}
+      </div>
+    </Panel></li>
 
-    <Panel title="Bigger wins count, less and less">
-      <p class="say">A {blowout}-point win counts {blowoutTimes} times what a 1-point win does, not {blowout} times, so one blowout cannot swing a rating. {upsetSay}</p>
-      {bars.length > 0 && (
-        <div class="bars">
-          <span></span>
-          <span class="head">Winner gains</span>
-          {bars.map((b) => (
-            <Fragment>
-              <span class="label">{b.label}</span>
-              <span class="bar"><span class="fill" style={`width: ${b.width}`}></span><b class="v">{signed(b.change)}</b></span>
-            </Fragment>
-          ))}
-        </div>
-      )}
-    </Panel>
+    <li><Panel title="A bigger gap, a bigger favourite">
+      <div class="step">
+        <p class="say">Before tip-off, the gap between two ratings gives each team its chance to win. Home court counts as {int(edge)} points, measured over eight past seasons, so a home team facing an equal rival is a {home.chance} favourite.</p>
+        <figure
+          class="curve"
+          role="img"
+          aria-label={`A rating gap of ${int(edge)} points gives the higher-rated team a ${home.chance} chance, and ${int(GAP_MAX)} points gives ${pct(winProb(GAP_MAX))}.`}
+        >
+          <p class="axis-title">Chance the higher-rated team wins</p>
+          <div class="plot">
+            {chanceTicks.map((p) => (
+              <Fragment>
+                <span class="grid" style={`top: ${y(p)}%`}></span>
+                <span class="ytick" style={`top: ${y(p)}%`}>{pct(p)}</span>
+              </Fragment>
+            ))}
+            <span class="guide v" style={`left: ${home.x}; top: ${home.y}`}></span>
+            <span class="guide h" style={`width: ${home.x}; top: ${home.y}`}></span>
+            <svg viewBox={`0 0 ${GAP_MAX} 100`} preserveAspectRatio="none" aria-hidden="true">
+              <path d={curve} vector-effect="non-scaling-stroke" />
+            </svg>
+            <span class="dot accent" style={`left: ${home.x}; top: ${home.y}`}></span>
+            <span class="mark" style={`left: ${home.x}; top: ${home.y}`}>{int(edge)} points, {home.chance}</span>
+            {gapTicks.map((g) => <span class="xtick" style={`left: ${at(g, 0, GAP_MAX)}`}>{int(g)}</span>)}
+          </div>
+          <p class="axis-title x">Rating gap, in points</p>
+        </figure>
+      </div>
+    </Panel></li>
+  </ol>
 
-    <Panel title="A bigger gap, a bigger favourite">
-      <p class="say">Before tip-off, the gap between two ratings gives each team its chance to win.</p>
-      <figure
-        class="curve"
-        role="img"
-        aria-label={`A rating gap of ${int(edge)} points gives the higher-rated team a ${home.chance} chance, and ${int(GAP_MAX)} points gives ${pct(winProb(GAP_MAX))}.`}
-      >
-        <p class="axis-title">Chance the higher-rated team wins</p>
-        <div class="plot">
-          {chanceTicks.map((p) => (
-            <Fragment>
-              <span class="grid" style={`top: ${y(p)}%`}></span>
-              <span class="ytick" style={`top: ${y(p)}%`}>{pct(p)}</span>
-            </Fragment>
-          ))}
-          <span class="guide v" style={`left: ${home.x}; top: ${home.y}`}></span>
-          <span class="guide h" style={`width: ${home.x}; top: ${home.y}`}></span>
-          <svg viewBox={`0 0 ${GAP_MAX} 100`} preserveAspectRatio="none" aria-hidden="true">
-            <path d={curve} vector-effect="non-scaling-stroke" />
-          </svg>
-          <span class="dot accent" style={`left: ${home.x}; top: ${home.y}`}></span>
-          <span class="mark" style={`left: ${home.x}; top: ${home.y}`}>{int(edge)} points, {home.chance}</span>
-          {gapTicks.map((g) => <span class="xtick" style={`left: ${at(g, 0, GAP_MAX)}`}>{int(g)}</span>)}
-        </div>
-        <p class="axis-title x">Rating gap, in points</p>
-      </figure>
-      <p class="note">Home court counts as {int(edge)} points, measured over eight past seasons, so a home team facing an equal rival is a {home.chance} favourite.</p>
-    </Panel>
-  </div>
-
-  <Panel class="counts" title="Which games count">
-    <p class="say">Regular-season, play-in and playoff games count, but preseason games and the All-Star Game don't. Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN</a> each morning. Every setting was chosen by testing it on past seasons, as <a href={methodLink}>the model notes</a> show.</p>
-  </Panel>
+  <p class="close">Regular-season, play-in and playoff games count, but preseason games and the All-Star Game don't. Scores come from <a href="https://www.espn.com/nba/scoreboard">ESPN</a> each morning. Every setting was chosen by testing it on past seasons, as <a href={methodLink}>the model notes</a> show.</p>
 </Base>
 
 <style>
-  .steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--gap); margin-bottom: var(--gap); }
-  @media (max-width: 899px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+  .steps { display: grid; gap: var(--gap); }
+  /* A step's words at a fixed measure beside its drawing, so every drawing starts at the same edge; stacked
+     where the two do not fit side by side. */
+  .step { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; gap: 16px 56px; padding-bottom: 8px; }
+  @media (max-width: 1023px) { .step { grid-template-columns: minmax(0, 1fr); } }
 
-  .say { max-width: 60ch; line-height: 22px; margin-bottom: 16px; }
-  .say a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
-  .say a:hover { text-decoration-color: currentColor; }
-  .counts .say { margin-bottom: 4px; }
-  .note { margin-top: 12px; color: var(--muted); }
+  .say { max-width: 60ch; line-height: 22px; }
+  .close { max-width: 72ch; margin-top: var(--gap); line-height: 22px; color: var(--muted); }
+  .close a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
+  .close a:hover { text-decoration-color: currentColor; }
 
   figure { position: relative; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
   b { color: var(--text); font-weight: 500; }
@@ -237,7 +245,8 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
   .lines .lane span { position: absolute; left: 10px; transform: translateY(-50%); color: var(--text); white-space: nowrap; }
   .lines .start { grid-column: 2 / 4; margin: 6px 0 0 -4px; color: var(--text); }
 
-  /* Step 2: the score, then each team's rating before and after. */
+  /* Step 2: the day and score, then each team's rating before and after. */
+  .day { font-size: var(--fs-small); line-height: 16px; color: var(--muted); margin-bottom: 4px; }
   .score { font-size: var(--fs-card); line-height: 24px; font-weight: 600; margin-bottom: 8px; }
   .moves { border-collapse: collapse; font-variant-numeric: tabular-nums; }
   .moves th { text-align: left; font-weight: 500; padding-right: 20px; }
