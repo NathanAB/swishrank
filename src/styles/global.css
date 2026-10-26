@@ -18,7 +18,7 @@
   --bar: #888888;
   /* How much of a team's colour its line carries at rest, mixed into the grey of an ordinary line; a
      previewed team draws in its full colour. */
-  --tint-mix: 35%;
+  --tint-mix: 45%;
   /* A switch's track, and the pill that raises its current option (components/Segmented.astro); the
      season menu sits on the same track. */
   --seg-track: #eaeaea;
@@ -58,7 +58,7 @@
     --line-other: #5d5d5d;
     --bar: #737373;
     /* The dark theme's grey line sits low against its surface, so it takes a little more of the team colour. */
-    --tint-mix: 40%;
+    --tint-mix: 50%;
     --seg-track: #232323;
     --seg-pill: #3a3a3a;
     /* Dark panels sit a step below the ground and lift on a soft shadow instead of a border. */
