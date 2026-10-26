@@ -10,8 +10,7 @@ const MOVED = /\/(graph|fixtures|results(\/[^/]+)?|teams)\/$/;
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://nathanab.github.io',
-  base: '/nba-elo',
+  site: 'https://swishrank.com',
   // Astro downloads the face at build time and serves it from the site, with metric-matched fallbacks.
   fonts: [
     { ...publicSans, cssVariable: '--font-public-sans' },
