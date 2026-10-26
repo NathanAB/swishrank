@@ -230,8 +230,8 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
   }
   .dot.accent { background: var(--accent); }
 
-  /* Step 1: a tick lane, the plot stretched to the card, and a lane for the two end labels. */
-  .lines { display: grid; grid-template-columns: 36px minmax(0, 1fr) var(--lane); grid-template-rows: var(--h) auto; }
+  /* Step 1: a tick lane, the plot, and a lane for the two end labels. */
+  .lines { max-width: 600px; display: grid; grid-template-columns: 36px minmax(0, 1fr) var(--lane); grid-template-rows: var(--h) auto; }
   .lines .ticks, .lines .field, .lines .lane { position: relative; height: var(--h); }
   .lines .ticks span { position: absolute; right: 8px; transform: translateY(-50%); }
   .lines .ticks .ref { color: var(--text); }
@@ -256,15 +256,15 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
   .moves .up { color: var(--accent); }
   .moves .down { color: var(--muted); }
 
-  /* Step 3: a bar per game, its length the winner's gain, on one scale. */
-  .bars { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 10px 16px; }
+  /* Step 3: a bar per game, its length the winner's gain, on one scale at every screen width. */
+  .bars { display: grid; grid-template-columns: max-content minmax(0, 300px); align-items: center; gap: 10px 16px; }
   .bars .head { font-size: var(--fs-small); line-height: 16px; color: var(--muted); margin-bottom: -4px; }
   .bar { display: flex; align-items: center; gap: 8px; }
   .fill { flex: none; height: 6px; min-width: 2px; background: var(--accent); border-radius: 0 3px 3px 0; }
   .v { font-variant-numeric: tabular-nums; }
 
   /* Step 4: the curve. The svg stretches to the plot, and its 2px stroke stays 2px. */
-  .curve { padding-left: 36px; padding-right: 12px; }
+  .curve { max-width: 520px; padding-left: 36px; padding-right: 12px; }
   .axis-title { margin: 0 0 10px -36px; }
   .axis-title.x { margin: 26px 0 0; text-align: center; }
   .plot { position: relative; height: 150px; }
