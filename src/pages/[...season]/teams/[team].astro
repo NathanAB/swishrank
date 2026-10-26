@@ -136,15 +136,17 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
   .card { margin-top: var(--gap); }
   .empty { padding: 4px 0 8px; color: var(--muted); }
 
-  /* Both tables share the date and opponent columns, so they line up one above the other. */
+  /* Both tables share the date and opponent columns, so they line up one above the other. The figures share
+     what the card has left evenly, so a wide card spreads them out rather than opening a gap after the
+     opponent. */
   .sheet .hd, .sheet .row { display: grid; grid-template-columns: var(--cols); column-gap: 16px; align-items: center; }
-  .fx { --cols: 112px minmax(0, 1fr) 96px 96px; }
-  .gl { --cols: 112px minmax(0, 1fr) 16px 72px 96px 64px 64px; }
+  .fx { --cols: 112px minmax(0, 240px) repeat(2, minmax(96px, 1fr)); }
+  .gl { --cols: 112px minmax(0, 240px) minmax(16px, 1fr) minmax(72px, 1fr) minmax(96px, 1fr) repeat(2, minmax(64px, 1fr)); }
   .hd { height: 32px; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
   .hd abbr { text-decoration: none; }
   .row { height: 36px; border-bottom: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
   .sheet > .row:last-child { border-bottom: 0; }
-  .r { text-align: right; }
+  .r, .wl { text-align: right; }
   .row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
   .who { color: var(--muted); }
