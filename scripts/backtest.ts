@@ -32,7 +32,6 @@ const RATIO_LIMIT = 4;
 
 const ratio = (m: MarginRule) => counted(43, m) / counted(1, m);
 
-// h0 for an (n0, margin) pair: the mean of the tuning seasons' home edges, each fitted on all its games.
 const h0Cache = new Map<string, number>();
 function h0Of(n0: number, mi: number) {
   const key = `${n0}:${mi}`;
@@ -63,7 +62,6 @@ const tuning = inSeasons(TUNING);
 const held = inSeasons(HELD_OUT);
 const only = (s: Scored[], keep: (x: Scored) => boolean) => s.filter(keep);
 
-// Formatting.
 const f4 = (x: number) => x.toFixed(4);
 const s4 = (x: number) => (x >= 0 ? "+" : "") + x.toFixed(4);
 const ci = (d: Diff) => `${s4(d.d)} [${s4(d.lo)}, ${s4(d.hi)}]`;
@@ -75,7 +73,6 @@ function table(head: string[], rows: (string | number)[][]) {
 const out: string[] = [];
 const section = (title: string, intro: string, body: string) => out.push(`### ${title}\n\n${intro}\n\n${body}`);
 
-// Score every candidate on the tuning seasons.
 type Tuned = { c: Candidate; ll: number; vsElo: Diff; wins: number; worseWindows: number; oneBlock: number; eligible: boolean };
 const seasonWins = (c: Candidate, ids: string[]) =>
   ids.filter((id) => logLoss(only(c.scored, inSeasons([id]))) < logLoss(only(elo, inSeasons([id])))).length;
@@ -90,7 +87,6 @@ const byLoss = (a: Tuned, b: Tuned) => a.ll - b.ll;
 const passing = tuned.filter((t) => t.worseWindows === 0).sort(byLoss);
 const site = passing.find((t) => t.eligible) ?? null;
 const best = passing[0] ?? null;
-// The same choice with the deviation's rule, which judges no one-block window.
 const passingJudged = tuned.filter((t) => t.worseWindows - t.oneBlock === 0).sort(byLoss);
 const sameChoice = passingJudged.find((t) => ratio(t.c.rule.margin) <= RATIO_LIMIT) === site && passingJudged[0] === best;
 
@@ -126,7 +122,6 @@ if (!site || !best) {
     ),
   );
 
-  // Confirmation on the held-out seasons.
   const s = site.c.scored;
   const seasonRow = (name: string, keep: (x: Scored) => boolean) => {
     const d = compare(s, elo, keep);
@@ -203,7 +198,6 @@ if (!site || !best) {
     ),
   );
 
-  // Neighbours of the site's model in the grid, and the home prior's weight, which the grid holds fixed.
   const near: Candidate[] = [];
   const find = (n0: number, mi: number, mode: Mode) => grid.find((c) => c.n0 === n0 && c.mi === mi && c.mode === mode)!;
   const ni = N0.indexOf(site.c.n0);
@@ -223,7 +217,6 @@ if (!site || !best) {
     ),
   );
 
-  // Provisional threshold: excess log loss over the final fit, by games the newer side had played.
   const tun = only(s, tuning);
   const excess = (x: Scored) => loss(x.p, x.y) - loss(x.ph, x.y);
   const within = (lo: number, hi: number) => tun.filter((x) => x.k >= lo && x.k <= hi).map(excess);
@@ -239,7 +232,6 @@ if (!site || !best) {
     ),
   );
 
-  // The Elo scale.
   const classic = (d: number) => 1 / (1 + 10 ** (-d / 400));
   let maxErr = 0;
   for (let d = 0; d <= 1200; d++) maxErr = Math.max(maxErr, Math.abs(phi(d / ELO_PER_SIGMA) - classic(d)));
@@ -274,7 +266,6 @@ if (!site || !best) {
     ),
   );
 
-  // Does src/lib/elo.ts hold what the plan chose?
   const r3 = (x: number) => Math.round(x * 1000) / 1000;
   const want = { n0: site.c.n0, margin: site.c.rule.margin, home: site.c.mode === "fixed" ? { kind: "fixed", value: r3(site.c.h0) } : { kind: "fitted", centre: r3(site.c.h0), weight: HOME_WEIGHT }, sigma: r3(site.c.sigma) };
   const have = { ...PARAMS, home: PARAMS.home.kind === "fixed" ? { kind: "fixed", value: r3(PARAMS.home.value) } : { kind: "fitted", centre: r3(PARAMS.home.centre), weight: PARAMS.home.weight }, sigma: r3(PARAMS.sigma) };
@@ -286,7 +277,6 @@ if (!site || !best) {
   if (!paramsMatch || !provisionalMatch) process.exitCode = 1;
 }
 
-// The pre-registration must be the text that was hashed when it was written.
 const doc = readFileSync(DOC, "utf8");
 const lines = doc.split("\n");
 const from = lines.indexOf("## Pre-registration");

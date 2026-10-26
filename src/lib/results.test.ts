@@ -28,7 +28,6 @@ test("a month lists its days newest first and each day's games in tip-off order"
 });
 
 test("the latest results are the game days in the week that ends on the newest one, newest first", () => {
-  // The 2025-26 Finals ended on June 13 after games on June 5, 8 and 10.
   assert.deepEqual(recentDays(last, 7).map((d) => d.day), ["2026-06-13", "2026-06-10", "2026-06-08"]);
   assert.deepEqual(recentDays(compute({ season: "x", teams: {}, games: [] }), 7), []);
 });

@@ -28,7 +28,6 @@ test("a two-team toy season fits the least-squares answer, day by day", () => {
 });
 
 test("the re-fit moves a team that did not play when a past opponent's results change", () => {
-  // A beats B on day one and sits out day two, when B beats C: B now looks better, so A's win over it does too.
   const m = compute({
     season: "x", teams: teams("A", "B", "C"),
     games: [game("1", "2026-10-20T23:00Z", "A", "B", 110, 100, true), game("2", "2026-10-21T23:00Z", "B", "C", 110, 100, true)],

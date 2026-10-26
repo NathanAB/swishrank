@@ -118,15 +118,13 @@ export const monthPaths = () =>
     months(season.model).map((month) => ({ params: { season: seasonParam(season), month: month.key }, props: { season, month: month.key } })),
   );
 
-// The graph, fixtures, results and team-list pages moved while the site had only the current season and
-// 2025-26, so only those seasons have old URLs to redirect.
-const moved = (season: SeasonView) => season.current || season.id === "2025-26";
+const hadOldPages = (season: SeasonView) => season.current || season.id === "2025-26";
 
 /** getStaticPaths for a moved page: one redirect per season that had the page. */
-export const movedSeasonPaths = () => seasonPaths().filter((p) => moved(p.props.season));
+export const movedSeasonPaths = () => seasonPaths().filter((p) => hadOldPages(p.props.season));
 
 /** getStaticPaths for a moved month of results: one redirect per month of a season that had them. */
-export const movedMonthPaths = () => monthPaths().filter((p) => moved(p.props.season));
+export const movedMonthPaths = () => monthPaths().filter((p) => hadOldPages(p.props.season));
 
 /** getStaticPaths for src/pages/[...season]/teams/[team].astro: one page per team per season. */
 export const teamPaths = () =>

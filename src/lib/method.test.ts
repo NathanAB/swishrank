@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import type { Game, Result } from "./elo.ts";
 import { examples } from "./method.ts";
 
-// Every home team is the same 60% favourite and a neutral game is even, so only the margin and who won tell
-// the games apart.
 const game = (id: string, away: string, home: string, as: number, hs: number, neutral = false): Game => ({
   id, t: "2026-10-20T23:00Z", home, away, hs, as, final: true, neutral, note: null,
 });

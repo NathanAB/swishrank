@@ -79,7 +79,6 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
   .meta { color: var(--muted); }
   .empty { padding: 4px 0 8px; color: var(--muted); }
 
-  /* The month switch: a 1px accent line as wide as the label. */
   .months { display: flex; gap: 20px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
   .months a {
     position: relative; flex: none; padding: 4px 0 5px; color: var(--muted); font-weight: 500;
@@ -90,7 +89,6 @@ const switcher = all.map((x) => ({ key: x.key, href: href(monthRoute(season, x.k
   .months a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--accent); }
 
   @media (max-width: 640px) {
-    /* Nine months fit a phone's width as 44px tall targets, on their own line. */
     .months { flex-basis: 100%; margin-left: 0; gap: 12px; justify-content: space-between; }
     .months a { padding: 12px 0 11px; }
   }

@@ -19,8 +19,6 @@ interface Props {
 const { season, day, labels = false } = Astro.props;
 const games = day.results.map((r) => ({ r, lines: [outcome(r).away, outcome(r).home] as [Line, Line] }));
 
-// What the games were part of when every one has a note, such as "NBA Finals · Game 5" for a lone game or
-// "East 1st Round · West 1st Round" for several.
 const notes = day.results.map((r) => r.game.note);
 const meta = notes.every((n) => n !== null) && notes.length
   ? (notes.length === 1 ? notes[0].split(" - ") : [...new Set(notes.map((n) => n.split(" - ")[0]))]).join(" · ")

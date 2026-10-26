@@ -40,8 +40,6 @@ const Heading = level === 1 ? "h1" : "h2";
   h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
   .meta { min-width: 0; color: var(--muted); }
   .aside { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-  /* On a phone the aside takes what the title's line leaves, or a line of its own when that is too little,
-     and below 330px or so its controls take two lines. */
   @media (max-width: 640px) {
     .aside { flex-grow: 1; flex-wrap: wrap; justify-content: flex-end; }
   }

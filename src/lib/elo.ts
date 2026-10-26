@@ -49,8 +49,7 @@ export type Fit = { r: Record<Abbr, number>; home: number };
 /** A game day: its games, the fit they were predicted from, and the fit after them. */
 export type FitDay = { day: string; games: FinalGame[]; before: Fit; after: Fit };
 
-/** Solves M x = v for a symmetric positive-definite M by Cholesky factorisation. */
-function solveSpd(M: number[][], v: number[]): number[] {
+function solveCholesky(M: number[][], v: number[]): number[] {
   const n = v.length;
   const L = Array.from({ length: n }, () => new Array<number>(n).fill(0));
   for (let j = 0; j < n; j++) {
@@ -78,7 +77,6 @@ function solveSpd(M: number[][], v: number[]): number[] {
   return x;
 }
 
-/** The fit before any game: every team at the league average, the home edge at its prior. */
 const startFit = (abbrs: Abbr[], rule: FitRule): Fit => ({
   r: Object.fromEntries(abbrs.map((a) => [a, 0])),
   home: rule.home.kind === "fixed" ? rule.home.value : rule.home.centre,
@@ -93,7 +91,6 @@ export function fitSeason(data: SeasonData, rule: FitRule): FitDay[] {
   const abbrs = Object.keys(data.teams);
   const n = abbrs.length;
   const at = new Map(abbrs.map((a, i) => [a, i]));
-  // Running sums of x x' and x y over the games so far, x being +1 home, -1 away and 1 in the home-edge slot.
   const xx = Array.from({ length: n + 1 }, () => new Array<number>(n + 1).fill(0));
   const xy = new Array<number>(n + 1).fill(0);
   const home = rule.home;
@@ -107,7 +104,7 @@ export function fitSeason(data: SeasonData, rule: FitRule): FitDay[] {
       M[n][n] += home.weight;
       v[n] += home.weight * home.centre;
     }
-    const x = solveSpd(M, v);
+    const x = solveCholesky(M, v);
     return { r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])), home: home.kind === "fixed" ? home.value : x[n] };
   };
 
@@ -162,7 +159,6 @@ export const winProb = (gap: number) => phi(gap / ELO_PER_SIGMA);
 /** Home-court-adjusted rating gap, home minus away, with `home` the home edge in Elo points. */
 export const gap = (game: Game, r: Record<Abbr, number>, home: number) => r[game.home] + (game.neutral ? 0 : home) - r[game.away];
 
-/** A fit in Elo points: 1500 plus the rating at ELO_PER_SIGMA points per sigma, and the home edge likewise. */
 const toElo = (fit: Fit) => ({
   r: Object.fromEntries(Object.entries(fit.r).map(([a, v]) => [a, START + (v * ELO_PER_SIGMA) / PARAMS.sigma])),
   home: (fit.home * ELO_PER_SIGMA) / PARAMS.sigma,

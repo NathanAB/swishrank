@@ -39,7 +39,6 @@ const y = (v: number) => PAD + ((H - 2 * PAD) * (hi - v)) / (hi - lo);
 const X = 1000; // the plot's viewBox width, stretched to the card
 const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
 const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
-// Lines run through the displayed (rounded) ratings, so the hover box reads each day's rating back exactly.
 const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(2)}`).join(" ");
 const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const tint = tintStyles(m.data.teams);
@@ -54,13 +53,12 @@ const marker = playoffsMark(m);
 const text = (a: Abbr) => (team ? m.data.teams[a].short : a);
 const PITCH = 6, GAP = 22, COL = 8 + 8 * Math.max(...m.abbrs.map((a) => a.length));
 const LANE = team ? GAP + 4 + 7 * text(team).length : GAP + 2 * COL;
-// A day label is about 40px wide. The narrowest plot is on a 360px phone, inside the page's and the card's
-// 16px gutters, and from 641px inside their 24px and 20px ones; a phone gets its own, sparser labels.
-const LABEL = 40;
+const DAY_LABEL = 40, TICK_LANE = 40;
+const narrowestPlot = (screen: number, pad: number, cardPad: number) => screen - 2 * pad - 2 * cardPad - TICK_LANE - LANE;
 const xDays = ser.map((d) => d.day);
 const xLabels = [
-  { phone: false, list: dateTicks(xDays, LABEL / (641 - 88 - 40 - LANE)) },
-  { phone: true, list: dateTicks(xDays, LABEL / (360 - 64 - 40 - LANE)) },
+  { phone: false, list: dateTicks(xDays, DAY_LABEL / narrowestPlot(641, 24, 20)) },
+  { phone: true, list: dateTicks(xDays, DAY_LABEL / narrowestPlot(360, 16, 16)) },
 ];
 const last = ser[n - 1];
 const labels = teams.filter((a) => !team || a === team).map((a) => ({ a, y: last ? y(last.r[a]) : 0, ly: 0 }));
@@ -93,9 +91,9 @@ const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}$
   <p class="empty">No games yet.</p>
 ) : (
   <div class="chart">
-    <div class:list={["rc", { tinted: !team }]} role="img" aria-label={label} style={`--h: ${H}px; --lane: ${LANE}px`}>
+    <div class:list={["rc", { tinted: !team }]} role="img" aria-label={label} style={`--h: ${H}px; --ticks: ${TICK_LANE}px; --lane: ${LANE}px`}>
       {marker && <span class="mark-label" style={`left: ${pct(marker.i)}`}>{marker.label}</span>}
-      <svg class="ticks" width="40" height={H} viewBox={`0 0 40 ${H}`}>
+      <svg class="ticks" width={TICK_LANE} height={H} viewBox={`0 0 ${TICK_LANE} ${H}`}>
         {ticks.map((t) => <text x="32" y={y(t) + 4} text-anchor="end">{t}</text>)}
       </svg>
       <svg
@@ -155,7 +153,7 @@ const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}$
 <style>
   .empty { padding: 8px 0 12px; color: var(--muted); }
 
-  .rc { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
+  .rc { position: relative; display: grid; grid-template-columns: var(--ticks) minmax(0, 1fr) var(--lane); grid-template-rows: auto var(--h) 20px; }
   .mark-label {
     grid-row: 1; grid-column: 2; position: relative; justify-self: start; transform: translateX(calc(-100% - 4px));
     font-size: 11px; line-height: 16px; color: var(--muted); white-space: nowrap;

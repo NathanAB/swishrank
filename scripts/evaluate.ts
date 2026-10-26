@@ -76,8 +76,7 @@ export function fitSigma(rows: Row[]): number {
 
 export const BOOTSTRAP = { resamples: 2000, seed: 20261025 };
 
-/** mulberry32, a small seeded generator, so every rerun draws the same resamples. */
-function random(seed: number) {
+function mulberry32(seed: number) {
   let s = seed >>> 0;
   return () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -110,7 +109,7 @@ export function compare(a: Scored[], b: Scored[], keep: (s: Scored) => boolean =
     blocks.set(key, blk);
   });
   const list = [...blocks.values()];
-  const rnd = random(BOOTSTRAP.seed);
+  const rnd = mulberry32(BOOTSTRAP.seed);
   const means: number[] = [];
   for (let r = 0; r < BOOTSTRAP.resamples; r++) {
     let s = 0, c = 0;

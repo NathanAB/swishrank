@@ -15,17 +15,13 @@ const closestOf = (t: EventTarget | null, selector: string) => (t instanceof Ele
 const chartOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<SVGSVGElement>("svg[data-chart]") : null);
 
 type Chart = {
-  /** The lines as drawn, read once before any line is raised, so ties go the same way all session. */
   lines: PlotLine[];
   names: Record<string, string>;
   hrefs: Record<string, string>;
   scale: Scale | null;
-  /** Each day's label, first day first. */
   days: string[];
-  /** The page's own team, which the readout always names; null on a chart that names the nearest team. */
   own: string | null;
-  /** Whether pointing previews the nearest team and a click opens its page. */
-  picks: boolean;
+  previewsNearest: boolean;
   cross: SVGPathElement | null;
   tip: HTMLElement | null;
 };
@@ -48,7 +44,7 @@ const charts = new Map<SVGSVGElement, Chart>(
         scale: parseScale(svg.dataset.scale ?? ""),
         days: parseDays(svg.dataset.days),
         own: svg.dataset.own ?? null,
-        picks: svg.hasAttribute("data-plot"),
+        previewsNearest: svg.hasAttribute("data-plot"),
         cross: svg.querySelector<SVGPathElement>("[data-cross]"),
         tip: svg.parentElement?.querySelector<HTMLElement>("[data-tip]") ?? null,
       },
@@ -56,7 +52,6 @@ const charts = new Map<SVGSVGElement, Chart>(
   }),
 );
 
-/** Where the pointer is across the chart's plot (0 to 1) and down it, in the lines' units. */
 function placeOn(e: MouseEvent, svg: SVGSVGElement) {
   const box = svg.getBoundingClientRect();
   return { fx: (e.clientX - box.left) / box.width, y: ((e.clientY - box.top) / box.height) * svg.viewBox.baseVal.height };
@@ -98,7 +93,6 @@ function showReadout(e: MouseEvent, svg: SVGSVGElement, c: Chart, team: string |
   c.tip.replaceChildren(when, line);
   c.tip.hidden = false;
 
-  // Beside the pointer and above it, flipped to its left near the container's right edge, kept inside.
   const area = c.tip.offsetParent?.getBoundingClientRect();
   if (!area) return;
   const px = e.clientX - area.left;
@@ -114,8 +108,8 @@ function onChart(e: PointerEvent, svg: SVGSVGElement) {
   const c = charts.get(svg);
   if (!c) return;
   const { fx, y } = placeOn(e, svg);
-  const team = c.own ?? (c.picks ? nearestLine(c.lines, fx, y) : null);
-  if (c.picks) preview(team);
+  const team = c.own ?? (c.previewsNearest ? nearestLine(c.lines, fx, y) : null);
+  if (c.previewsNearest) preview(team);
   showReadout(e, svg, c, team);
 }
 
@@ -126,13 +120,12 @@ const pointed = (e: PointerEvent) => {
 };
 document.addEventListener("pointerover", pointed);
 
-// The team a touch has armed: the one whose readout the last tap showed, which a second tap opens.
-let armed: string | null = null;
+let firstTapTeam: string | null = null;
 let lastPointer = "mouse";
 document.addEventListener("pointerdown", (e) => {
   lastPointer = e.pointerType;
   if (chartOf(e.target)) return;
-  armed = null;
+  firstTapTeam = null;
   for (const svg of charts.keys()) hideReadout(svg);
 });
 
@@ -142,21 +135,20 @@ for (const [svg, c] of charts) {
   svg.addEventListener("pointerleave", (e) => {
     if (e.pointerType !== "touch") hideReadout(svg);
   });
-  if (!c.picks) continue;
+  if (!c.previewsNearest) continue;
   svg.addEventListener("click", (e) => {
     const { fx, y } = placeOn(e, svg);
     const team = nearestLine(c.lines, fx, y);
     const to = team ? c.hrefs[team] : undefined;
     if (!team || !to) return;
-    if (lastPointer === "touch" && armed !== team) {
-      armed = team;
+    if (lastPointer === "touch" && firstTapTeam !== team) {
+      firstTapTeam = team;
       return;
     }
     location.assign(to);
   });
 }
 
-// A dot on the league table's scale is no link, but a click opens its team's page, as its row does.
 document.addEventListener("click", (e) => {
   const to = closestOf(e.target, "[data-preview][data-href]")?.dataset.href;
   if (to) location.assign(to);

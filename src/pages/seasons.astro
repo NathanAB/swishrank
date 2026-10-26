@@ -49,11 +49,9 @@ const rows = allSeasons().map((s) => {
   th:first-child { width: 120px; }
   .team { color: var(--text); }
   .rt { color: var(--text); font-weight: 600; }
-  /* The row's spare width goes after the rating, so each top team sits by its rating. */
   .state { width: 100%; padding-left: 16px; text-align: right; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-  /* Each row is one link to its season: the season's link stretches over the row. */
   tbody tr { position: relative; }
   .go { color: var(--text); font-weight: 500; }
   .go::before { content: ""; position: absolute; inset: 0; }

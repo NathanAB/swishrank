@@ -47,7 +47,6 @@ const { heading, meta, label, count, cols, labels = [] } = Astro.props;
   .gs :global(.g) { padding: 4px 0; border-top: 1px solid var(--rule); line-height: 17px; }
   .gs :global(.g:first-child) { border-top-color: transparent; }
 
-  /* A wide card sets two or three columns, each read top to bottom. */
   @container games (min-width: 680px) {
     .gday { --across: 2; --rows: var(--r2); }
     .gs :global(.g.h2) { border-top-color: transparent; }

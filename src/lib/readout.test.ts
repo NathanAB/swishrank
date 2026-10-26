@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseScale, ratingAt, readout, scaleAttr } from "./readout.ts";
 
-// 1600 drawn at y 10 and 1400 at y 210: one point of rating is one unit of height.
 const scale = { hi: 1600, yHi: 10, lo: 1400, yLo: 210 };
 const y = (v: number) => 10 + (1600 - v);
 

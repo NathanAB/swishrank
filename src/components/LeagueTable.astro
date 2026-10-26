@@ -31,7 +31,6 @@ interface Props {
 const { season, conference } = Astro.props;
 const m = season.model;
 const { order, rank } = standings(m, conference);
-// Early in a season every team is provisional: one mark on the column says so, not one per row.
 const provCount = order.filter((a) => provisional(m.stats[a])).length;
 const allProv = provCount === order.length;
 
@@ -41,9 +40,9 @@ const n = order.length;
 const tint = tintStyles(m.data.teams);
 // Px down the body on a wide screen: row i's centre, and a rating's place on a scale from the first row's
 // centre (the season's top rating) to the last row's (its bottom one).
-const ROW = 26; // a row's height on a wide screen; the styles read it as --row-wide
-const Y = n * ROW; // the body's height, and the drawing's viewBox height
-const rowY = (i: number) => (i + 0.5) * ROW;
+const ROW_WIDE = 26;
+const Y = n * ROW_WIDE; // the body's height, and the drawing's viewBox height
+const rowY = (i: number) => (i + 0.5) * ROW_WIDE;
 const valY = (v: number) => (hi === lo ? Y / 2 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
 const f = (y: number) => y.toFixed(2);
 
@@ -63,17 +62,14 @@ const X = 1000; // the plot's viewBox width
 const at = (i: number) => i / (ser.length - 1);
 // Lines run through the displayed (rounded) ratings, as the dots do, so each one ends on its dot.
 const lines = order.map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(Math.round(d.r[a])))}`).join(" ") })).reverse();
-// Records count every game, so once the play-in or playoffs have begun the header says so.
 const wl = includesPostseason(m.results) ? "W–L incl. playoffs" : "W–L";
 const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const playoffs = playoffsMark(m);
-// The dates share the plot's top edge with the playoffs label. The narrowest plot beside the table is about
-// 530px, where that label takes some 112px, a month about 30px and a day about 40px.
-const PLOT_MIN = 530;
-const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.length, playoffs, { mark: 112 / PLOT_MIN, tick: 30 / PLOT_MIN });
+const PLOT_MIN = 530, PLAYOFFS_LABEL = 112, MONTH_LABEL = 30, DAY_LABEL = 40;
+const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN), ser.length, playoffs, { mark: PLAYOFFS_LABEL / PLOT_MIN, tick: MONTH_LABEL / PLOT_MIN });
 ---
 
-<div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-wide: ${ROW}px`}>
+<div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-wide: ${ROW_WIDE}px`}>
   <div class="stacked"><RatingChart season={season} teams={order} height={400} /></div>
   <table>
     <thead>
@@ -103,7 +99,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
               <td class="lad" rowspan={n} aria-hidden="true">
                 <div class="lad-in">
                   {marks.map((v) => (
-                    <span class="tick" style={`top: calc(${(valY(v) / ROW).toFixed(4)} * var(--row))`}>{v}</span>
+                    <span class="tick" style={`top: calc(${(valY(v) / ROW_WIDE).toFixed(4)} * var(--row))`}>{v}</span>
                   ))}
                   {charted && (
                     <svg
@@ -182,9 +178,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   th:last-child, td:last-child { padding-right: 0; }
   .rank { width: 32px; }
   td.team { color: var(--text); }
-  /* Each row is one link to the team's page: the name's link stretches over the row, under the scale's cell.
-     Pointing at a row or focusing it previews the team on the scale and the chart. The focus ring goes round
-     the row's own cells, not through the scale and the chart. */
   tbody tr { position: relative; }
   .go::before { content: ""; position: absolute; inset: 0; z-index: 1; }
   .go:focus-visible { outline: none; }
@@ -196,7 +189,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   .go:hover .name { text-decoration: underline; text-underline-offset: 3px; }
   .go:hover .name::after, tr.hov .name::after { background: var(--control); }
   td.rating { position: relative; color: var(--text); font-weight: 600; }
-  /* Out of flow, so a provisional rating's digits line up with the rest. */
   .prov { position: absolute; margin-left: 1px; color: var(--muted); font-weight: 400; text-decoration: none; cursor: help; }
   td.opt { color: var(--text); }
   .rh { position: relative; }
@@ -218,7 +210,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   .history { left: var(--tl); width: calc(100% - var(--tl) - var(--cv)); }
   .lad path, .lad polyline { fill: none; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--grid); stroke-width: 1; }
-  /* Leaders only point a dot to its row, so they read as pointers, not data: grey and dotted, previewed or not. */
   .lead { stroke: var(--line-other); stroke-width: 1; stroke-dasharray: 1 3; stroke-linecap: round; }
   .grid { stroke: var(--grid); stroke-width: 1; }
   .marker { stroke: var(--muted); stroke-width: 1; }
@@ -238,7 +229,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   /* While one team is previewed, the rest step back so its line can be followed. */
   .lt:has(.hov) :is(.line, .lead, .dot):not(.hov) { opacity: 0.4; }
   .lt:has(.hov) tbody tr:not(.hov) > td:not(.lad) { opacity: 0.4; }
-  /* The plot's dates and the playoffs label along its top edge, in the header row. */
   .xs { position: absolute; inset: 0 var(--cv) 0 var(--tl); }
   .xs span { position: absolute; bottom: 2px; left: calc(var(--at) * 100%); transform: translateX(-50%); line-height: 16px; }
   .xs .first { transform: none; }
@@ -246,9 +236,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   .xs .mark-label { transform: translateX(calc(-100% - 4px)); }
   .stacked { margin-bottom: 16px; }
 
-  /* With the chart stacked above, on a tablet or a phone, the scale's curves take the width the columns
-     leave, stopping short of the rank, so each name sits by its figures and nothing opens beside the table.
-     Tablet rows are tall enough to tap. */
   @media (max-width: 999px) {
     .lad { width: 100%; }
     .rail { left: var(--tl); width: calc(100% - var(--tl) - 5px); }
@@ -256,8 +243,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.l
   @media (min-width: 641px) and (max-width: 999px) {
     .lt { --row: 36px; }
   }
-  /* From 1000px the chart sits beside the rows in the width the columns leave, about 530px or more, and the
-     stacked chart goes. */
   @media (min-width: 1000px) {
     .charted table { width: 100%; }
     .charted .lad { width: 100%; }
