@@ -1,15 +1,18 @@
 ---
-// One team's season: where it stands, how its rating moved against the other 29, every game it played and
-// the games it has next. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/ every other one.
+// One team's season: where it stands, how its rating moved against the other 29, the games it has next and
+// every game it played. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/ every other one. Ink marks
+// the expected or actual winner, as on the games page: the favourite's win chance, the winner's name and
+// result.
 import KpiStrip, { type Kpi } from "../../../components/KpiStrip.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
+import SeasonMenu from "../../../components/SeasonMenu.astro";
 import Base from "../../../layouts/Base.astro";
 import { dayKey, gap, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
-import { ordinal, pct, rating, record, shortDay, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
-import { href } from "../../../lib/routes.ts";
+import { ordinal, pct, rating, record, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
+import { href, type Route } from "../../../lib/routes.ts";
 import { TODAY, noGamesAhead, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
-import { nextGames, stage, teamGames, type Venue } from "../../../lib/teams.ts";
+import { highLow, includesPostseason, nextGames, stage, teamGames, type Venue } from "../../../lib/teams.ts";
 
 export function getStaticPaths() {
   return teamPaths();
@@ -21,6 +24,7 @@ interface Props {
 }
 
 const { season, abbr } = Astro.props;
+const route: Route = { kind: "team", season, abbr };
 const m = season.model;
 const me = team(season, abbr);
 const s = m.stats[abbr];
@@ -30,8 +34,8 @@ const prep = (v: Venue) => (v === "away" ? "at" : "vs");
 
 const kpis: Kpi[] = [
   { label: "Rating", value: rating(m.r[abbr]), unit: `${tied ? "tied " : ""}${ordinal(m.rank[abbr])}` },
-  { label: "Record", value: record(s.W, s.L) },
-  { label: "High / low", value: `${rating(s.hi)} / ${rating(s.lo)}` },
+  { label: includesPostseason(games.map((g) => g.result)) ? "Record incl. playoffs" : "Record", value: record(s.W, s.L) },
+  { label: "High / low", ...highLow(s) },
 ];
 
 // The games in the week ahead, each with the win chance today's ratings give this team.
@@ -44,152 +48,125 @@ const fixtures = nextGames(m, abbr, TODAY).map((g: Game) => {
 
 const log = [...games].reverse();
 const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
-// Early in a season the two columns come out within a row or two of each other, so they end level: the plot
-// takes the height of the rows beside it (36px each, with 68px more of frames on the left than on the chart's
-// card) and the last cards stretch to absorb what is left. A longer log runs on past the chart, which then
-// stays in view beside it.
-const rows = fixtures.length + log.length;
-const level = rows <= 7;
-const plotHeight = level ? Math.max(240, 68 + 36 * rows) : 300;
 ---
 
 <Base
   title={me.name}
   docTitle={`${me.name} ${season.label}`}
   description={`${season.label} Elo rating, game log${season.current ? " and next games" : ""} for the ${me.name}.`}
-  route={{ kind: "team", season, abbr }}
+  route={route}
+  ownHeading
 >
-  <KpiStrip class="kpis" items={kpis} label={`The ${me.short} in numbers`} />
+  <Panel level={1} title={me.name}>
+    <SeasonMenu slot="aside" route={route} />
+    <KpiStrip items={kpis} label={`The ${me.short} in numbers`} />
+  </Panel>
 
-  <div class:list={["grid", { level }]}>
-    <div class="main">
-      {season.current && (
-        <Panel class="next" title="Next games">
-          {fixtures.length === 0 ? (
-            <p class="empty">{noGamesAhead(season)}</p>
-          ) : (
-            <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
-              <div class="hd" role="row">
-                <span role="columnheader">Date</span>
-                <span role="columnheader">Opponent</span>
-                <span role="columnheader" class="r">Tip-off, ET</span>
-                <span role="columnheader" class="r">Win chance</span>
-              </div>
-              {fixtures.map((x) => (
-                <div class="row" role="row">
-                  <span role="cell" class="when">{weekdayDay(x.day)}</span>
-                  <span role="cell" class="who" data-team={x.opp}>
-                    {prep(x.venue)} <a class="nm" data-team={x.opp} data-preview href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
-                    {x.tag && <span class="tag">{x.tag}</span>}
-                    <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)}{x.tag ? ` · ${x.tag}` : ""}</span>
-                  </span>
-                  <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
-                  <span role="cell" class:list={["r num chance", { fav: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-      )}
+  <Panel class="card" title="Rating history">
+    <RatingChart season={season} team={abbr} height={260} />
+  </Panel>
 
-      <Panel class="log" fill={level} title="Game log">
-        {games.length === 0 ? (
-          <p class="empty">No games yet.</p>
-        ) : (
-          <div class="sheet gl" role="table" aria-label={`Games played by the ${me.short}, newest first`}>
-            <div class="hd" role="row">
-              <span role="columnheader">Date</span>
-              <span role="columnheader">Opponent</span>
-              <span role="columnheader" class="res">Result</span>
-              <span role="columnheader" class="r">Change</span>
-              <span role="columnheader" class="r">Rating</span>
-            </div>
-            {log.map((g) => (
-              <div class="row" role="row">
-                <span role="cell" class="when num">{shortDay(g.result.day)}</span>
-                <span role="cell" class="who" data-team={g.them.abbr}>
-                  {prep(g.venue)} <a class="nm" data-team={g.them.abbr} data-preview href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
-                  {g.stage.label && <span class="tag">{g.stage.label}</span>}
-                  <span class="sub">{shortDay(g.result.day)}{g.stage.label ? ` · ${g.stage.label}` : ""}</span>
-                </span>
-                <span role="cell" class:list={["res num", { won: g.us.won }]}>
-                  <b>{g.us.won ? "W" : "L"}</b>
-                  <span>{g.us.score}–{g.them.score}</span>
-                </span>
-                <span role="cell" class="r num opt chg">{signed(g.us.change)}</span>
-                <span role="cell" class="r num rt">
-                  {rating(g.us.rating)}
-                  <span class="sub">{signed(g.us.change)}</span>
-                </span>
-              </div>
-            ))}
+  {season.current && (
+    <Panel class="card" title="Next games">
+      {fixtures.length === 0 ? (
+        <p class="empty">{noGamesAhead(season)}</p>
+      ) : (
+        <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
+          <div class="hd" role="row">
+            <span role="columnheader">Date</span>
+            <span role="columnheader">Opponent</span>
+            <span role="columnheader" class="r opt">Tip-off, ET</span>
+            <span role="columnheader" class="r">Win chance</span>
           </div>
-        )}
-      </Panel>
-    </div>
+          {fixtures.map((x) => (
+            <div class="row" role="row">
+              <span role="cell" class="when">{weekdayDay(x.day)}</span>
+              <span role="cell" class="who" data-team={x.opp}>
+                {prep(x.venue)} <a class:list={["nm", { ink: x.chance < 0.5 }]} data-team={x.opp} data-preview href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
+                {x.tag && <span class="tag">{x.tag}</span>}
+                <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)}{x.tag ? ` · ${x.tag}` : ""}</span>
+              </span>
+              <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
+              <span role="cell" class:list={["r num", { ink: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  )}
 
-    <div class="rail">
-      <Panel class="chart" fill={level} title="Rating history">
-        <RatingChart season={season} team={abbr} height={plotHeight} />
-      </Panel>
-    </div>
-  </div>
+  <Panel class="card" title="Game log">
+    {games.length === 0 ? (
+      <p class="empty">No games yet.</p>
+    ) : (
+      <div class="sheet gl" role="table" aria-label={`Games played by the ${me.short}, newest first`}>
+        <div class="hd" role="row">
+          <span role="columnheader">Date</span>
+          <span role="columnheader">Opponent</span>
+          <span role="columnheader" class="wl"><abbr title="Result">W/L</abbr></span>
+          <span role="columnheader" class="r">Score</span>
+          <span role="columnheader" class="r opt">Win chance</span>
+          <span role="columnheader" class="r opt">Change</span>
+          <span role="columnheader" class="r">Rating</span>
+        </div>
+        {log.map((g) => (
+          <div class="row" role="row">
+            <span role="cell" class="when">{weekdayDay(g.result.day)}</span>
+            <span role="cell" class="who" data-team={g.them.abbr}>
+              {prep(g.venue)} <a class:list={["nm", { ink: g.them.won }]} data-team={g.them.abbr} data-preview href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
+              {g.stage.label && <span class="tag">{g.stage.label}</span>}
+              <span class="sub">{weekdayDay(g.result.day)}{g.stage.label ? ` · ${g.stage.label}` : ""}</span>
+            </span>
+            <span role="cell" class:list={["wl", { ink: g.us.won }]}>{g.us.won ? "W" : "L"}</span>
+            <span role="cell" class:list={["r num", { ink: g.us.won }]}>{record(g.us.score, g.them.score)}</span>
+            <span role="cell" class:list={["r num opt", { ink: g.us.chance >= 0.5 }]}>{pct(g.us.chance)}</span>
+            <span role="cell" class="r num opt chg">{signed(g.us.change)}</span>
+            <span role="cell" class="r num rt">
+              {rating(g.us.rating)}
+              <span class="sub">{signed(g.us.change)}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+  </Panel>
 </Base>
 
 <style>
-  /* At 1440 the strip runs the 1200 column (3 x 400); below it 744 + 24 + 432 = 1200. The rail holds
-     the chart in view while the log scrolls past it. */
-  .kpis { margin-bottom: var(--gap); }
-  .grid { display: grid; grid-template-columns: minmax(0, 744fr) minmax(0, 432fr); gap: var(--gap); align-items: start; }
-  .main { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
-  .rail { position: sticky; top: var(--gap); min-width: 0; }
-  .level { align-items: stretch; }
-  .level .rail { position: static; display: flex; flex-direction: column; }
+  .card { margin-top: var(--gap); }
   .empty { padding: 4px 0 8px; color: var(--muted); }
 
-  .sheet .hd, .sheet .row { display: grid; grid-template-columns: var(--cols); column-gap: 12px; align-items: center; }
-  .fx { --cols: 96px minmax(0, 1fr) 80px 80px; }
-  .gl { --cols: 56px minmax(0, 1fr) 84px 60px 56px; }
+  /* Both tables share the date and opponent columns, so they line up one above the other. */
+  .sheet .hd, .sheet .row { display: grid; grid-template-columns: var(--cols); column-gap: 16px; align-items: center; }
+  .fx { --cols: 112px minmax(0, 1fr) 96px 96px; }
+  .gl { --cols: 112px minmax(0, 1fr) 16px 72px 96px 64px 64px; }
   .hd { height: 32px; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .hd abbr { text-decoration: none; }
   .row { height: 36px; border-bottom: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
   .sheet > .row:last-child { border-bottom: 0; }
   .r { text-align: right; }
   .row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
   .who { color: var(--muted); }
-  .nm { position: relative; color: var(--text); font-weight: 500; }
+  .nm { position: relative; color: var(--muted); }
   .nm::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: transparent; }
-  .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .nm:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
   .who.hov .nm::after { background: var(--control); }
   .tag { margin-left: 8px; font-size: var(--fs-small); }
   .sub { display: none; }
-  .chance.fav { color: var(--text); font-weight: 500; }
-
-  .row .res { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 4px; }
-  .res b { font-weight: 600; }
-  .res span { text-align: right; color: var(--text); }
-  .res.won b { color: var(--text); }
+  .ink { color: var(--text); font-weight: 500; }
+  .wl.ink { font-weight: 600; }
   .chg, .rt { color: var(--text); }
-
-  /* Tablet and phone: one column. The next games come first, then the chart, then the log. */
-  @media (max-width: 1239px) {
-    .grid { grid-template-columns: minmax(0, 1fr); }
-    .main { display: contents; }
-    .rail { position: static; }
-    .next { order: 1; }
-    .rail { order: 2; }
-    .log { order: 3; }
-  }
 
   /* Phone: two-line rows. The opponent and the result on the first line; the date and stage under the
      opponent, and the change under the rating. */
   @media (max-width: 640px) {
     .fx { --cols: minmax(0, 1fr) 64px; }
-    .gl { --cols: minmax(0, 1fr) 84px 48px; }
+    .gl { --cols: minmax(0, 1fr) 14px 76px 44px; }
     .sheet .hd, .sheet .row { column-gap: 8px; }
     .sheet .row { height: 48px; align-items: start; padding-top: 6px; line-height: 18px; }
-    .opt, .when, .hd > :first-child, .hd > .r:not(:last-child), .tag { display: none; }
-    .sub { display: block; font-size: 13px; color: var(--muted); }
+    .opt, .when, .hd > :first-child, .tag { display: none; }
+    .sub { display: block; font-size: 13px; color: var(--muted); font-weight: 400; }
     .who .sub { overflow: hidden; text-overflow: ellipsis; }
     .rt .sub { color: var(--text); }
   }

@@ -1,7 +1,8 @@
 // One team's season as the team pages show it, and the conference each team plays in. Every change is the
 // displayed one (facts.ts outcome), so a team's log agrees with the league's lists.
-import { addDays, dayKey, ranksOf, type Abbr, type Game, type Result, type Season } from "./elo.ts";
+import { addDays, dayKey, ranksOf, START, type Abbr, type Game, type Result, type Season, type TeamStats } from "./elo.ts";
 import { outcome, type Line } from "./facts.ts";
+import { DASH, rating } from "./format.ts";
 import { WEEK } from "./fixtures.ts";
 
 export type Conference = "East" | "West";
@@ -54,6 +55,21 @@ export function stage(note: string | null): Stage {
   if (note === null) return { phase: "regular", label: null };
   for (const [pattern, phase, label] of STAGES) if (pattern.test(note)) return { phase, label: note.replace(pattern, label) };
   return { phase: "regular", label: note };
+}
+
+/** Whether any of these games was a play-in or playoff game, so a won-lost record over them says so. */
+export const includesPostseason = (results: readonly Result[]) => results.some((r) => stage(r.game.note).phase !== "regular");
+
+/**
+ * The high and low a team page shows. Every team starts at 1500, so a team that never fell below it has the
+ * start for its low, and one that never rose above it the start for its high; the unit says so.
+ */
+export function highLow(s: TeamStats): { value: string; unit?: string } {
+  if (s.W + s.L === 0) return { value: DASH };
+  const value = `${rating(s.hi)} / ${rating(s.lo)}`;
+  if (s.lo === START) return { value, unit: `never below ${START}` };
+  if (s.hi === START) return { value, unit: `never above ${START}` };
+  return { value };
 }
 
 export type Venue = "home" | "away" | "neutral";

@@ -19,7 +19,7 @@ import { rating, record, weekdayDay } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
-import { standings, type Conference } from "../lib/teams.ts";
+import { includesPostseason, standings, type Conference } from "../lib/teams.ts";
 import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
@@ -60,6 +60,8 @@ const X = 1000; // the plot's viewBox width
 const at = (i: number) => i / (ser.length - 1);
 // Lines run through the displayed (rounded) ratings, as the dots do, so each one ends on its dot.
 const lines = order.map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(Math.round(d.r[a])))}`).join(" ") })).reverse();
+// Records count every game, so once the play-in or playoffs have begun the header says so.
+const wl = includesPostseason(m.results) ? "W–L incl. playoffs" : "W–L";
 const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const playoffs = playoffsMark(m);
 // The dates share the plot's top edge with the playoffs label. The narrowest plot beside the table is about
@@ -84,9 +86,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day)), ser.length, playoffs
           )}
         </th>
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
-        <th class="team" scope="col">Team<span class="sub"> · W–L</span></th>
+        <th class="team" scope="col">Team<span class="sub"> · {wl}</span></th>
         <th class="num" scope="col">Rating</th>
-        <th class="num opt" scope="col">W–L</th>
+        <th class="num opt" scope="col">{wl}</th>
       </tr>
     </thead>
     <tbody>
