@@ -6,22 +6,22 @@
 :root {
   color-scheme: light dark;
   --ground: #ffffff;
-  --surface: #f6f6f7;
-  --border: #e4e4e7;
-  --rule: #e6e6e9;
-  --control: #c9cacf;
-  --text: #111113;
-  --muted: #5a5c63;
+  --surface: #f6f6f6;
+  --border: #e5e5e5;
+  --rule: #e7e7e7;
+  --control: #cbcbcb;
+  --text: #111111;
+  --muted: #5d5d5d;
   --accent: #e06c1b;
-  --grid: #e1e1e5;
-  --line-other: #a9abb2;
-  --bar: #85878e;
+  --grid: #e2e2e2;
+  --line-other: #ababab;
+  --bar: #888888;
   /* How much of a team's colour its line carries at rest, mixed into the grey of an ordinary line; a
      previewed team draws in its full colour. */
   --tint-mix: 35%;
   /* A switch's track, and the pill that raises its current option (components/Segmented.astro); the
      season menu sits on the same track. */
-  --seg-track: #e9e9ec;
+  --seg-track: #eaeaea;
   --seg-pill: #ffffff;
   --panel-edge: 1px solid var(--border);
   --shadow: none;
@@ -46,21 +46,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: #171719;
-    --surface: #131217;
-    --border: #222224;
-    --rule: #1b1a1f;
-    --control: #3a3a3e;
+    --ground: #171717;
+    --surface: #131313;
+    --border: #222222;
+    --rule: #1c1c1c;
+    --control: #3b3b3b;
     --text: #ffffff;
-    --muted: #8a8c92;
+    --muted: #8c8c8c;
     --accent: #f08c3a;
-    --grid: #26252b;
-    --line-other: #5b5c63;
-    --bar: #727379;
+    --grid: #272727;
+    --line-other: #5d5d5d;
+    --bar: #737373;
     /* The dark theme's grey line sits low against its surface, so it takes a little more of the team colour. */
     --tint-mix: 40%;
-    --seg-track: #222226;
-    --seg-pill: #38383e;
+    --seg-track: #232323;
+    --seg-pill: #3a3a3a;
     /* Dark panels sit a step below the ground and lift on a soft shadow instead of a border. */
     --panel-edge: 0;
     --shadow: 0 12px 28px rgba(0, 0, 0, 0.2); /* taste-skill-ignore: the dealt data-terminal card shadow, dark only */
