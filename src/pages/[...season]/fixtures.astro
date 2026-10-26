@@ -1,10 +1,10 @@
 ---
 // The old fixtures page, now the top of the games page.
 import { href } from "../../lib/routes.ts";
-import { seasonPaths, type SeasonView } from "../../lib/season.ts";
+import { movedSeasonPaths, type SeasonView } from "../../lib/season.ts";
 
 export function getStaticPaths() {
-  return seasonPaths();
+  return movedSeasonPaths();
 }
 
 interface Props {
@@ -12,5 +12,5 @@ interface Props {
 }
 
 const { season } = Astro.props;
-return Astro.redirect(href({ kind: "games", season }));
+return Astro.redirect(href({ kind: "games", season }), 301);
 ---

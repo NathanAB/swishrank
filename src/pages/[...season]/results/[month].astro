@@ -1,10 +1,10 @@
 ---
 // An old month of results, now that month's games page.
 import { href } from "../../../lib/routes.ts";
-import { monthPaths, type SeasonView } from "../../../lib/season.ts";
+import { movedMonthPaths, type SeasonView } from "../../../lib/season.ts";
 
 export function getStaticPaths() {
-  return monthPaths();
+  return movedMonthPaths();
 }
 
 interface Props {
@@ -13,5 +13,5 @@ interface Props {
 }
 
 const { season, month } = Astro.props;
-return Astro.redirect(href({ kind: "games", season, month }));
+return Astro.redirect(href({ kind: "games", season, month }), 301);
 ---

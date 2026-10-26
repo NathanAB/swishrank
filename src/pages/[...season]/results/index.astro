@@ -2,10 +2,10 @@
 // The old results index, now part of the games page. Astro's config redirects drop the site base, so this
 // page redirects through href(), which keeps it.
 import { href } from "../../../lib/routes.ts";
-import { seasonPaths, type SeasonView } from "../../../lib/season.ts";
+import { movedSeasonPaths, type SeasonView } from "../../../lib/season.ts";
 
 export function getStaticPaths() {
-  return seasonPaths();
+  return movedSeasonPaths();
 }
 
 interface Props {
@@ -13,5 +13,5 @@ interface Props {
 }
 
 const { season } = Astro.props;
-return Astro.redirect(href({ kind: "games", season }));
+return Astro.redirect(href({ kind: "games", season }), 301);
 ---
