@@ -77,8 +77,8 @@ const gain = (kind: ContrastKind) => contrasts.find((c) => c.kind === kind)?.gam
 const times = gain("close") > 0 ? Math.round(gain("upset") / gain("close")) : 0;
 const TIMES: Record<number, string> = { 2: "twice", 3: "three times", 4: "four times", 5: "five times" };
 const upsetSay = times >= 2
-  ? `A close win by the underdog earns about ${TIMES[times] ?? `${times} times`} what a close win by the favourite does, as it beat what the ratings expected.`
-  : "A win the ratings did not expect, or a bigger one, earns more than a favourite's close win.";
+  ? `An underdog's close win earns about ${TIMES[times] ?? `${times} times`} what a favourite's does, as the ratings did not expect it.`
+  : "An upset, or a bigger win, earns more than a favourite's close win.";
 
 // Step 4: the favourite's chance against the rating gap, 0 to 400 points, on a 50% to 100% scale, and home
 // court's place on it.
@@ -103,7 +103,7 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
   <ol class="steps">
     <li><Panel title={`Everyone starts at ${START}`}>
       <div class="step">
-        <p class="say">Nothing carries over from last season, so every team opens at {START}, the league average, and the games spread them out.</p>
+        <p class="say">Nothing carries over from last season, and the games spread the teams out.</p>
         {lines && (
           <figure
             class="lines"
@@ -135,10 +135,10 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
 
     <li><Panel title="Every morning, every game again">
       <div class="step">
-        <p class="say">Each morning the ratings are worked out again from every game so far, as the ones that best explain every margin, like SRS or Massey ratings. Here are the first game's two teams, before and after opening night.</p>
+        <p class="say">Each morning the ratings are worked out again to best explain every margin so far, like SRS or Massey ratings.</p>
         {game && (
           <div class="game">
-            <p class="day">{game.day}</p>
+            <p class="day">Opening night, {game.day}</p>
             <p class="score">{game.score}</p>
             <table class="moves">
               {game.rows.map((r) => (
@@ -176,7 +176,7 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
 
     <li><Panel title="A bigger gap, a bigger favourite">
       <div class="step">
-        <p class="say">Before tip-off, the gap between two ratings gives each team its chance to win. Home court counts as {int(edge)} points, measured over eight past seasons, so a home team facing an equal rival is a {home.chance} favourite.</p>
+        <p class="say">Before tip-off, the gap between two ratings gives each team its chance to win. Home court is worth {int(edge)} points, measured over eight past seasons, so a home team is a {home.chance} favourite over an equal rival.</p>
         <figure
           class="curve"
           role="img"
@@ -205,7 +205,7 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
     </Panel></li>
   </ol>
 
-  <p class="close">Regular-season, play-in and playoff games count, but preseason games and the All-Star Game don't. Every setting was chosen by testing it on past seasons, as <a href={methodLink}>the model notes</a> show.</p>
+  <p class="close">Regular-season, play-in and playoff games count, but preseason games and the All-Star Game don't. Every setting was chosen by testing on past seasons, as <a href={methodLink}>the model notes</a> show.</p>
 </Base>
 
 <style>
