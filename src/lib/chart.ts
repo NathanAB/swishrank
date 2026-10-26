@@ -1,8 +1,8 @@
 // What the two drawings of the season's ratings share: the rating chart's card and the chart built into the
-// league table label their dates and mark the playoffs the same way.
+// league table label their dates and mark the end of the regular season the same way.
 import { START, type Season } from "./elo.ts";
-import { playoffsStart } from "./facts.ts";
 import { monthShort, shortDay } from "./format.ts";
+import { regularSeasonEnd } from "./teams.ts";
 
 /**
  * Date labels on one step that lands on the last day: month starts for a long season, days for a short one.
@@ -37,15 +37,18 @@ export function ratingTicks(min: number, max: number): { lo: number; hi: number;
   throw new Error("unreachable: the last step always returns");
 }
 
-/** The day the playoffs proper began, as an index into the daily series, with its label; null before then. */
-export function playoffsMark(model: Season): { i: number; label: string } | null {
-  const day = playoffsStart(model);
+/**
+ * The regular season's last day, as an index into the daily series, with its label; null until the postseason
+ * has a game. The lines of the teams it ended stop at this mark.
+ */
+export function seasonEndMark(model: Season): { i: number; label: string } | null {
+  const day = regularSeasonEnd(model);
   const i = day ? model.series.findIndex((d) => d.day === day) : -1;
-  return day && i >= 0 ? { i, label: `Playoffs from ${shortDay(day)}` } : null;
+  return day && i >= 0 ? { i, label: `Regular season ends ${shortDay(day)}` } : null;
 }
 
 /**
- * The date labels that keep clear of the playoffs label, where both share the plot's top edge: that label
+ * The date labels that keep clear of the season-end label, where both share the plot's top edge: that label
  * ends just left of its marker. Places and widths are fractions of the plot's width; give the widths at the
  * narrowest plot that shows the labels, so they stay apart at every wider one.
  */

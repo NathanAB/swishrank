@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { compute, type Game, type SeasonData } from "./elo.ts";
-import { conferenceOf, highLow, includesPostseason, nextGames, stage, standings } from "./teams.ts";
+import { conferenceOf, highLow, includesPostseason, nextGames, regularSeasonEnd, runEnds, stage, standings } from "./teams.ts";
 
 const dir = new URL("../data/games/", import.meta.url);
 const seasons: SeasonData[] = readdirSync(dir).map((f) => JSON.parse(readFileSync(new URL(f, dir), "utf8")));
@@ -67,4 +67,37 @@ test("the high and low say when one of them is just the 1500 every team starts a
   assert.deepEqual(highLow({ W: 3, L: 0, hi: 1540.6, lo: 1500 }), { value: "1541 / 1500", unit: "never below 1500" });
   assert.deepEqual(highLow({ W: 0, L: 3, hi: 1500, lo: 1462 }), { value: "1500 / 1462", unit: "never above 1500" });
   assert.deepEqual(highLow({ W: 0, L: 0, hi: 1500, lo: 1500 }), { value: "—" });
+});
+
+test("in every finished season the champion's run alone goes on to the end, and each other team's ends at its last game", () => {
+  const wrong: string[] = [];
+  for (const data of seasons.filter((d) => d.season !== "2026-27")) {
+    const m = compute(data);
+    const ends = runEnds(m);
+    const going = m.abbrs.filter((a) => ends[a] === null);
+    if (going.length !== 1) wrong.push(`${data.season}: ${going.length} runs still going (${going.join(", ")})`);
+    for (const a of m.abbrs) {
+      const last = m.results.filter((r) => r.game.home === a || r.game.away === a).at(-1)?.day ?? null;
+      if (ends[a] !== null && ends[a] !== last) wrong.push(`${data.season} ${a}: ended ${ends[a]}, last game ${last}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test("a team left out of the playoffs is out only once all sixteen playoff teams are known", () => {
+  const abbrs = Array.from({ length: 18 }, (_, i) => String.fromCharCode(65 + i));
+  const regular = abbrs.map((a, i): Game => ({ id: `r${i}`, t: "2027-04-11T23:00Z", home: a, away: abbrs[(i + 1) % 18], hs: 110, as: 100, final: true, neutral: false, note: null }));
+  const firstRound = (pairs: number) => Array.from({ length: pairs }, (_, i): Game => ({
+    id: `p${i}`, t: "2027-04-18T23:00Z", home: abbrs[2 * i], away: abbrs[2 * i + 1], hs: null, as: null, final: false, neutral: false, note: "East 1st Round - Game 1",
+  }));
+  const teams = Object.fromEntries(abbrs.map((a) => [a, { name: a, short: a, color: "000000", alternateColor: "ffffff" }]));
+  const out = (pairs: number) => Object.entries(runEnds(compute({ season: "x", teams, games: [...regular, ...firstRound(pairs)] }))).filter(([, d]) => d !== null).map(([a]) => a);
+  assert.deepEqual(out(7), [], "fourteen known, so the last two may be any of the rest");
+  assert.deepEqual(out(8), ["Q", "R"]);
+});
+
+test("the regular season's end is marked once the postseason has a game, and not before", () => {
+  const byId = Object.fromEntries(seasons.map((d) => [d.season, compute(d)]));
+  assert.equal(regularSeasonEnd(byId["2025-26"]), "2026-04-12");
+  assert.equal(regularSeasonEnd(byId["2026-27"]), null);
 });

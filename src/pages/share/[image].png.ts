@@ -9,13 +9,13 @@ import satori, { type Font, type FontWeight } from "satori";
 import sharp from "sharp";
 import mark from "../../../public/favicon.svg?raw";
 import css from "../../styles/global.css?raw";
-import { dateTicks, playoffsMark, ratingTicks } from "../../lib/chart.ts";
+import { dateTicks, ratingTicks, seasonEndMark } from "../../lib/chart.ts";
 import { START, type Abbr } from "../../lib/elo.ts";
 import { rating } from "../../lib/format.ts";
 import { homeTitle, leaders, SHARE_SIZE, SITE_NAME } from "../../lib/meta.ts";
 import { shareImage, shareName, type Route, type ShareImage } from "../../lib/routes.ts";
 import { allSeasons, currentSeason, type SeasonView } from "../../lib/season.ts";
-import { place } from "../../lib/teams.ts";
+import { place, runEnds } from "../../lib/teams.ts";
 import { lineColor } from "../../lib/tint.ts";
 
 export function getStaticPaths() {
@@ -78,7 +78,11 @@ function chart(season: SeasonView, own: Abbr | null): El {
   const { lo, hi, ticks } = ratingTicks(Math.min(START, ...all), Math.max(START, ...all));
   const y = (v: number) => 8 + ((PLOT_H - 16) * (hi - v)) / (hi - lo);
   const x = (i: number) => (i / (n - 1)) * PLOT_W;
-  const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(1)}`).join(" ");
+  const pts = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(1)}`);
+  // As on the site: a team whose run has ended goes dotted past its last game, with the run drawn solid over it.
+  const ends = runEnds(m);
+  const runEnd = (a: Abbr) => ser.findIndex((d) => d.day === ends[a]);
+  const ended = (a: Abbr) => runEnd(a) > 0 && runEnd(a) < n - 1;
   const tint = (a: Abbr) => ({ "--tint-light": lineColor(m.data.teams[a], "light") });
   const stroke = (a: Abbr) =>
     own === null
@@ -87,7 +91,7 @@ function chart(season: SeasonView, own: Abbr | null): El {
         ? { stroke: token("--tint", tint(a)), "stroke-width": 5 }
         : { stroke: token("--line-other"), "stroke-opacity": 0.55, "stroke-width": 1.5 };
   const drawOrder = [...m.order].reverse().sort((p, q) => Number(p === own) - Number(q === own));
-  const marker = playoffsMark(m);
+  const marker = seasonEndMark(m);
   const muted = token("--muted");
 
   const text = (style: Record<string, unknown>, value: string) =>
@@ -106,7 +110,12 @@ function chart(season: SeasonView, own: Abbr | null): El {
       { width: PLOT_W + 10, height: PLOT_H, viewBox: `0 0 ${PLOT_W + 10} ${PLOT_H}`, style: { position: "absolute", top: MARK, left: TICKS } },
       ...ticks.map((t) => h("path", { d: `M0,${y(t)}H${PLOT_W}`, stroke: token("--grid"), "stroke-width": 1.5 })),
       ...(marker ? [h("path", { d: `M${x(marker.i).toFixed(1)},0V${PLOT_H}`, stroke: muted, "stroke-width": 1.5 })] : []),
-      ...drawOrder.map((a) => h("polyline", { points: points(a), fill: "none", "stroke-linejoin": "round", ...stroke(a) })),
+      ...drawOrder.flatMap((a) => {
+        const line = { fill: "none", "stroke-linejoin": "round", ...stroke(a) };
+        if (!ended(a)) return [h("polyline", { points: pts(a).join(" "), ...line })];
+        const dots = { "stroke-dasharray": `1 ${Number(line["stroke-width"]) * 2.5}`, "stroke-linecap": "round" };
+        return [h("polyline", { points: pts(a).slice(runEnd(a)).join(" "), ...line, ...dots }), h("polyline", { points: pts(a).slice(0, runEnd(a) + 1).join(" "), ...line })];
+      }),
       ...(own ? [h("circle", { cx: PLOT_W, cy: y(ser[n - 1].r[own]), r: 7, fill: token("--tint", tint(own)), stroke: token("--surface"), "stroke-width": 3 })] : []),
     ),
     ...dateTicks(ser.map((d) => d.day), LABEL / PLOT_W).map((d) => text({ top: MARK + PLOT_H + 8, ...atDay(d.i) }, d.text)),

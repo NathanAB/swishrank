@@ -1,6 +1,6 @@
 ---
-// Every team's daily rating from the 1500 they all start at, with the start of the playoffs marked once they
-// begin. Pointing anywhere on the plot previews the nearest line (lib/pick.ts), shows that day with a thin
+// Every team's daily rating from the 1500 they all start at, with the regular season's end marked once the
+// postseason has a game, and each line dotted past the end of its team's run. Pointing anywhere on the plot previews the nearest line (lib/pick.ts), shows that day with a thin
 // line and a box with the team's rating and rank (lib/readout.ts), and a click opens the team's page. The end
 // of every line is labelled with its abbreviation in two staggered columns with short leaders, so labels
 // never collide. Given a `team`, a team's own page, the same lines are drawn with only that team's in its own
@@ -9,12 +9,13 @@
 // previewed. The plot stretches with the card, the whole season at any width; the tick lane and the label
 // lane keep a fixed size, and the height is fixed too, so the label layout worked out here holds at every
 // width.
-import { dateTicks, playoffsMark, ratingTicks } from "../lib/chart.ts";
+import { dateTicks, ratingTicks, seasonEndMark } from "../lib/chart.ts";
 import { START, type Abbr } from "../lib/elo.ts";
 import { shortDay, weekdayDay } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
+import { runEnds } from "../lib/teams.ts";
 import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
@@ -39,12 +40,19 @@ const y = (v: number) => PAD + ((H - 2 * PAD) * (hi - v)) / (hi - lo);
 const X = 1000; // the plot's viewBox width, stretched to the card
 const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * X);
 const pct = (i: number) => `${((x(i) / X) * 100).toFixed(2)}%`;
-const points = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(2)}`).join(" ");
+const pts = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(2)}`);
+const points = (a: Abbr) => pts(a).join(" ");
+// A team whose run has ended: its line up to its last game, drawn solid over the full line, which goes dotted.
+const ends = runEnds(m);
+const run = (a: Abbr) => {
+  const end = ser.findIndex((d) => d.day === ends[a]);
+  return end > 0 && end < n - 1 ? `M${pts(a).slice(0, end + 1).join(" L")}` : null;
+};
 const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const tint = tintStyles(m.data.teams);
 const drawOrder = [...teams].reverse().sort((p, q) => Number(p === team) - Number(q === team));
 
-const marker = playoffsMark(m);
+const marker = seasonEndMark(m);
 
 // The label lane: two columns, so neighbours in the order sit half a label apart. Each cluster of labels
 // that would overlap is spread around its mean and kept inside the plot's height.
@@ -113,7 +121,7 @@ const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}$
         <g>
           {drawOrder.map((a) => (
             <polyline
-              class:list={["line", { own: a === team }]}
+              class:list={["line", { own: a === team, ended: run(a) }]}
               data-team={a}
               data-name={m.data.teams[a].short}
               data-href={team ? undefined : href({ kind: "team", season, abbr: a })}
@@ -122,6 +130,7 @@ const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}$
               points={points(a)}
             />
           ))}
+          {drawOrder.map((a) => run(a) && <path class:list={["run", { own: a === team }]} data-team={a} style={tint[a]} d={run(a)} />)}
         </g>
       </svg>
       <svg class="lane" width={LANE} height={H} viewBox={`0 0 ${LANE} ${H}`}>
@@ -176,15 +185,16 @@ const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}$
   .grid { stroke: var(--grid); stroke-width: 1; }
   .marker { stroke: var(--muted); stroke-width: 1; }
   /* 1.5px, not 1: a 1px line on a stretched plot falls between pixels and shimmers on a standard-density screen. */
-  .line { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1.5; stroke-linejoin: round; }
-  .line.hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 2; }
-  .line.own { stroke: var(--tint); stroke-opacity: 1; stroke-width: 2.5; }
+  :is(.line, .run) { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1.5; stroke-linejoin: round; }
+  :is(.line, .run).hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 2; }
+  :is(.line, .run).own { stroke: var(--tint); stroke-opacity: 1; stroke-width: 2.5; }
+  .line.ended { stroke-dasharray: 1 3.5; stroke-linecap: round; }
   .leader { fill: none; stroke: var(--line-other); stroke-opacity: 0.6; stroke-width: 1.5; }
   .leader.own { stroke: var(--tint); stroke-opacity: 1; }
-  .tinted :is(.line, .leader) { stroke: var(--tint-rest); stroke-opacity: 1; }
-  .tinted .line.hov { stroke: var(--tint); stroke-opacity: 1; stroke-width: 2.25; }
+  .tinted :is(.line, .run, .leader) { stroke: var(--tint-rest); stroke-opacity: 1; }
+  .tinted :is(.line, .run).hov { stroke: var(--tint); stroke-opacity: 1; stroke-width: 2.25; }
   .tinted .leader.hov { stroke: var(--tint); }
-  .tinted:has(.hov) :is(.line, .leader):not(.hov) { opacity: 0.4; }
+  .tinted:has(.hov) :is(.line, .run, .leader):not(.hov) { opacity: 0.4; }
   .plot[data-plot]:has(.line.hov) { cursor: pointer; }
   .lab.hov { fill: var(--text); }
   .lab.own { fill: var(--text); font-weight: 600; }

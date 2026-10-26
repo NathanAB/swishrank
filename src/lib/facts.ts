@@ -59,5 +59,3 @@ export function ratingRange(model: Season): { lo: number; hi: number } {
   return { lo: Math.min(...all), hi: Math.max(...all) };
 }
 
-/** The first day of the playoffs proper (play-in games come before it), if they have started. */
-export const playoffsStart = (model: Season) => model.results.find((r) => /1st Round/.test(r.game.note ?? ""))?.day ?? null;

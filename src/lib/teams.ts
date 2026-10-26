@@ -63,6 +63,37 @@ export function stage(note: string | null): Stage {
   return { phase: "regular", label: note };
 }
 
+/** The last day of the regular season, once the play-in or the playoffs has a game, played or scheduled; null before. */
+export function regularSeasonEnd(model: Season): string | null {
+  const postseason = [...model.results.map((r) => r.game), ...model.upcoming].some((g) => stage(g.note).phase !== "regular");
+  const days = model.results.filter((r) => stage(r.game.note).phase === "regular").map((r) => r.day);
+  return postseason && days.length ? days.reduce((a, b) => (b > a ? b : a)) : null;
+}
+
+/**
+ * The day each team's run ended, at its last game, or null while it goes on. A team is out once it loses a
+ * fourth playoff game to one opponent, or once all sixteen playoff teams have a playoff game, played or
+ * scheduled, and it is not one of them: that takes in every team the regular season or the play-in ended, and
+ * in 2019-20 the eight left out of the bubble. The same rule serves a finished season and one in progress.
+ */
+export function runEnds(model: Season): Record<Abbr, string | null> {
+  const last: Record<Abbr, string> = {};
+  for (const r of model.results) for (const a of [r.game.home, r.game.away]) if (!(a in last) || r.day > last[a]) last[a] = r.day;
+  const out = new Set<Abbr>();
+  const losses = new Map<string, number>();
+  for (const r of model.results) {
+    if (stage(r.game.note).phase !== "playoffs") continue;
+    const { winner, loser } = outcome(r);
+    const key = `${loser.abbr} ${winner.abbr}`;
+    losses.set(key, (losses.get(key) ?? 0) + 1);
+    if (losses.get(key) === 4) out.add(loser.abbr);
+  }
+  const playoffGames = [...model.results.map((r) => r.game), ...model.upcoming].filter((g) => stage(g.note).phase === "playoffs");
+  const field = new Set(playoffGames.flatMap((g) => [g.home, g.away]));
+  if (field.size >= 16) for (const a of model.abbrs) if (!field.has(a)) out.add(a);
+  return Object.fromEntries(model.abbrs.map((a) => [a, out.has(a) ? (last[a] ?? null) : null]));
+}
+
 /** Whether any of these games was a play-in or playoff game, so a won-lost record over them says so. */
 export const includesPostseason = (results: readonly Result[]) => results.some((r) => stage(r.game.note).phase !== "regular");
 
