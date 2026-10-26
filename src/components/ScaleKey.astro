@@ -1,0 +1,23 @@
+---
+// One line that says what a rating means, for a reader who has never met Elo, with the way to the full
+// account. The page places it with its own class; other attributes land on the paragraph too.
+import type { HTMLAttributes } from "astro/types";
+import { START, winProb } from "../lib/elo.ts";
+import { pct, rating } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+
+type Props = HTMLAttributes<"p">;
+
+const { class: cls, ...rest } = Astro.props;
+---
+
+<p {...rest} class:list={["key", cls]}>
+  Elo ratings: every team starts the season at {rating(START)}, the league average. A team rated 100 points higher
+  wins about {pct(winProb(100))} of the time. <a href={href({ kind: "about" })}>How it works</a>
+</p>
+
+<style>
+  .key { color: var(--muted); }
+  .key a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
+  .key a:hover { text-decoration-color: currentColor; }
+</style>

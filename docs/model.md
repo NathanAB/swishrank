@@ -315,7 +315,7 @@ Too young to judge; shown so the season's start can be compared later.
 
 | Season | Games | Elo log loss | Model log loss |
 | --- | --- | --- | --- |
-| 2026-27 | 42 | 0.7362 | 0.6857 |
+| 2026-27 | 43 | 0.7394 | 0.6835 |
 
 ### Check
 
@@ -332,6 +332,7 @@ Written after the results. Each setting lives in `src/lib/elo.ts` (`PARAMS`, `PR
 - **Home edge, fixed at 0.622 margin units, 64 Elo points.** Fixed beats fitted from the season's own games at every `n0` and margin rule (table 1), and for the site's model by 0.0004, a tie (table 7). The `w_h` rows the plan reports for a fitted home edge do not apply, as the chosen edge is fixed. A home team facing an equal rival is a 59% favourite.
 - **`SIGMA` = 2.866 margin units.** Fitted once by maximum likelihood on the tuning seasons (table 1). Its calibration on the held-out seasons, which it never saw, is within 2.5 points in every bucket with more than 60 games, where Elo's favourites from 60% to 80% won 3.4 to 5.3 points less often than it said (table 6).
 - **The Elo scale, 295.7 Elo points per `SIGMA`.** A rating is 1500 plus the fitted rating times 295.7 / 2.866, about 103 Elo points per margin unit. At that scale the model's own chance for a gap, `Phi(gap / 295.7)`, is never more than 0.0095 from classic Elo's chance for the same gap (table 9). The fixtures, the team pages, the About page's curve and its home court line all use the model's chance, not the classic formula.
+- **Softer chances for a team's first 5 games, `EARLY` in `src/lib/elo.ts`.** Added 2026-10-26, after the results and outside the plan. Over all eleven seasons, favourites the model called 60% or more in the first two weeks won 61.1% against 66.0% stated (432 games). While either side has played fewer than 5 games, a gap now counts 1.55 times less. The pair was fitted on the tuning seasons over a grid of 2 to 10 games and 1.0 to 1.6. On the held-out seasons it cuts the first two weeks' log loss from 0.6727 to 0.6718 (314 games) and leaves weeks 3-4 unchanged (0.5904). A smooth widening that shrank with every game played helped the first two weeks less and hurt weeks 3-4, so the site uses the cutoff. The gain is small, and it touches only the chances, never the ratings.
 - **Provisional until 26 games.** Table 8's rule gives 26. The curve is noisy: the excess first falls within 0.01 of the settled level at 9 games, and again from 15 to 24, but a bump at 25 (0.013) holds the rule's answer at 26. The rule was fixed in advance, so the site uses 26. A smoother rule would likely give a smaller number. That would need a new pre-registration.
 - **Against the old Elo.** The site's model wins all eight tuning seasons and all three held-out seasons. Pooled over the held-out seasons its log loss is 0.0138 lower, [0.0095, 0.0182], with Brier 0.2130 against 0.2191 and accuracy 66.2% against 64.7% (table 3). It is better in weeks 1-2, 3-4 and the rest of the season, and ties in weeks 5-6 (table 4). `scripts/backtest.test.ts` fails if a later change loses that edge on whole-season log loss.
 

@@ -149,12 +149,22 @@ export function phi(z: number): number {
 /**
  * Elo points per sigma of expected margin. Phi(z) is within 0.0095 of the logistic 1 / (1 + e^(-1.702 z)), so
  * at this scale the model's chance for a rating gap is within a point of classic Elo's 1 / (1 + 10^(-gap / 400)):
- * 100 points still makes a 64% favourite. docs/model.md, table 9.
+ * 100 points makes a 63% favourite, where classic Elo says 64%. docs/model.md, table 9.
  */
 export const ELO_PER_SIGMA = (400 / Math.LN10) * 1.702;
 
-/** The model's win chance for a rating gap in Elo points: Phi(gap / ELO_PER_SIGMA). */
-export const winProb = (gap: number) => phi(gap / ELO_PER_SIGMA);
+/**
+ * A season's first games say little, and the model's chances for them run high: over the eleven seasons,
+ * favourites it called 60% or more in the first two weeks won 61% against 66% stated. While either side has
+ * played fewer than `games` games, a gap counts `widen` times less. docs/model.md, settings.
+ */
+export const EARLY = { games: 5, widen: 1.55 };
+
+/** The model's win chance for a rating gap in Elo points, when the less experienced side has `played` games. */
+export const winProb = (gap: number, played = Infinity) => phi(gap / (ELO_PER_SIGMA * (played < EARLY.games ? EARLY.widen : 1)));
+
+/** The fewest games either side of `game` had played, by `log`. */
+export const played = (log: Record<Abbr, readonly unknown[]>, game: Game) => Math.min(log[game.home].length, log[game.away].length);
 
 /** Home-court-adjusted rating gap, home minus away, with `home` the home edge in Elo points. */
 export const gap = (game: Game, r: Record<Abbr, number>, home: number) => r[game.home] + (game.neutral ? 0 : home) - r[game.away];
@@ -212,7 +222,7 @@ export function compute(data: SeasonData): Season {
     for (const game of games) {
       const result: Result = {
         game, day,
-        p: winProb(gap(game, r, home)),
+        p: winProb(gap(game, r, home), played(log, game)),
         pre: { h: r[game.home], a: r[game.away] },
         post: { h: next.r[game.home], a: next.r[game.away] },
       };

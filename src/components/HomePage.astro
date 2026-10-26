@@ -4,6 +4,7 @@
 import Base from "../layouts/Base.astro";
 import LeagueTable from "./LeagueTable.astro";
 import Panel from "./Panel.astro";
+import ScaleKey from "./ScaleKey.astro";
 import SeasonMenu from "./SeasonMenu.astro";
 import Segmented from "./Segmented.astro";
 import { homeDescription, homeTitle } from "../lib/meta.ts";
@@ -38,6 +39,11 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
       <Segmented label="Conference" options={views} />
       <SeasonMenu route={route} />
     </Fragment>
+    <ScaleKey class="lead" />
     <LeagueTable season={season} conference={conference} />
   </Panel>
 </Base>
+
+<style>
+  .lead { margin: -4px 0 16px; }
+</style>

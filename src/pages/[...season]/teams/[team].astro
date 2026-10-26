@@ -6,9 +6,10 @@
 import KpiStrip, { type Kpi } from "../../../components/KpiStrip.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
+import ScaleKey from "../../../components/ScaleKey.astro";
 import SeasonMenu from "../../../components/SeasonMenu.astro";
 import Base from "../../../layouts/Base.astro";
-import { dayKey, gap, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
+import { dayKey, gap, played, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
 import { pct, rating, record, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
 import { teamDescription } from "../../../lib/meta.ts";
 import { href, type Route } from "../../../lib/routes.ts";
@@ -41,7 +42,7 @@ const kpis: Kpi[] = [
 // The games in the week ahead, each with the win chance today's ratings give this team.
 const fixtures = nextGames(m, abbr, TODAY).map((g: Game) => {
   const home = g.home === abbr;
-  const p = winProb(gap(g, m.r, m.home));
+  const p = winProb(gap(g, m.r, m.home), played(m.log, g));
   const venue: Venue = g.neutral ? "neutral" : home ? "home" : "away";
   return { g, day: dayKey(g.t), venue, opp: home ? g.away : g.home, chance: home ? p : 1 - p, tag: stage(g.note).label };
 });
@@ -60,6 +61,7 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
   <Panel level={1} title={me.name}>
     <SeasonMenu slot="aside" route={route} />
     <KpiStrip items={kpis} label={`The ${me.short} in numbers`} />
+    <ScaleKey class="after" />
   </Panel>
 
   <Panel class="card" title="Rating history">
@@ -136,6 +138,7 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
 
 <style>
   .card { margin-top: var(--gap); }
+  .after { margin-top: 12px; }
   /* The next games and the game log side by side where both fit; the log has more columns, so it takes more. */
   .pair { display: grid; align-items: start; gap: var(--gap); margin-top: var(--gap); }
   .pair .card { margin-top: 0; }

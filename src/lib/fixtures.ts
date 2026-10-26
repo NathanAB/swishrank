@@ -1,6 +1,6 @@
 // Games still to play, priced on the ratings as they stand now: nothing here moves a rating before tip-off,
 // so a game five days out gets the same chances it would get if it were played tonight.
-import { addDays, dayKey, gap, winProb, type Abbr, type Game, type Season } from "./elo.ts";
+import { addDays, dayKey, gap, played, winProb, type Abbr, type Game, type Season } from "./elo.ts";
 import type { Side } from "./facts.ts";
 
 export type FixtureLine = {
@@ -23,9 +23,9 @@ export type FixtureDay = { day: string; fixtures: Fixture[] };
 /** The days the site looks ahead: today and the six after it. The data holds a day more than this. */
 export const WEEK = 7;
 
-/** A game priced on ratings `r` and a home edge `home`, both in Elo points. */
-export function fixture(game: Game, r: Record<Abbr, number>, home: number): Fixture {
-  const p = winProb(gap(game, r, home));
+/** A game priced on `model`'s current ratings and home edge, and the games each side has played. */
+export function fixture(game: Game, model: Pick<Season, "r" | "home" | "log">): Fixture {
+  const p = winProb(gap(game, model.r, model.home), played(model.log, game));
   return {
     game,
     lines: [
@@ -41,6 +41,6 @@ export function nextDays(model: Season, today: string, count: number): FixtureDa
   const games = [...model.upcoming].sort((x, y) => x.t.localeCompare(y.t));
   return Array.from({ length: count }, (_, i) => {
     const day = addDays(today, i);
-    return { day, fixtures: games.filter((g) => dayKey(g.t) === day).map((g) => fixture(g, model.r, model.home)) };
+    return { day, fixtures: games.filter((g) => dayKey(g.t) === day).map((g) => fixture(g, model)) };
   });
 }
