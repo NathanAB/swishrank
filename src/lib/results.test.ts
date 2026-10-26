@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { compute } from "./elo.ts";
-import { gamesIn, monthRoute, months, recentDays } from "./results.ts";
+import { monthRoute, months, recentDays } from "./results.ts";
 import { routePath } from "./routes.ts";
 
 const last = compute(JSON.parse(readFileSync(new URL("../data/games/2025-26.json", import.meta.url), "utf8")));
@@ -10,7 +10,7 @@ const all = months(last);
 
 test("the 2025-26 results split into its nine calendar months, every final game on exactly one page", () => {
   assert.deepEqual(all.map((m) => m.key), ["2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06"]);
-  const ids = all.flatMap((m) => gamesIn(m).map((r) => r.game.id));
+  const ids = all.flatMap((m) => m.days.flatMap((d) => d.results.map((r) => r.game.id)));
   assert.equal(ids.length, 1322);
   assert.equal(new Set(ids).size, 1322);
 });

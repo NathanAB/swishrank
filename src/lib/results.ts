@@ -31,8 +31,5 @@ export function recentDays(model: Season, count: number): Day[] {
   return days.filter((d) => d.day >= from);
 }
 
-/** Every game in a month, newest day first. */
-export const gamesIn = (month: Month) => month.days.flatMap((d) => d.results);
-
 /** Where a month's page lives: under its key, the newest month included, so a shared link keeps its month. */
 export const monthRoute = (season: SeasonRef, key: string): Route => ({ kind: "games", season, month: key });

@@ -169,9 +169,9 @@ const toElo = (fit: Fit) => ({
 });
 
 type Pair = { h: number; a: number };
-/** One final game: the home side's pre-game chance, and each side's rating and rank before and after its day. */
-export type Result = { game: Game; day: string; p: number; pre: Pair; post: Pair; rankPre: Pair; rankPost: Pair };
-export type Snapshot = { day: string; r: Record<Abbr, number>; rank: Record<Abbr, number> };
+/** One final game: the home side's pre-game chance, and each side's rating before and after its day. */
+export type Result = { game: Game; day: string; p: number; pre: Pair; post: Pair };
+export type Snapshot = { day: string; r: Record<Abbr, number> };
 export type TeamGame = { result: Result; side: "h" | "a" };
 /** `hi` and `lo` are the team's highest and lowest rating on any day of the season, 1500 included. */
 export type TeamStats = { W: number; L: number; hi: number; lo: number };
@@ -186,7 +186,6 @@ export type Season = {
   results: Result[];
   log: Record<Abbr, TeamGame[]>;
   series: Snapshot[];
-  weekAgo: Snapshot | null;
   stats: Record<Abbr, TeamStats>;
   order: Abbr[];
   upcoming: Game[];
@@ -213,20 +212,16 @@ export function compute(data: SeasonData): Season {
   let home = toElo(startFit(abbrs, PARAMS)).home;
   const log: Record<Abbr, TeamGame[]> = Object.fromEntries(abbrs.map((a) => [a, []]));
   const results: Result[] = [];
-  const endOfDay = new Map<string, Omit<Snapshot, "day">>();
-  let rank = ranksOf(r);
+  const endOfDay = new Map<string, Record<Abbr, number>>();
 
   for (const { day, games, after } of fitSeason(data, PARAMS)) {
     const next = toElo(after);
-    const nextRank = ranksOf(next.r);
     for (const game of games) {
       const result: Result = {
         game, day,
         p: winProb(gap(game, r, home)),
         pre: { h: r[game.home], a: r[game.away] },
         post: { h: next.r[game.home], a: next.r[game.away] },
-        rankPre: { h: rank[game.home], a: rank[game.away] },
-        rankPost: { h: nextRank[game.home], a: nextRank[game.away] },
       };
       results.push(result);
       log[game.home].push({ result, side: "h" });
@@ -234,8 +229,7 @@ export function compute(data: SeasonData): Season {
     }
     r = next.r;
     home = next.home;
-    rank = nextRank;
-    endOfDay.set(day, { r, rank });
+    endOfDay.set(day, r);
   }
 
   // One snapshot per calendar day from the day before opening night to the latest game day.
@@ -243,17 +237,13 @@ export function compute(data: SeasonData): Season {
   if (results.length) {
     const first = results[0].day;
     const last = results[results.length - 1].day;
-    let cur = { r: fresh(), rank: ranksOf(fresh()) };
-    series.push({ day: addDays(first, -1), ...cur });
+    let cur = fresh();
+    series.push({ day: addDays(first, -1), r: cur });
     for (let d = first; d <= last; d = addDays(d, 1)) {
       cur = endOfDay.get(d) ?? cur;
-      series.push({ day: d, ...cur });
+      series.push({ day: d, r: cur });
     }
   }
-  const asOf = series.at(-1)?.day ?? null;
-
-  const target = asOf ? addDays(asOf, -7) : null;
-  const weekAgo = target && target >= series[1].day ? [...series].reverse().find((x) => x.day <= target) ?? null : null;
 
   const stats = Object.fromEntries(
     abbrs.map((a) => {
@@ -274,7 +264,7 @@ export function compute(data: SeasonData): Season {
 
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
   return {
-    data, abbrs, r, home, rank, log, results, series, weekAgo, stats, order,
+    data, abbrs, r, home, rank: ranksOf(r), log, results, series, stats, order,
     upcoming: data.games.filter((g) => !g.final),
   };
 }
