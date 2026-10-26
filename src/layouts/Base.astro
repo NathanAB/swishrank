@@ -25,9 +25,11 @@ interface Props {
   route?: Route;
   /** The page draws its h1 in its first card's header, so the shell draws none. */
   ownHeading?: boolean;
+  /** The page runs the full width of the screen, for the ratings chart; others keep to a centred column. */
+  wide?: boolean;
 }
 
-const { title, docTitle = title, description = "Season-only Elo ratings for all 30 NBA teams. Every team starts the season at 1500.", route, ownHeading = false } = Astro.props;
+const { title, docTitle = title, description = "Season-only Elo ratings for all 30 NBA teams. Every team starts the season at 1500.", route, ownHeading = false, wide = false } = Astro.props;
 
 const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
@@ -82,7 +84,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
       </div>
     </header>
 
-    <main class="canvas">
+    <main class:list={["canvas", { wide }]}>
       {!ownHeading && (
         <div class="title">
           <h1>{title}</h1>
@@ -122,7 +124,8 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
   .nav a[aria-current="page"] { color: var(--text); }
   .nav a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--accent); }
 
-  .canvas { flex: 1 0 auto; padding: 10px var(--pad) 48px; }
+  .canvas { flex: 1 0 auto; width: 100%; max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 10px var(--pad) 48px; }
+  .canvas.wide { max-width: none; }
   .title { min-width: 0; margin: 12px 0 var(--gap); }
   h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
   .lede { margin-top: 6px; max-width: 72ch; font-size: 15px; line-height: 22px; color: var(--muted); }
