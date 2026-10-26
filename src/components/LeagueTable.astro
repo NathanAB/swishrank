@@ -68,9 +68,9 @@ const wl = includesPostseason(m.results) ? "W–L incl. playoffs" : "W–L";
 const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const playoffs = playoffsMark(m);
 // The dates share the plot's top edge with the playoffs label. The narrowest plot beside the table is about
-// 530px, where that label takes some 112px and a month about 30px.
+// 530px, where that label takes some 112px, a month about 30px and a day about 40px.
 const PLOT_MIN = 530;
-const dates = clearOfMark(dateTicks(ser.map((d) => d.day)), ser.length, playoffs, { mark: 112 / PLOT_MIN, tick: 30 / PLOT_MIN });
+const dates = clearOfMark(dateTicks(ser.map((d) => d.day), 40 / PLOT_MIN), ser.length, playoffs, { mark: 112 / PLOT_MIN, tick: 30 / PLOT_MIN });
 ---
 
 <div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-wide: ${ROW}px`}>

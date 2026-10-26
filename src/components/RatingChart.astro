@@ -9,7 +9,7 @@
 // previewed. The plot stretches with the card, the whole season at any width; the tick lane and the label
 // lane keep a fixed size, and the height is fixed too, so the label layout worked out here holds at every
 // width.
-import { dateTicks, playoffsMark } from "../lib/chart.ts";
+import { dateTicks, playoffsMark, ratingTicks } from "../lib/chart.ts";
 import { START, type Abbr } from "../lib/elo.ts";
 import { shortDay, weekdayDay } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
@@ -32,21 +32,8 @@ const m = season.model;
 const ser = m.series;
 const n = ser.length;
 
-// 3 to 5 round ticks that include 1500, with the top tick above the highest point.
-function scale(min: number, max: number) {
-  for (const step of [25, 50, 100, 150, 200, 250, 300, 500]) {
-    const lo = START - Math.ceil((START - min) / step) * step;
-    let hi = START + Math.ceil((max - START) / step) * step;
-    if (hi <= max) hi += step;
-    const ticks: number[] = [];
-    for (let v = lo; v <= hi; v += step) ticks.push(v);
-    if (ticks.length <= 5 || step === 500) return { lo, hi, ticks };
-  }
-  throw new Error("unreachable: the last step always returns");
-}
-
 const all = ser.flatMap((d) => m.abbrs.map((a) => d.r[a]));
-const { lo, hi, ticks } = scale(Math.min(START, ...all), Math.max(START, ...all));
+const { lo, hi, ticks } = ratingTicks(Math.min(START, ...all), Math.max(START, ...all));
 const PAD = 8;
 const y = (v: number) => PAD + ((H - 2 * PAD) * (hi - v)) / (hi - lo);
 const X = 1000; // the plot's viewBox width, stretched to the card
@@ -58,7 +45,6 @@ const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const tint = tintStyles(m.data.teams);
 const drawOrder = [...teams].reverse().sort((p, q) => Number(p === team) - Number(q === team));
 
-const xLabels = dateTicks(ser.map((d) => d.day));
 const marker = playoffsMark(m);
 
 // The label lane: two columns, so neighbours in the order sit half a label apart. Each cluster of labels
@@ -68,6 +54,14 @@ const marker = playoffsMark(m);
 const text = (a: Abbr) => (team ? m.data.teams[a].short : a);
 const PITCH = 6, GAP = 22, COL = 8 + 8 * Math.max(...m.abbrs.map((a) => a.length));
 const LANE = team ? GAP + 4 + 7 * text(team).length : GAP + 2 * COL;
+// A day label is about 40px wide. The narrowest plot is on a 360px phone, inside the page's and the card's
+// 16px gutters, and from 641px inside their 24px and 20px ones; a phone gets its own, sparser labels.
+const LABEL = 40;
+const xDays = ser.map((d) => d.day);
+const xLabels = [
+  { phone: false, list: dateTicks(xDays, LABEL / (641 - 88 - 40 - LANE)) },
+  { phone: true, list: dateTicks(xDays, LABEL / (360 - 64 - 40 - LANE)) },
+];
 const last = ser[n - 1];
 const labels = teams.filter((a) => !team || a === team).map((a) => ({ a, y: last ? y(last.r[a]) : 0, ly: 0 }));
 type Cluster = { list: typeof labels; sum: number; top: number; bot: number };
@@ -146,11 +140,13 @@ const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}$
         })}
         {labels.map((l) => <circle class:list={["end", { own: l.a === team }]} data-team={l.a} style={tint[l.a]} cx="0" cy={l.y.toFixed(1)} r="4" />)}
       </svg>
-      <div class="xs">
-        {xLabels.map((l) => (
-          <span class:list={{ first: l.i === 0, last: l.i === n - 1 }} style={`left: ${pct(l.i)}`}>{l.text}</span>
-        ))}
-      </div>
+      {xLabels.map((set) => (
+        <div class:list={["xs", { phone: set.phone }]}>
+          {set.list.map((l) => (
+            <span class:list={{ first: l.i === 0, last: l.i === n - 1 }} style={`left: ${pct(l.i)}`}>{l.text}</span>
+          ))}
+        </div>
+      ))}
       <div class="tip" data-tip hidden></div>
     </div>
   </div>
@@ -171,6 +167,11 @@ const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}$
   .xs span { position: absolute; top: 4px; transform: translateX(-50%); font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap; }
   .xs .first { transform: none; }
   .xs .last { transform: translateX(-100%); }
+  .xs.phone { display: none; }
+  @media (max-width: 640px) {
+    .xs { display: none; }
+    .xs.phone { display: block; }
+  }
 
   text { font: 12px var(--font); font-variant-numeric: tabular-nums; fill: var(--muted); }
   .plot path, .plot polyline { fill: none; vector-effect: non-scaling-stroke; }
