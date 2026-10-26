@@ -4,7 +4,7 @@
 // docs/model.md holds the backtest behind each setting.
 import Panel from "../components/Panel.astro";
 import Base from "../layouts/Base.astro";
-import { counted, PARAMS, PROVISIONAL, START, winProb } from "../lib/elo.ts";
+import { counted, PARAMS, START, winProb } from "../lib/elo.ts";
 import { int, pct, signed, weekdayDay } from "../lib/format.ts";
 import { examples, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
@@ -129,7 +129,6 @@ const methodLink = "https://github.com/NathanAB/nba-elo/blob/main/docs/model.md"
           <p class="start">Opening night, all at {START}</p>
         </figure>
       )}
-      <p class="note">A ? after a rating in the table marks it provisional. Its team has played fewer than {PROVISIONAL} games, about how many it took in past seasons for a team's chances to settle.</p>
     </Panel>
 
     <Panel title="Every morning, every game again" meta={game?.day}>

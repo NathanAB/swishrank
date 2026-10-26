@@ -13,7 +13,7 @@
 // same league-wide scale, so a rating sits at the same height in every view.
 import RatingChart from "./RatingChart.astro";
 import { clearOfMark, dateTicks, playoffsMark } from "../lib/chart.ts";
-import { PROVISIONAL, START, provisional } from "../lib/elo.ts";
+import { START } from "../lib/elo.ts";
 import { ratingRange } from "../lib/facts.ts";
 import { rating, record, weekdayDay } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
@@ -31,8 +31,6 @@ interface Props {
 const { season, conference } = Astro.props;
 const m = season.model;
 const { order, rank } = standings(m, conference);
-const provCount = order.filter((a) => provisional(m.stats[a])).length;
-const allProv = provCount === order.length;
 
 const shown = Object.fromEntries(order.map((a) => [a, Math.round(m.r[a])]));
 const { lo, hi } = ratingRange(m);
@@ -86,7 +84,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
         </th>
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
         <th class="team" scope="col">Team<span class="sub"> · {wl}</span></th>
-        <th class="num rh" scope="col">Rating{allProv && <abbr class="prov" title={`Provisional: fewer than ${PROVISIONAL} games played`}>?</abbr>}</th>
+        <th class="num" scope="col">Rating</th>
         <th class="num opt" scope="col">{wl}</th>
       </tr>
     </thead>
@@ -152,14 +150,13 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
               <a class="go" href={href({ kind: "team", season, abbr: a })} data-team={a} data-preview><span class="name">{m.data.teams[a].short}</span></a>
               <span class="sub">{record(s.W, s.L)}</span>
             </td>
-            <td class="num rating">{rating(m.r[a])}{provisional(s) && !allProv && <abbr class="prov" title={`Provisional: fewer than ${PROVISIONAL} games played`}>?</abbr>}</td>
+            <td class="num rating">{rating(m.r[a])}</td>
             <td class="num opt">{record(s.W, s.L)}</td>
           </tr>
         );
       })}
     </tbody>
   </table>
-  {provCount > 0 && <p class="prov-note">? Provisional until a team has played {PROVISIONAL} games.</p>}
 </div>
 
 <style>
@@ -188,11 +185,8 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
   .go:hover .name { text-decoration: underline; text-underline-offset: 3px; }
   .go:hover .name::after, tr.hov .name::after { background: var(--control); }
-  td.rating { position: relative; color: var(--text); font-weight: 600; }
-  .prov { position: absolute; margin-left: 1px; color: var(--muted); font-weight: 400; text-decoration: none; cursor: help; }
+  td.rating { color: var(--text); font-weight: 600; }
   td.opt { color: var(--text); }
-  .rh { position: relative; }
-  .prov-note { margin: 8px 0 0; font-size: 12px; color: var(--muted); text-align: right; }
   .sub { display: none; }
 
   /* the scale, and the chart on it */

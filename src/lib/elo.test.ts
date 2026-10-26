@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, counted, fitSeason, gap, PARAMS, phi, provisional, PROVISIONAL, ranksOf, winProb, type Game, type SeasonData } from "./elo.ts";
+import { compute, counted, fitSeason, gap, PARAMS, phi, ranksOf, winProb, type Game, type SeasonData } from "./elo.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
 const teams = (...abbrs: string[]) => Object.fromEntries(abbrs.map((a) => [a, team(a)]));
@@ -72,15 +72,6 @@ test("a 43-point win counts at most four times a 1-point win, and a loss counts 
   const ratio = counted(43, PARAMS.margin) / counted(1, PARAMS.margin);
   assert.ok(ratio > 1 && ratio <= 4, `43 vs 1 counts ${ratio}x`);
   assert.equal(counted(-43, PARAMS.margin), -counted(43, PARAMS.margin));
-});
-
-test("a team's rating is provisional until it has played PROVISIONAL games", () => {
-  const season = (n: number) => compute({
-    season: "x", teams: teams("A", "B"),
-    games: Array.from({ length: n }, (_, i) => game(String(i), new Date(Date.UTC(2026, 9, 20 + i, 23)).toISOString(), "A", "B", 110, 100)),
-  });
-  assert.equal(provisional(season(PROVISIONAL - 1).stats.A), true);
-  assert.equal(provisional(season(PROVISIONAL).stats.A), false);
 });
 
 test("equal displayed ratings share a rank and the next rank skips", () => {

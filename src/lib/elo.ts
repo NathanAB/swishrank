@@ -193,9 +193,6 @@ export function ranksOf(ratings: Record<Abbr, number>) {
   return Object.fromEntries(vals.map(([a, v]) => [a, 1 + vals.filter(([, w]) => w > v).length]));
 }
 
-/** Whether a team has played too few games for its rating to have settled. */
-export const provisional = (s: TeamStats) => s.W + s.L < PROVISIONAL;
-
 const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
 /** The US Eastern calendar day a game belongs to, as YYYY-MM-DD. */
 export const dayKey = (iso: string) => dayFmt.format(new Date(iso));
