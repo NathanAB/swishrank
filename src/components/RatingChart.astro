@@ -2,7 +2,7 @@
 // Every team's daily rating from the 1500 they all start at, with the start of the playoffs marked once they
 // begin. Pointing anywhere on the plot previews the nearest line (lib/pick.ts). The end of every line is
 // labelled with its abbreviation in two staggered columns with short leaders, so labels never collide. Given
-// a `team`, a team's own page, the same lines are drawn with only that team's in the accent and labelled, by
+// a `team`, a team's own page, the same lines are drawn with only that team's in its own colour and labelled, by
 // its name, and pointing at the plot does nothing. Otherwise each line and leader carries a faint tint of its
 // team's colour (lib/tint.ts), full strength while the team is previewed. The plot stretches with the card;
 // the tick lane and the label lane keep a fixed size, and the height is fixed too, so the label layout worked
@@ -18,7 +18,7 @@ interface Props {
   season: SeasonView;
   /** The teams to draw, in rating order; leave it out for the whole league. The scale is always the league's. */
   teams?: readonly Abbr[];
-  /** The page's own team, on a team's page: its line alone is in the accent and labelled. */
+  /** The page's own team, on a team's page: its line alone is in its own colour and labelled. */
   team?: Abbr;
   /** Plot height in px, the same at every width. */
   height?: number;
@@ -133,7 +133,7 @@ const scroll = minDayWidth > 0;
             </g>
           );
         })}
-        {labels.map((l) => <circle class:list={["end", { own: l.a === team }]} data-team={l.a} cx="0" cy={l.y.toFixed(1)} r="4" />)}
+        {labels.map((l) => <circle class:list={["end", { own: l.a === team }]} data-team={l.a} style={tint[l.a]} cx="0" cy={l.y.toFixed(1)} r="4" />)}
       </svg>
       <div class="xs">
         {xLabels.map((l) => (
@@ -175,15 +175,15 @@ const scroll = minDayWidth > 0;
   .marker { stroke: var(--muted); stroke-width: 1; }
   .line { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; stroke-linejoin: round; }
   .line.hov { stroke: var(--text); stroke-opacity: 1; stroke-width: 1.5; }
-  .line.own { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
+  .line.own { stroke: var(--tint); stroke-opacity: 1; stroke-width: 2; }
   .leader { fill: none; stroke: var(--line-other); stroke-opacity: 0.6; stroke-width: 1; }
-  .leader.own { stroke: var(--accent); stroke-opacity: 1; }
+  .leader.own { stroke: var(--tint); stroke-opacity: 1; }
   .tinted :is(.line, .leader) { stroke: var(--tint-rest); stroke-opacity: 1; }
   .tinted .line.hov { stroke: var(--tint); stroke-opacity: 1; stroke-width: 1.75; }
   .tinted .leader.hov { stroke: var(--tint); }
   .tinted:has(.hov) :is(.line, .leader):not(.hov) { opacity: 0.4; }
   .lab.hov { fill: var(--text); }
   .lab.own { fill: var(--text); font-weight: 600; }
-  .end { display: none; fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+  .end { display: none; fill: var(--tint); stroke: var(--surface); stroke-width: 2; }
   .end.own { display: inline; }
 </style>
