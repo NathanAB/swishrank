@@ -3,13 +3,14 @@
 // is a dot at its rating, joined by a curve to its row, so ties bunch and the gaps between tiers open up. On a
 // wide screen the rating chart runs left of that scale and on it, so each team's line ends at its dot and the
 // curve carries it on to its row, which is the line's label. The scale spans every rating of the season
-// (ratingRange), so a line that ran higher or lower than today's table still fits. Everything is drawn in
-// fractions of the rows' height and stretched over them, so it fits the desktop's one-line rows and the
-// phone's two-line rows without measuring anything in the browser. Narrower, the chart stacks above the
-// table on its own axis, and the table keeps its scale. Each team's line, curve and dot carry a faint tint of
-// its colour (lib/tint.ts), which goes full strength while the team is previewed; the rows stay ink. Given a
-// conference, only its teams are drawn and listed, ranked among themselves, on the same league-wide scale, so
-// a rating sits at the same height in every view.
+// (ratingRange), so a line that ran higher or lower than today's table still fits. Rows have a fixed height,
+// so every height (line ends, dots, curves, ticks) is worked out here in px of the wide screen's rows, and
+// lines, curves and dots are all drawn in SVG on those px, so they meet exactly. The phone's taller rows
+// stretch that drawing evenly, and the dots are round strokes that do not stretch with it. Narrower, the
+// chart stacks above the table on its own axis, and the table keeps its scale. Each team's line, curve and
+// dot carry a faint tint of its colour (lib/tint.ts), which goes full strength while the team is previewed;
+// the rows stay ink. Given a conference, only its teams are drawn and listed, ranked among themselves, on the
+// same league-wide scale, so a rating sits at the same height in every view.
 import RatingChart from "./RatingChart.astro";
 import { dateTicks, playoffsMark } from "../lib/chart.ts";
 import { START } from "../lib/elo.ts";
@@ -34,15 +35,16 @@ const shown = Object.fromEntries(order.map((a) => [a, Math.round(m.r[a])]));
 const { lo, hi } = ratingRange(m);
 const n = order.length;
 const tint = tintStyles(m.data.teams);
-// Fractions of the body's height: row i's centre, and a rating's place on a scale from the first row's
+// Px down the body on a wide screen: row i's centre, and a rating's place on a scale from the first row's
 // centre (the season's top rating) to the last row's (its bottom one).
-const rowY = (i: number) => (i + 0.5) / n;
-const valY = (v: number) => (hi === lo ? 0.5 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
-const Y = 1000; // the scale's viewBox height
-const f = (x: number) => (x * Y).toFixed(1);
+const ROW = 32; // a row's height on a wide screen; the styles read it as --row-wide
+const Y = n * ROW; // the body's height, and the drawing's viewBox height
+const rowY = (i: number) => (i + 0.5) * ROW;
+const valY = (v: number) => (hi === lo ? Y / 2 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
+const f = (y: number) => y.toFixed(2);
 
 // Round values to label on the scale, counted from 1500 so every gap between them is the same step. At most
-// six steps across the range keeps them over 150px apart on the desktop's 960px body.
+// six steps across the range keeps them over 150px apart on the desktop's 960px league body.
 const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 6) ?? 500;
 const marks: number[] = [];
 for (let v = START - Math.floor((START - lo) / step) * step; v <= hi; v += step) marks.push(v);
@@ -55,15 +57,13 @@ const ser = m.series;
 const charted = ser.length >= 2;
 const X = 1000; // the plot's viewBox width
 const at = (i: number) => i / (ser.length - 1);
-// Each line ends on its dot, at the displayed rating.
-const lines = order
-  .map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(i === ser.length - 1 ? shown[a] : d.r[a]))}`).join(" ") }))
-  .reverse();
+// Lines run through the displayed (rounded) ratings, as the dots do, so each one ends on its dot.
+const lines = order.map((a) => ({ a, points: ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(Math.round(d.r[a])))}`).join(" ") })).reverse();
 const dates = dateTicks(ser.map((d) => d.day));
 const playoffs = playoffsMark(m);
 ---
 
-<div class:list={["lt", { charted }]}>
+<div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-wide: ${ROW}px`}>
   <div class="stacked"><RatingChart season={season} teams={order} height={400} minDayWidth={2} /></div>
   <table>
     <thead>
@@ -87,11 +87,11 @@ const playoffs = playoffsMark(m);
               <td class="lad" rowspan={n} aria-hidden="true">
                 <div class="lad-in">
                   {marks.map((v) => (
-                    <span class:list={["tick", { start: v === START }]} style={`top: ${(valY(v) * 100).toFixed(2)}%`}>{v}</span>
+                    <span class="tick" style={`top: calc(${(valY(v) / ROW).toFixed(4)} * var(--row))`}>{v}</span>
                   ))}
                   {charted && (
                     <svg class="history" data-plot viewBox={`0 0 ${X} ${Y}`} preserveAspectRatio="none">
-                      {marks.map((v) => <path class:list={["grid", { start: v === START }]} d={`M0,${f(valY(v))}H${X}`} />)}
+                      {marks.map((v) => <path class="grid" d={`M0,${f(valY(v))}H${X}`} />)}
                       {playoffs && <path class="marker" d={`M${(at(playoffs.i) * X).toFixed(1)},0V${Y}`} />}
                       <g>
                         {lines.map((l) => (
@@ -105,10 +105,15 @@ const playoffs = playoffsMark(m);
                     {curves.map((c) => (
                       <path class="lead" data-team={c.a} data-raise style={tint[c.a]} d={`M0,${f(c.from)}C50,${f(c.from)} 50,${f(c.to)} 100,${f(c.to)}`} />
                     ))}
+                    <g>
+                      {curves.map((c) => (
+                        <g class="dot" data-team={c.a} data-preview data-raise style={tint[c.a]}>
+                          <path class="ring" d={`M0,${f(c.from)}h0`} />
+                          <path class="pin" d={`M0,${f(c.from)}h0`} />
+                        </g>
+                      ))}
+                    </g>
                   </svg>
-                  {curves.map((c) => (
-                    <i class="dot" data-team={c.a} data-preview style={`${tint[c.a]}; top: ${(c.from * 100).toFixed(2)}%`} />
-                  ))}
                 </div>
               </td>
             )}
@@ -143,7 +148,7 @@ const playoffs = playoffsMark(m);
 <style>
   /* --tl is the tick lane on the scale's left and --cv the curves' lane on its right; the axis runs between
      them, and on a wide screen the chart's plot fills the space between the two. */
-  .lt { --row: 32px; --tl: 38px; --cv: 86px; }
+  .lt { --row: var(--row-wide); --tl: 38px; --cv: 86px; }
   table { width: 100%; border-collapse: collapse; }
   th {
     height: 36px; padding: 0 8px; font-size: var(--fs-small); font-weight: 400; color: var(--muted);
@@ -176,29 +181,30 @@ const playoffs = playoffsMark(m);
   .mark-label, .history, .dates { display: none; }
   /* Above the rows' links, so the plot takes the pointer. */
   td.lad { position: relative; z-index: 2; border-bottom: 0; }
-  .lad-in { position: absolute; inset: 0; }
-  .lad svg { position: absolute; top: 0; height: 100%; overflow: visible; }
+  /* The cell starts below half of the header's collapsed 1px rule, so the drawing moves up by that half to
+     sit on the rows. */
+  .lad-in { position: absolute; inset: -0.5px 0 0; }
+  /* Exactly the rows' height: on a wide screen one px of the drawing is one px on screen. */
+  .lad svg { position: absolute; top: 0; height: calc(var(--rows) * var(--row)); overflow: visible; }
   .rail { left: calc(100% - var(--cv)); width: var(--cv); }
   .history { left: var(--tl); width: calc(100% - var(--tl) - var(--cv)); }
   .lad path, .lad polyline { fill: none; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--grid); stroke-width: 1; }
-  .lead { stroke: var(--tint); stroke-opacity: var(--tint-rest); stroke-width: 1; }
-  .lead.hov { stroke-opacity: 1; stroke-width: 1.5; }
+  .lead { stroke: var(--tint-rest); stroke-width: 1; }
+  .lead.hov { stroke: var(--tint); stroke-width: 1.5; }
   .grid { stroke: var(--grid); stroke-width: 1; }
-  .grid.start { stroke: var(--muted); stroke-opacity: 0.7; stroke-dasharray: 3 3; }
   .marker { stroke: var(--muted); stroke-width: 1; }
-  .line { stroke: var(--tint); stroke-opacity: var(--tint-rest); stroke-width: 1; stroke-linejoin: round; }
-  .line.hov { stroke-opacity: 1; stroke-width: 1.75; }
+  .line { stroke: var(--tint-rest); stroke-width: 1; stroke-linejoin: round; }
+  .line.hov { stroke: var(--tint); stroke-width: 1.75; }
   .tick {
     position: absolute; right: calc(100% - var(--tl) + 8px); transform: translateY(-50%);
     font-size: 11px; line-height: 12px; color: var(--muted);
   }
-  .tick.start { color: var(--text); font-weight: 500; }
-  .dot {
-    position: absolute; left: calc(100% - var(--cv)); width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
-    background: color-mix(in srgb, var(--tint) calc(var(--tint-rest) * 100%), var(--surface)); box-shadow: 0 0 0 1.5px var(--surface);
-  }
-  .dot.hov { background: var(--tint); }
+  /* A dot is a round cap on a zero-length stroke, 6px across with a 1.5px ring of the surface, at any stretch. */
+  .dot path { stroke-linecap: round; }
+  .ring { stroke: var(--surface); stroke-width: 9; }
+  .pin { stroke: var(--tint-rest); stroke-width: 6; }
+  .dot.hov .pin { stroke: var(--tint); }
   .mark-label {
     position: absolute; bottom: 2px; left: calc(var(--tl) + (100% - var(--tl) - var(--cv)) * var(--at));
     transform: translateX(calc(-100% - 4px)); font-size: 11px; line-height: 16px;
