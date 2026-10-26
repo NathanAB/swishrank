@@ -28,7 +28,7 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   docTitle={conference ? `${season.label} ${conference} ratings` : undefined}
   route={{ kind: "home", season, conference }}
 >
-  <Fragment slot="lede"><a class="what" href={href({ kind: "about" })}>What's Elo?</a></Fragment>
+  <Fragment slot="lede">{season.note && <>{season.note}. </>}<a class="what" href={href({ kind: "about" })}>What's Elo?</a></Fragment>
 
   <Panel title={conference ? `${conference}ern Conference` : "League table"}>
     <Segmented slot="aside" label="Conference" options={views} />

@@ -14,12 +14,17 @@ test("the conference map agrees with the data's Cup groups and playoff rounds", 
   for (const { season, games } of seasons) {
     for (const g of games) {
       const named = g.note?.match(/^(?:NBA Play-In - )?(East|West)\b/)?.[1];
-      const want = named ?? (g.note === "NBA Cup - Group Play" ? conferenceOf(g.home) : undefined);
+      const want = named ?? (stage(g.note).label === "Cup" ? conferenceOf(g.home) : undefined);
       if (want === undefined) continue;
       for (const abbr of [g.home, g.away]) if (conferenceOf(abbr) !== want) wrong.push(`${season} ${g.id}: ${abbr} is not ${want}`);
     }
   }
   assert.deepEqual(wrong, []);
+});
+
+test("every team in every season has a conference", () => {
+  const unmapped = seasons.flatMap(({ season, teams }) => Object.keys(teams).filter((a) => conferenceOf(a) === null).map((a) => `${season} ${a}`));
+  assert.deepEqual(unmapped, []);
 });
 
 test("a conference's table holds only its teams, ranked from 1 among themselves", () => {

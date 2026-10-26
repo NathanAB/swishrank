@@ -14,6 +14,8 @@ export type SeasonView = SeasonRef & {
   start: string;
   /** Last day for a finished season; null for the current one. */
   end: string | null;
+  /** A line on what set the season apart, such as the 2019-20 bubble, from seasons.json; null for most. */
+  note: string | null;
   /** compute()'s model: ratings, ranks, results, logs, stats, daily series, upcoming games. */
   model: Season;
 };
@@ -62,10 +64,10 @@ function parseSeasonData(raw: unknown, id: string): SeasonData {
   return { season: id, teams, games };
 }
 
-type Entry = { id: string; start: string; end: string | null };
+type Entry = { id: string; start: string; end: string | null; note: string | null };
 
-function parseList(raw: readonly { id: string; start: string; end?: string }[]): { current: Entry; all: Entry[] } {
-  const all = raw.map((s) => ({ id: s.id, start: s.start, end: s.end ?? null })).sort((a, b) => b.start.localeCompare(a.start));
+function parseList(raw: readonly { id: string; start: string; end?: string; note?: string }[]): { current: Entry; all: Entry[] } {
+  const all = raw.map((s) => ({ id: s.id, start: s.start, end: s.end ?? null, note: s.note ?? null })).sort((a, b) => b.start.localeCompare(a.start));
   const [current, ...others] = all.filter((s) => s.end === null);
   if (!current || others.length) throw new Error(`src/data/seasons.json: exactly one season must have no "end"`);
   return { current, all };
@@ -85,6 +87,7 @@ function load(entry: Entry): SeasonView {
     label: seasonLabel(entry.id),
     start: entry.start,
     end: entry.end,
+    note: entry.note,
     model: compute(parseSeasonData(raw, entry.id)),
   };
   cache.set(entry.id, view);

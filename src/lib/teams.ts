@@ -36,18 +36,18 @@ export type Phase = "regular" | "play-in" | "playoffs";
 export type Stage = { phase: Phase; label: string | null };
 
 // ESPN's game notes, tried in order. "NBA Cup - Semifinals" is a regular-season game, so the conference
-// rounds are matched on their whole prefix.
+// rounds are matched on their whole prefix. The Cup was the In-Season Tournament in its first season, 2023-24.
 const STAGES: readonly (readonly [RegExp, Phase, string])[] = [
   [/^NBA Finals - Game (\d+)$/, "playoffs", "Finals game $1"],
   [/^(East|West) Finals - Game (\d+)$/, "playoffs", "$1 finals game $2"],
   [/^(East|West) Semifinals - Game (\d+)$/, "playoffs", "$1 semis game $2"],
   [/^(East|West) 1st Round - Game (\d+)$/, "playoffs", "1st round game $2"],
   [/^NBA Play-In\b.*$/, "play-in", "Play-In"],
-  [/^NBA Cup Championship$/, "regular", "Cup final"],
-  [/^NBA Cup - Semifinals$/, "regular", "Cup semifinal"],
-  [/^NBA Cup - Quarterfinals$/, "regular", "Cup quarterfinal"],
-  [/^NBA Cup - Group Play$/, "regular", "Cup"],
-  [/^NBA (.+) Game \d{4}$/, "regular", "$1"],
+  [/^NBA (?:Cup|In-Season Tournament) Championship$/, "regular", "Cup final"],
+  [/^NBA (?:Cup|In-Season Tournament) - Semifinals$/, "regular", "Cup semifinal"],
+  [/^NBA (?:Cup|In-Season Tournament) - Quarterfinals$/, "regular", "Cup quarterfinal"],
+  [/^NBA (?:Cup|In-Season Tournament) - Group Play$/, "regular", "Cup"],
+  [/^NBA (.+?) Games?(?: \d{4})?$/, "regular", "$1"],
 ];
 
 export function stage(note: string | null): Stage {
