@@ -75,5 +75,5 @@ test("a 43-point win counts at most four times a 1-point win, and a loss counts 
 });
 
 test("equal displayed ratings share a rank and the next rank skips", () => {
-  assert.deepEqual(ranksOf({ A: 1523.4, B: 1522.6, C: 1510, D: 1530 }), { D: 1, A: 2, B: 2, C: 4 });
+  assert.deepEqual(ranksOf({ A: 1023.4, B: 1022.6, C: 1010, D: 1030 }), { D: 1, A: 2, B: 2, C: 4 });
 });
