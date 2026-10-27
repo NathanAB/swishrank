@@ -38,12 +38,14 @@ const n = order.length;
 // The longest nickname in the league, so the team column, and with it the chart, keeps one width in every view.
 const longest = Math.max(...m.abbrs.map((a) => m.data.teams[a].short.length));
 const tint = tintStyles(m.data.teams);
-// Px down the body on a wide screen: row i's centre, and a rating's place on a scale from the first row's
-// centre (the season's top rating) to the last row's (its bottom one).
+// Px down the body on a wide screen: row i's centre, and a rating's place on a scale from the league's first
+// row's centre (the season's top rating) to its last row's (its bottom one). A conference's rows are taller,
+// so its body is the league's height, and the scale keeps the league's ends, so it matches in every view.
 const ROW_WIDE = 26;
-const Y = n * ROW_WIDE; // the body's height, and the drawing's viewBox height
-const rowY = (i: number) => (i + 0.5) * ROW_WIDE;
-const valY = (v: number) => (hi === lo ? Y / 2 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
+const ROW = (ROW_WIDE * m.abbrs.length) / n; // this view's row on a wide screen, as --row sets it
+const Y = n * ROW; // the body's height, and the drawing's viewBox height
+const rowY = (i: number) => (i + 0.5) * ROW;
+const valY = (v: number) => (hi === lo ? Y / 2 : ROW_WIDE / 2 + ((hi - v) / (hi - lo)) * (Y - ROW_WIDE));
 const f = (y: number) => y.toFixed(2);
 
 // Round values to label on the scale, counted from 1000 so every gap between them is the same step. At most
@@ -107,7 +109,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
               <td class="lad" rowspan={n} aria-hidden="true" data-preview>
                 <div class="lad-in">
                   {marks.map((v) => (
-                    <span class="tick" style={`top: calc(${(valY(v) / ROW_WIDE).toFixed(4)} * var(--row))`}>{v}</span>
+                    <span class="tick" style={`top: calc(${(valY(v) / ROW).toFixed(4)} * var(--row))`}>{v}</span>
                   ))}
                   {charted && (
                     <svg
