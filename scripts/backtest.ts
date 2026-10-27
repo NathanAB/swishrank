@@ -4,7 +4,7 @@
 // or PROVISIONAL differ from what the plan chose, or when the pre-registration's text has changed.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { counted, ELO_PER_SIGMA, fitSeason, PARAMS, phi, PROVISIONAL, type FitRule, type HomeRule, type MarginRule, type SeasonData } from "../src/lib/elo.ts";
+import { counted, ELO_PER_SIGMA, fitSeason, PARAMS, phi, PROVISIONAL, START, type FitRule, type HomeRule, type MarginRule, type SeasonData } from "../src/lib/elo.ts";
 import {
   accuracy, brier, compare, eloScored, fitSigma, HELD_OUT, inSeasons, LOG_ONLY, loadSeason, logLoss, loss, mean, modelRows,
   price, TUNING, windows, worse, worseJudged, type Diff, type Row, type Scored,
@@ -238,7 +238,7 @@ if (!site || !best) {
   const eloPerUnit = ELO_PER_SIGMA / site.c.sigma;
   section(
     "Table 9. The Elo scale",
-    `A rating is 1500 plus the fitted rating times ${ELO_PER_SIGMA.toFixed(1)} / SIGMA Elo points, so a gap of g Elo points means Phi(g / ${ELO_PER_SIGMA.toFixed(1)}), the model's own chance. ${ELO_PER_SIGMA.toFixed(1)} is 400 x 1.702 / ln 10, the scale at which the normal curve sits closest to classic Elo's logistic: the largest gap between the two chances over 0 to 1200 points is ${maxErr.toFixed(4)}.`,
+    `A rating is ${START} plus the fitted rating times ${ELO_PER_SIGMA.toFixed(1)} / SIGMA Elo points, so a gap of g Elo points means Phi(g / ${ELO_PER_SIGMA.toFixed(1)}), the model's own chance. ${ELO_PER_SIGMA.toFixed(1)} is 400 x 1.702 / ln 10, the scale at which the normal curve sits closest to classic Elo's logistic: the largest gap between the two chances over 0 to 1200 points is ${maxErr.toFixed(4)}.`,
     table(
       ["Quantity", "Value"],
       [

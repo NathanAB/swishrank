@@ -52,7 +52,7 @@ export const upset = (o: Outcome) => percent(o.winner.chance) < UPSET;
 
 /**
  * The lowest and highest displayed rating any team has held this season, today included, so a scale over it
- * fits every day of every team's line. It always holds the 1500 every team starts at.
+ * fits every day of every team's line. It always holds the 1000 every team starts at.
  */
 export function ratingRange(model: Season): { lo: number; hi: number } {
   const all = model.abbrs.flatMap((a) => [model.stats[a].lo, model.stats[a].hi, model.r[a]]).map(Math.round);

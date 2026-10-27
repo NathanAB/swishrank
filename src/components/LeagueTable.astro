@@ -46,7 +46,7 @@ const rowY = (i: number) => (i + 0.5) * ROW_WIDE;
 const valY = (v: number) => (hi === lo ? Y / 2 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
 const f = (y: number) => y.toFixed(2);
 
-// Round values to label on the scale, counted from 1500 so every gap between them is the same step. At most
+// Round values to label on the scale, counted from 1000 so every gap between them is the same step. At most
 // six steps across the range keeps them over 150px apart on the desktop's 960px league body.
 const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 6) ?? 500;
 const marks: number[] = [];

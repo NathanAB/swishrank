@@ -95,7 +95,7 @@ export function runEnds(model: Season): Record<Abbr, string | null> {
 }
 
 /**
- * The high and low a team page shows. Every team starts at 1500, so a team that never fell below it has the
+ * The high and low a team page shows. Every team starts at 1000, so a team that never fell below it has the
  * start for its low, and one that never rose above it the start for its high; the unit says so.
  */
 export function highLow(s: TeamStats): { value: string; unit?: string } {

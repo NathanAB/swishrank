@@ -19,7 +19,7 @@ test("day labels end on the last day, at least two label widths apart on a plot 
 });
 
 test("a rating axis takes the finest round step with at most six ticks, so the lines fill most of its height", () => {
-  // The 2026-27 opening week ran from 1417 to 1606: steps of 50 fit, where 100 would leave 1600 to 1700 empty.
-  assert.deepEqual(ratingTicks(1417, 1606), { lo: 1400, hi: 1650, ticks: [1400, 1450, 1500, 1550, 1600, 1650] });
-  assert.deepEqual(ratingTicks(1257, 1768), { lo: 1200, hi: 1800, ticks: [1200, 1350, 1500, 1650, 1800] });
+  // The 2026-27 opening week ran from 917 to 1106: steps of 50 fit, where 100 would leave 1100 to 1200 empty.
+  assert.deepEqual(ratingTicks(917, 1106), { lo: 900, hi: 1150, ticks: [900, 950, 1000, 1050, 1100, 1150] });
+  assert.deepEqual(ratingTicks(757, 1268), { lo: 700, hi: 1300, ticks: [700, 850, 1000, 1150, 1300] });
 });

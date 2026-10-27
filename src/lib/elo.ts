@@ -1,8 +1,8 @@
 // Elo-style ratings for NBA teams, worked out like SRS or Massey ratings: after every game day the season's
-// ratings are fitted again, by least squares, to the margins of every game so far. 1500 is the league
+// ratings are fitted again, by least squares, to the margins of every game so far. 1000 is the league
 // average and nothing carries over from last season. docs/model.md holds the backtest behind every setting.
 
-export const START = 1500;
+export const START = 1000;
 export const TZ = "America/New_York";
 
 export type Abbr = string;
@@ -179,7 +179,7 @@ type Pair = { h: number; a: number };
 export type Result = { game: Game; day: string; p: number; pre: Pair; post: Pair };
 export type Snapshot = { day: string; r: Record<Abbr, number> };
 export type TeamGame = { result: Result; side: "h" | "a" };
-/** `hi` and `lo` are the team's highest and lowest rating on any day of the season, 1500 included. */
+/** `hi` and `lo` are the team's highest and lowest rating on any day of the season, 1000 included. */
 export type TeamStats = { W: number; L: number; hi: number; lo: number };
 
 export type Season = {
