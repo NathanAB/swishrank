@@ -42,10 +42,11 @@ const tint = tintStyles(m.data.teams);
 // row's centre (the season's top rating) to its last row's (its bottom one). A conference's rows are taller,
 // so its body is the league's height, and the scale keeps the league's ends, so it matches in every view.
 const ROW_WIDE = 26;
-const ROW = (ROW_WIDE * m.abbrs.length) / n; // this view's row on a wide screen, as --row sets it
-const Y = n * ROW; // the body's height, and the drawing's viewBox height
+const ROW = (ROW_WIDE * m.abbrs.length) / n; // this view's row on a wide screen
+const Y = n * ROW; // the body's height, the league's in every view, and the drawing's viewBox height
 const rowY = (i: number) => (i + 0.5) * ROW;
-const valY = (v: number) => (hi === lo ? Y / 2 : ROW_WIDE / 2 + ((hi - v) / (hi - lo)) * (Y - ROW_WIDE));
+const top = ROW_WIDE / 2, bottom = Y - ROW_WIDE / 2; // the league's first and last row centres
+const valY = (v: number) => (hi === lo ? Y / 2 : top + ((hi - v) / (hi - lo)) * (bottom - top));
 const f = (y: number) => y.toFixed(2);
 
 // Round values to label on the scale, counted from 1000 so every gap between them is the same step. At most
@@ -79,7 +80,7 @@ const PLOT_MIN = 530, MARK_LABEL = 150, MONTH_LABEL = 30, DAY_LABEL = 40;
 const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN), ser.length, seasonEnd, { mark: MARK_LABEL / PLOT_MIN, tick: MONTH_LABEL / PLOT_MIN });
 ---
 
-<div class:list={["lt", { charted }]} style={`--rows: ${n}; --league: ${m.abbrs.length}; --row-wide: ${ROW_WIDE}px; --name: ${longest}ch`}>
+<div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-view: ${ROW}px; --name: ${longest}ch`}>
   <div class="stacked"><RatingChart season={season} teams={order} height={400} /></div>
   <table>
     <thead>
@@ -177,7 +178,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
      them, and on a wide screen the chart's plot fills the space between the two. */
   /* A conference's rows are as much taller as it has fewer teams, so every view is the league's height and a
      rating sits at the same place in each; switching All, East and West moves nothing. */
-  .lt { --row: calc(var(--row-wide) * var(--league) / var(--rows)); --tl: 38px; --cv: 86px; }
+  .lt { --row: var(--row-view); --tl: 38px; --cv: 86px; }
   table { width: 100%; border-collapse: collapse; }
   th {
     height: 18px; padding: 0 8px 2px; vertical-align: bottom; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted);

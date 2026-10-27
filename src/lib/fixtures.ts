@@ -24,8 +24,11 @@ export type FixtureDay = { day: string; fixtures: Fixture[] };
 export const WEEK = 7;
 
 /** A game priced on `model`'s current ratings and home edge, and the games each side has played. */
-export function fixture(game: Game, model: Pick<Season, "r" | "home" | "log">): Fixture {
-  const p = winProb(gap(game, model.r, model.home), played(model.log, game));
+export const fixture = (game: Game, model: Pick<Season, "r" | "home" | "log">): Fixture =>
+  priced(game, winProb(gap(game, model.r, model.home), played(model.log, game)));
+
+/** A game with `p`, the home side's chance. */
+export function priced(game: Game, p: number): Fixture {
   return {
     game,
     lines: [

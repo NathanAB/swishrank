@@ -1,13 +1,13 @@
 ---
 // One day's games still to play, one tile each: the tip-off in US Eastern, then away at home, then each
-// side's win chance from today's ratings at its end of a bar split at that chance, each part in its team's
-// colour. The favourite's name and chance are in ink, whether home or away.
+// side's win chance from today's ratings on its chance bar. The favourite's name and chance are in ink,
+// whether home or away.
+import ChanceBar from "./ChanceBar.astro";
 import GameDay from "./GameDay.astro";
 import type { FixtureDay } from "../lib/fixtures.ts";
-import { longDay, nearDay, pct, tipTime, weekdayDay } from "../lib/format.ts";
+import { longDay, nearDay, tipTime, weekdayDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import { TODAY, team, type SeasonView } from "../lib/season.ts";
-import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
   season: SeasonView;
@@ -17,7 +17,6 @@ interface Props {
 }
 
 const { season, day, lead = false } = Astro.props;
-const tint = tintStyles(season.model.data.teams);
 const near = nearDay(day.day, TODAY);
 ---
 
@@ -32,14 +31,7 @@ const near = nearDay(day.day, TODAY);
           <span class:list={{ fav: f.fav === "a" }}>{name(away.abbr)}</span>
           <span class:list={{ fav: f.fav === "h" }}>{f.game.neutral ? "vs " : "at "}{name(home.abbr)}</span>
         </div>
-        <div class="odds">
-          <span class:list={["num", { fav: f.fav === "a" }]}>{pct(away.chance)}</span>
-          <span class="bar" aria-hidden="true" style={`grid-template-columns: ${away.chance}fr ${home.chance}fr`}>
-            <i data-team={away.abbr} style={tint[away.abbr]} />
-            <i data-team={home.abbr} style={tint[home.abbr]} />
-          </span>
-          <span class:list={["num r", { fav: f.fav === "h" }]}>{pct(home.chance)}</span>
-        </div>
+        <ChanceBar fixture={f} teams={season.model.data.teams} />
       </li>
     );
   })}
@@ -47,15 +39,8 @@ const near = nearDay(day.day, TODAY);
 
 <style>
   .top { min-height: 18px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
-  .teams, .odds { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
+  .teams { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
   .teams > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .odds .num { flex: none; width: 3.5ch; }
-  .r { text-align: right; }
   .fav { color: var(--text); font-weight: 500; }
-  /* The two parts meet at the chance, split by a 2px gap in the tile's own colour. */
-  .bar { flex: 1; display: grid; column-gap: 2px; height: 6px; }
-  .bar i { background: var(--tint); }
-  .bar i:first-child { border-radius: 3px 0 0 3px; }
-  .bar i:last-child { border-radius: 0 3px 3px 0; }
   .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
 </style>
