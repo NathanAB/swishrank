@@ -115,6 +115,9 @@ svg { display: block; }
 .tip i { margin-left: 6px; font-style: normal; }
 .tip > span { display: block; }
 
+/* A game's tile, on the games page and How it works. */
+.tile { min-width: 0; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; }
+
 /* Every figure in a column or a strip lines up digit for digit. */
 .num, table { font-variant-numeric: tabular-nums; }
 

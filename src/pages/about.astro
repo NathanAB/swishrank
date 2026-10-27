@@ -4,9 +4,10 @@
 // docs/model.md holds the backtest behind each setting.
 import ChanceBar from "../components/ChanceBar.astro";
 import Panel from "../components/Panel.astro";
+import ResultTile from "../components/ResultTile.astro";
 import Base from "../layouts/Base.astro";
-import { counted, dayKey, EARLY, gap, PARAMS, played, START, winProb } from "../lib/elo.ts";
-import { UPSET, type Outcome } from "../lib/facts.ts";
+import { counted, dayKey, EARLY, gap, PARAMS, START, winProb } from "../lib/elo.ts";
+import { outcome, upset, UPSET, type Outcome } from "../lib/facts.ts";
 import { nextDays, priced, WEEK } from "../lib/fixtures.ts";
 import { int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
@@ -107,16 +108,19 @@ const chanceTicks = [0.5, 0.75, 1];
 const ahead = model && nextDays(model, TODAY, WEEK).flatMap((d) => d.fixtures)[0];
 const last = model?.results.at(-1);
 const shown = model && (ahead
-  ? { fixture: ahead, r: model.r, played: played(model.log, ahead.game), ahead: true }
+  ? { fixture: ahead, r: model.r, games: (a: string) => model.log[a].length, ahead: true }
   : last && {
     fixture: priced(last.game, last.p), r: { [last.game.home]: last.pre.h, [last.game.away]: last.pre.a }, ahead: false,
-    played: Math.min(...[last.game.home, last.game.away].map((a) => model.log[a].findIndex((t) => t.result === last))),
+    games: (a: string) => model.log[a].findIndex((t) => t.result === last),
   });
 const example = shown && (() => {
   const { fixture: f, r } = shown;
   const g = f.game;
   const court = g.neutral ? 0 : Math.round(model!.home);
   const sum = Math.round(r[g.home]) + court - Math.round(r[g.away]);
+  // The side with fewer games played, or both when level: the one that softens the chances.
+  const [fewer, more] = [g.home, g.away].sort((x, y) => shown.games(x) - shown.games(y));
+  const fewest = shown.games(fewer);
   return {
     fixture: f,
     ahead: shown.ahead,
@@ -128,12 +132,21 @@ const example = shown && (() => {
       { label: name(g.away), value: `${MINUS}${rating(r[g.away])}` },
     ],
     gap: sum < 0 ? `${MINUS}${int(-sum)}` : int(sum),
-    early: shown.played < EARLY.games && {
-      played: shown.played,
+    early: fewest < EARLY.games && {
+      who: shown.games(more) === fewest ? "Both teams have" : `The ${name(fewer)} have`,
+      played: fewest,
       fav: name(f.fav === "h" ? g.home : g.away),
       later: pct(winProb(Math.abs(gap(g, r, model!.home)))),
     },
   };
+})();
+// The latest upset, from the newest season that has one: a new season can go weeks without.
+const lastUpset = (() => {
+  for (const s of allSeasons()) {
+    const o = s.model.results.map(outcome).findLast(upset);
+    if (o) return { season: s, outcome: o, when: `${weekdayDay(o.result.day)}${s.id === season?.id ? "" : `, ${s.label} season`}` };
+  }
+  return null;
 })();
 
 ---
@@ -261,16 +274,16 @@ const example = shown && (() => {
       </div>
     </Panel></li>
 
-    <li><Panel title="The chances on the games page">
+    <li><Panel title="A chance for every game">
       <div class="step">
         <div class="say">
-          <p>Each game still to play gets a chance for each side. Take the home team's rating, add home court, subtract the visitor's, and read the gap off the curve above.</p>
-          <p>A team's first {EARLY.games} games say little, so while either side has played fewer than that, the gap counts {EARLY.widen} times less and the chance stays closer to 50%.</p>
-          <p>In the results, a team that wins after being given less than a {UPSET}% chance is tagged Upset.</p>
+          <p>The games page gives both teams a chance to win every game still to play. Take the home team's rating, add home court, and subtract the visitor's rating. The bigger that gap, the bigger the favorite, along the curve above.</p>
+          <p>A team's first {EARLY.games} games say little about it. Until both teams have played that many, the gap counts for less, and the chance stays closer to 50%.</p>
+          <p>A 70% favorite still loses about 3 games in 10. When a team wins with less than a {UPSET}% chance, the games page marks it as an upset, like the latest one shown here.</p>
         </div>
         {example && (
           <div class="game">
-            <p class="day">{example.ahead ? `Next on the games page, ${example.day}` : `The season's last game, before tip-off, ${example.day}`}</p>
+            <p class="day">{example.ahead ? `Next on the games page · ${example.day}` : `The season's last game, before tip-off · ${example.day}`}</p>
             <div class="tile">
               <div class="teams">
                 {example.fixture.lines.map((l) => (
@@ -288,12 +301,18 @@ const example = shown && (() => {
                 </tr>
               ))}
               <tr class="total">
-                <th scope="row">Gap, in points</th>
+                <th scope="row">Rating gap</th>
                 <td>{example.gap}</td>
               </tr>
             </table>
             {example.early && (
-              <p class="note">With {int(example.early.played)} {example.early.played === 1 ? "game" : "games"} played, under {EARLY.games}, the gap counts {EARLY.widen} times less. Later in the season it would make the {example.early.fav} {example.early.later} favorites.</p>
+              <p class="note">{example.early.who} played only {int(example.early.played)} {example.early.played === 1 ? "game" : "games"}, so these chances sit closer to 50%. Later in the season, the same ratings would make the {example.early.fav} {example.early.later} favorites.</p>
+            )}
+            {lastUpset && (
+              <Fragment>
+                <p class="from">The latest upset · {lastUpset.when}</p>
+                <ResultTile as="div" season={lastUpset.season} outcome={lastUpset.outcome} />
+              </Fragment>
             )}
           </div>
         )}
@@ -353,7 +372,7 @@ const example = shown && (() => {
   .say p + p { margin-top: 12px; }
   .sum .total :is(th, td) { padding-top: 6px; border-top: 1px solid var(--rule); }
   /* The game as a tile on the games page shows it. */
-  .tile { max-width: 340px; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; }
+  .game :global(.tile) { max-width: 340px; }
   .tile .teams { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
   .tile .teams > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tile .fav { color: var(--text); font-weight: 500; }
