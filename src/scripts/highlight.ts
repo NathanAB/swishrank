@@ -1,8 +1,9 @@
 // The site's interactions. A team shown in several places on a page is highlighted in all of them while the
 // reader points at or focuses one. Every element that shows a team carries data-team. Two kinds of element
 // preview a team: a rating chart's plot (data-plot) previews the team whose line is nearest the pointer, and
-// an element that names a team (data-preview: a league table row's link, a dot on its scale) previews it
-// while pointed at or focused. A click on a link just follows it; a click on a plot or a dot opens the
+// an element that names a team (data-preview: a league table row, its link, a dot on its scale) previews it
+// while pointed at or focused; the nearest data-preview decides, so one without a team (the table's scale
+// cell) previews none. A click on a link just follows it; a click on a plot, a row or a dot opens the
 // previewed team's page. Every rating chart (data-chart) also reads out the day under the pointer: a thin
 // line at that day and a box with the team's rating and rank, the nearest team's or, on a team's page, that
 // team's (data-own). On a touch screen a tap shows the readout and a second tap on the same team opens its
@@ -150,7 +151,8 @@ for (const [svg, c] of charts) {
 }
 
 document.addEventListener("click", (e) => {
-  const to = closestOf(e.target, "[data-preview][data-href]")?.dataset.href;
+  if (closestOf(e.target, "a[href]")) return;
+  const to = closestOf(e.target, "[data-preview]")?.dataset.href;
   if (to) location.assign(to);
 });
 
