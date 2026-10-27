@@ -102,9 +102,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
       {order.map((a, i) => {
         const s = m.stats[a];
         return (
-          <tr data-team={a}>
+          <tr data-team={a} data-preview data-href={href({ kind: "team", season, abbr: a })}>
             {i === 0 && (
-              <td class="lad" rowspan={n} aria-hidden="true">
+              <td class="lad" rowspan={n} aria-hidden="true" data-preview>
                 <div class="lad-in">
                   {marks.map((v) => (
                     <span class="tick" style={`top: calc(${(valY(v) / ROW_WIDE).toFixed(4)} * var(--row))`}>{v}</span>
@@ -188,16 +188,15 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   th:last-child, td:last-child { padding-right: 0; }
   .rank { width: 32px; }
   td.team { color: var(--text); }
-  tbody tr { position: relative; }
-  .go::before { content: ""; position: absolute; inset: 0; z-index: 1; }
+  tbody td:not(.lad) { cursor: pointer; }
   .go:focus-visible { outline: none; }
   tr:has(.go:focus-visible) > td:not(.lad) { --ring-l: 0 0; --ring-r: 0 0; box-shadow: inset var(--ring-l) var(--accent), inset var(--ring-r) var(--accent), inset 0 2px var(--accent), inset 0 -2px var(--accent); }
   tr:has(.go:focus-visible) > td.rank { --ring-l: 2px 0; }
   tr:has(.go:focus-visible) > td:last-child { --ring-r: -2px 0; }
   .name { position: relative; display: inline-block; min-width: var(--name); font-weight: 500; line-height: calc(var(--row) - 1px); }
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
-  .go:hover .name { text-decoration: underline; text-underline-offset: 3px; }
-  .go:hover .name::after, tr.hov .name::after { background: var(--control); }
+  tr:has(> td:not(.lad):hover) .name { text-decoration: underline; text-underline-offset: 3px; }
+  tr:has(> td:not(.lad):hover) .name::after, tr.hov .name::after { background: var(--control); }
   td.rating { color: var(--text); font-weight: 600; }
   td.opt { color: var(--text); }
   .sub { display: none; }
@@ -206,8 +205,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .lad { width: calc(var(--tl) + var(--cv)); padding: 0; }
   th.lad { position: relative; padding-right: 8px; }
   .xs, .history { display: none; }
-  /* Above the rows' links, so the plot takes the pointer. */
-  td.lad { position: relative; z-index: 2; border-bottom: 0; }
+  td.lad { position: relative; border-bottom: 0; }
   /* The cell starts below half of the header's collapsed 1px rule, so the drawing moves up by that half to
      sit on the rows. */
   .lad-in { position: absolute; inset: -0.5px 0 0; }
