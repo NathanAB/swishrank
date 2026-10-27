@@ -1,6 +1,6 @@
 ---
 // One day of games on the games page: a heading row with the day, then the games as tiles in a grid that
-// fills the width it has, in tip-off order along each row. Each game is an li of the "g" class that labels
+// fills the width it has, in tip-off order along each row. Each game is an li tile (global.css) that labels
 // its own figures, so no column heading is shared between games.
 interface Props {
   /** The day as shown: "Sun, Oct 25". */
@@ -27,5 +27,4 @@ const { heading, meta, label, lead = false } = Astro.props;
   .lead h3 { font-size: var(--fs-card); }
   .meta { color: var(--muted); font-size: var(--fs-body); font-weight: 400; }
   .gs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); gap: 8px; }
-  .gs :global(.g) { min-width: 0; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; }
 </style>

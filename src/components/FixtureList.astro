@@ -25,7 +25,7 @@ const near = nearDay(day.day, TODAY);
     const [away, home] = f.lines;
     const name = (abbr: string) => <a class="nm" href={href({ kind: "team", season, abbr })}>{team(season, abbr).short}</a>;
     return (
-      <li class="g">
+      <li class="tile">
         <p class="top num">{tipTime(f.game.t)}</p>
         <div class="teams">
           <span class:list={{ fav: f.fav === "a" }}>{name(away.abbr)}</span>

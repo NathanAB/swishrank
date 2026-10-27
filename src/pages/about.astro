@@ -4,9 +4,10 @@
 // docs/model.md holds the backtest behind each setting.
 import ChanceBar from "../components/ChanceBar.astro";
 import Panel from "../components/Panel.astro";
+import ResultTile from "../components/ResultTile.astro";
 import Base from "../layouts/Base.astro";
 import { counted, dayKey, EARLY, gap, PARAMS, played, START, winProb } from "../lib/elo.ts";
-import { UPSET, type Outcome } from "../lib/facts.ts";
+import { outcome, upset, UPSET, type Outcome } from "../lib/facts.ts";
 import { nextDays, priced, WEEK } from "../lib/fixtures.ts";
 import { int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
@@ -134,6 +135,14 @@ const example = shown && (() => {
       later: pct(winProb(Math.abs(gap(g, r, model!.home)))),
     },
   };
+})();
+// The latest upset, from the newest season that has one: a new season can go weeks without.
+const lastUpset = (() => {
+  for (const s of allSeasons()) {
+    const o = s.model.results.map(outcome).findLast(upset);
+    if (o) return { season: s, outcome: o, when: `${weekdayDay(o.result.day)}${s.id === season?.id ? "" : `, ${s.label}`}` };
+  }
+  return null;
 })();
 
 ---
@@ -295,6 +304,12 @@ const example = shown && (() => {
             {example.early && (
               <p class="note">With {int(example.early.played)} {example.early.played === 1 ? "game" : "games"} played, under {EARLY.games}, the gap counts {EARLY.widen} times less. Later in the season it would make the {example.early.fav} {example.early.later} favorites.</p>
             )}
+            {lastUpset && (
+              <Fragment>
+                <p class="from">The latest upset, {lastUpset.when}</p>
+                <ResultTile as="div" season={lastUpset.season} outcome={lastUpset.outcome} />
+              </Fragment>
+            )}
           </div>
         )}
       </div>
@@ -353,7 +368,7 @@ const example = shown && (() => {
   .say p + p { margin-top: 12px; }
   .sum .total :is(th, td) { padding-top: 6px; border-top: 1px solid var(--rule); }
   /* The game as a tile on the games page shows it. */
-  .tile { max-width: 340px; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; }
+  .game :global(.tile) { max-width: 340px; }
   .tile .teams { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
   .tile .teams > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tile .fav { color: var(--text); font-weight: 500; }
