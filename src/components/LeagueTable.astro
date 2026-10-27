@@ -38,15 +38,18 @@ const n = order.length;
 // The longest nickname in the league, so the team column, and with it the chart, keeps one width in every view.
 const longest = Math.max(...m.abbrs.map((a) => m.data.teams[a].short.length));
 const tint = tintStyles(m.data.teams);
-// Px down the body on a wide screen: row i's centre, and a rating's place on a scale from the first row's
-// centre (the season's top rating) to the last row's (its bottom one).
+// Px down the body on a wide screen: row i's centre, and a rating's place on a scale from the league's first
+// row's centre (the season's top rating) to its last row's (its bottom one). A conference's rows are taller,
+// so its body is the league's height, and the scale keeps the league's ends, so it matches in every view.
 const ROW_WIDE = 26;
-const Y = n * ROW_WIDE; // the body's height, and the drawing's viewBox height
-const rowY = (i: number) => (i + 0.5) * ROW_WIDE;
-const valY = (v: number) => (hi === lo ? Y / 2 : rowY(0) + ((hi - v) / (hi - lo)) * (rowY(n - 1) - rowY(0)));
+const ROW = (ROW_WIDE * m.abbrs.length) / n; // this view's row on a wide screen
+const Y = n * ROW; // the body's height, the league's in every view, and the drawing's viewBox height
+const rowY = (i: number) => (i + 0.5) * ROW;
+const top = ROW_WIDE / 2, bottom = Y - ROW_WIDE / 2; // the league's first and last row centres
+const valY = (v: number) => (hi === lo ? Y / 2 : top + ((hi - v) / (hi - lo)) * (bottom - top));
 const f = (y: number) => y.toFixed(2);
 
-// Round values to label on the scale, counted from 1500 so every gap between them is the same step. At most
+// Round values to label on the scale, counted from 1000 so every gap between them is the same step. At most
 // six steps across the range keeps them over 150px apart on the desktop's 960px league body.
 const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 6) ?? 500;
 const marks: number[] = [];
@@ -77,7 +80,7 @@ const PLOT_MIN = 530, MARK_LABEL = 150, MONTH_LABEL = 30, DAY_LABEL = 40;
 const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN), ser.length, seasonEnd, { mark: MARK_LABEL / PLOT_MIN, tick: MONTH_LABEL / PLOT_MIN });
 ---
 
-<div class:list={["lt", { charted }]} style={`--rows: ${n}; --league: ${m.abbrs.length}; --row-wide: ${ROW_WIDE}px; --name: ${longest}ch`}>
+<div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-view: ${ROW}px; --name: ${longest}ch`}>
   <div class="stacked"><RatingChart season={season} teams={order} height={400} /></div>
   <table>
     <thead>
@@ -107,7 +110,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
               <td class="lad" rowspan={n} aria-hidden="true" data-preview>
                 <div class="lad-in">
                   {marks.map((v) => (
-                    <span class="tick" style={`top: calc(${(valY(v) / ROW_WIDE).toFixed(4)} * var(--row))`}>{v}</span>
+                    <span class="tick" style={`top: calc(${(valY(v) / ROW).toFixed(4)} * var(--row))`}>{v}</span>
                   ))}
                   {charted && (
                     <svg
@@ -175,7 +178,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
      them, and on a wide screen the chart's plot fills the space between the two. */
   /* A conference's rows are as much taller as it has fewer teams, so every view is the league's height and a
      rating sits at the same place in each; switching All, East and West moves nothing. */
-  .lt { --row: calc(var(--row-wide) * var(--league) / var(--rows)); --tl: 38px; --cv: 86px; }
+  .lt { --row: var(--row-view); --tl: 38px; --cv: 86px; }
   table { width: 100%; border-collapse: collapse; }
   th {
     height: 18px; padding: 0 8px 2px; vertical-align: bottom; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted);

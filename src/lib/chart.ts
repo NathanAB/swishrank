@@ -24,7 +24,7 @@ export function dateTicks(days: readonly string[], tick: number): { i: number; t
   return out;
 }
 
-/** A rating axis: 3 to 6 round ticks that include 1500, the top one above the highest rating. */
+/** A rating axis: 3 to 6 round ticks that include 1000, the top one above the highest rating. */
 export function ratingTicks(min: number, max: number): { lo: number; hi: number; ticks: number[] } {
   for (const step of [25, 50, 100, 150, 200, 250, 300, 500]) {
     const lo = START - Math.ceil((START - min) / step) * step;

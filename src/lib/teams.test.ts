@@ -56,11 +56,11 @@ test("a team's next games are the games page's week: today and the six days afte
 });
 
 
-test("the high and low say when one of them is just the 1500 every team starts at", () => {
-  assert.deepEqual(highLow({ W: 70, L: 32, hi: 1807.2, lo: 1494.4 }), { value: "1807 / 1494" });
-  assert.deepEqual(highLow({ W: 3, L: 0, hi: 1540.6, lo: 1500 }), { value: "1541 / 1500", unit: "never below 1500" });
-  assert.deepEqual(highLow({ W: 0, L: 3, hi: 1500, lo: 1462 }), { value: "1500 / 1462", unit: "never above 1500" });
-  assert.deepEqual(highLow({ W: 0, L: 0, hi: 1500, lo: 1500 }), { value: "—" });
+test("the high and low say when one of them is just the 1000 every team starts at", () => {
+  assert.deepEqual(highLow({ W: 70, L: 32, hi: 1307.2, lo: 994.4 }), { value: "1307 / 994" });
+  assert.deepEqual(highLow({ W: 3, L: 0, hi: 1040.6, lo: 1000 }), { value: "1041 / 1000", unit: "never below 1000" });
+  assert.deepEqual(highLow({ W: 0, L: 3, hi: 1000, lo: 962 }), { value: "1000 / 962", unit: "never above 1000" });
+  assert.deepEqual(highLow({ W: 0, L: 0, hi: 1000, lo: 1000 }), { value: "—" });
 });
 
 test("in every finished season the champion's run alone goes on to the end, and each other team's ends at its last game", () => {

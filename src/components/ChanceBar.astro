@@ -1,0 +1,38 @@
+---
+// A game's two win chances, away then home, each at its end of a bar split at that chance, each part in its
+// team's colour. The favourite's chance is in ink. The games page's tiles and How it works share it.
+import type { Abbr, Team } from "../lib/elo.ts";
+import type { Fixture, FixtureLine } from "../lib/fixtures.ts";
+import { pct } from "../lib/format.ts";
+import { tintStyles } from "../lib/tint.ts";
+
+interface Props {
+  fixture: Fixture;
+  teams: Record<Abbr, Team>;
+}
+
+const { fixture: { lines, fav }, teams } = Astro.props;
+const tint = tintStyles(teams);
+const [away, home] = lines;
+const num = (l: FixtureLine) => ["num", { r: l === home, fav: l.side === fav }];
+---
+
+<div class="odds">
+  <span class:list={num(away)}>{pct(away.chance)}</span>
+  <span class="bar" aria-hidden="true" style={`grid-template-columns: ${away.chance}fr ${home.chance}fr`}>
+    {lines.map((l) => <i data-team={l.abbr} style={tint[l.abbr]} />)}
+  </span>
+  <span class:list={num(home)}>{pct(home.chance)}</span>
+</div>
+
+<style>
+  .odds { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
+  .num { flex: none; width: 3.5ch; }
+  .r { text-align: right; }
+  .fav { color: var(--text); font-weight: 500; }
+  /* The two parts meet at the chance, split by a 2px gap in the tile's own colour. */
+  .bar { flex: 1; display: grid; column-gap: 2px; height: 6px; }
+  .bar i { background: var(--tint); }
+  .bar i:first-child { border-radius: 3px 0 0 3px; }
+  .bar i:last-child { border-radius: 0 3px 3px 0; }
+</style>
