@@ -47,7 +47,7 @@ export function outcome(result: Result): Outcome {
  * had under 50% in 2023-24 to 2025-26, too many to call out; under 35% it is about one game in nine. The
  * chance as shown decides, so a 34.6% winner shown at 35% is not one.
  */
-const UPSET = 35;
+export const UPSET = 35;
 export const upset = (o: Outcome) => percent(o.winner.chance) < UPSET;
 
 /**

@@ -1,14 +1,16 @@
 ---
-// How the ratings work, for a fan who has never heard of Elo: four steps, each one sentence and one small
+// How the ratings work, for a fan who has never heard of Elo: five steps, each one sentence and one small
 // drawing of real games. Every figure comes from elo.ts, so the page cannot disagree with the ratings, and
 // docs/model.md holds the backtest behind each setting.
 import Panel from "../components/Panel.astro";
 import Base from "../layouts/Base.astro";
-import { counted, PARAMS, START, winProb } from "../lib/elo.ts";
-import type { Outcome } from "../lib/facts.ts";
-import { int, pct, signed, weekdayDay } from "../lib/format.ts";
+import { counted, dayKey, EARLY, PARAMS, played, START, winProb } from "../lib/elo.ts";
+import { UPSET, type Outcome } from "../lib/facts.ts";
+import { fixture } from "../lib/fixtures.ts";
+import { int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
+import { tintStyles } from "../lib/tint.ts";
 
 // The newest season with a game: its ratings for step 1, its opener and a team's day off for step 2, its results
 // for step 3.
@@ -99,6 +101,37 @@ const edge = Math.round(model?.home ?? 0);
 const home = { x: at(edge, 0, GAP_MAX), y: `${y(winProb(edge))}%`, chance: pct(winProb(edge)) };
 const gapTicks = [0, 100, 200, 300, 400];
 const chanceTicks = [0.5, 0.75, 1];
+
+// Step 5: one game priced as the games page prices it, worked through: the next game still to play, or in a
+// finished season its last game as it stood before tip-off.
+const next = model && [...model.upcoming].sort((p, q) => p.t.localeCompare(q.t))[0];
+const lastResult = model?.results.at(-1);
+const priced = model && (next
+  ? { game: next, h: model.r[next.home], a: model.r[next.away], p: fixture(next, model).lines[1].chance, played: played(model.log, next), ahead: true }
+  : lastResult && {
+    game: lastResult.game, h: lastResult.pre.h, a: lastResult.pre.a, p: lastResult.p, ahead: false,
+    played: Math.min(...(["home", "away"] as const).map((s) => model.log[lastResult.game[s]].findIndex((t) => t.result === lastResult))),
+  });
+const example = priced && (() => {
+  const { game: g, h, a, p } = priced;
+  const court = g.neutral ? 0 : Math.round(model!.home);
+  const diff = Math.round(h) + court - Math.round(a);
+  const fav = p >= 0.5 ? g.home : g.away;
+  return {
+    day: weekdayDay(dayKey(g.t)),
+    ahead: priced.ahead,
+    at: g.neutral ? "vs" : "at",
+    sides: [{ abbr: g.away, chance: 1 - p }, { abbr: g.home, chance: p }].map((x) => ({ ...x, name: name(x.abbr), fav: x.abbr === fav })),
+    tint: tintStyles(model!.data.teams),
+    rows: [
+      { label: name(g.home), value: rating(h) },
+      ...(court ? [{ label: "Home court", value: signed(court) }] : []),
+      { label: name(g.away), value: `${MINUS}${rating(a)}` },
+    ],
+    gap: diff < 0 ? `${MINUS}${int(-diff)}` : int(diff),
+    early: priced.played < EARLY.games && { played: priced.played, full: pct(winProb(Math.abs(h + (g.neutral ? 0 : model!.home) - a))) },
+  };
+})();
 
 ---
 
@@ -224,6 +257,50 @@ const chanceTicks = [0.5, 0.75, 1];
         </figure>
       </div>
     </Panel></li>
+
+    <li><Panel title="The chances on the games page">
+      <div class="step">
+        <div class="say">
+          <p>Each game still to play gets a chance for each side. Take the home team's rating, add home court, subtract the visitor's, and read the gap off the curve above. A game days away gets the same chance it would get tonight, because ratings only move after games are played.</p>
+          <p>A team's first {EARLY.games} games say little, so while either side has played fewer than that, the gap counts {EARLY.widen} times less and the chance stays closer to 50%.</p>
+          <p>After the game, a winner that had under {UPSET}% is tagged as an upset, about one game in nine.</p>
+        </div>
+        {example && (
+          <div class="game">
+            <p class="day">{example.ahead ? `Next on the games page, ${example.day}` : `The season's last game, ${example.day}`}</p>
+            <div class="tile">
+              <div class="teams">
+                <span class:list={{ fav: example.sides[0].fav }}>{example.sides[0].name}</span>
+                <span class:list={{ fav: example.sides[1].fav }}>{example.at} {example.sides[1].name}</span>
+              </div>
+              <div class="odds">
+                <span class:list={["num", { fav: example.sides[0].fav }]}>{pct(example.sides[0].chance)}</span>
+                <span class="split" aria-hidden="true" style={`grid-template-columns: ${example.sides[0].chance}fr ${example.sides[1].chance}fr`}>
+                  {example.sides.map((x) => <i data-team={x.abbr} style={example.tint[x.abbr]} />)}
+                </span>
+                <span class:list={["num r", { fav: example.sides[1].fav }]}>{pct(example.sides[1].chance)}</span>
+              </div>
+            </div>
+            <p class="from">Where the chances come from</p>
+            <table class="moves sum">
+              {example.rows.map((r) => (
+                <tr>
+                  <th scope="row">{r.label}</th>
+                  <td>{r.value}</td>
+                </tr>
+              ))}
+              <tr class="total">
+                <th scope="row">Gap, in points</th>
+                <td>{example.gap}</td>
+              </tr>
+            </table>
+            {example.early && (
+              <p class="note">With {int(example.early.played)} {example.early.played === 1 ? "game" : "games"} played, under {EARLY.games}, the gap counts {EARLY.widen} times less. It would give {example.early.full} later in the season.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </Panel></li>
   </ol>
 
 </Base>
@@ -273,6 +350,22 @@ const chanceTicks = [0.5, 0.75, 1];
   .moves .up { color: var(--accent); }
   .moves .plain { text-align: left; }
   .moves .down { color: var(--muted); }
+
+  /* Step 5: the sum down to the gap, and the early-season note. */
+  .say p + p { margin-top: 12px; }
+  .sum .total :is(th, td) { padding-top: 6px; border-top: 1px solid var(--rule); }
+  /* The game as a tile on the games page shows it: each side's chance at its end of a bar split there. */
+  .tile { max-width: 340px; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; }
+  .tile :is(.teams, .odds) { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
+  .tile .num { flex: none; width: 3.5ch; font-variant-numeric: tabular-nums; }
+  .tile .r { text-align: right; }
+  .tile .fav { color: var(--text); font-weight: 500; }
+  .tile .split { flex: 1; display: grid; column-gap: 2px; height: 6px; }
+  .tile .split i { background: var(--tint); }
+  .tile .split i:first-child { border-radius: 3px 0 0 3px; }
+  .tile .split i:last-child { border-radius: 0 3px 3px 0; }
+  .from { margin: 14px 0 4px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
+  .note { margin-top: 6px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
 
   /* Step 3: a bar per game, its length the winner's gain, on one scale at every screen width. */
   .bars { display: grid; grid-template-columns: max-content minmax(0, 480px); align-items: center; gap: 10px 16px; }
