@@ -6,17 +6,17 @@ import { outcome, ratingRange, upset } from "./facts.ts";
 const result = (pre: number, shift: number, p = 0.6): Result => ({
   game: { id: "1", t: "2026-10-20T23:00Z", home: "DET", away: "BOS", hs: 121, as: 113, final: true, neutral: false, note: null },
   day: "2026-10-20", p,
-  pre: { h: pre, a: 1500 }, post: { h: pre + shift, a: 1500 - shift },
+  pre: { h: pre, a: 1000 }, post: { h: pre + shift, a: 1000 - shift },
 });
 
 test("a game's change is the gap between the displayed ratings, not the rounded move", () => {
-  // 1500.4 shows as 1500 and 1505.8 as 1506: the reader sees +6, though the move rounds to 5.
-  assert.equal(outcome(result(1500.4, 5.4)).winner.change, 6);
+  // 1000.4 shows as 1000 and 1005.8 as 1006: the reader sees +6, though the move rounds to 5.
+  assert.equal(outcome(result(1000.4, 5.4)).winner.change, 6);
 });
 
 test("an upset is a win by the side whose pre-game chance shows under 35%", () => {
   // The home side wins each game; p is its chance. 34.6% shows as 35%, so that winner is not called an upset.
-  assert.deepEqual([0.3, 0.344, 0.346, 0.45].map((p) => upset(outcome(result(1500, 5, p)))), [true, true, false, false]);
+  assert.deepEqual([0.3, 0.344, 0.346, 0.45].map((p) => upset(outcome(result(1000, 5, p)))), [true, true, false, false]);
 });
 
 test("the rating range reaches the highs and lows a team held before today, so every day's line fits on it", () => {
