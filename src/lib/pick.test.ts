@@ -28,6 +28,14 @@ test("a point just past either edge of the plot reads the first or the last day"
   assert.deepEqual([nearestLine(lines, -0.3, 90), nearestLine(lines, 1.3, 90)], ["UP", "DOWN"]);
 });
 
+test("lines that start together are told apart just past the first day, where they are drawn apart", () => {
+  const lines = [
+    { team: "UP", ys: [100, 0, 0] },
+    { team: "DOWN", ys: [100, 200, 200] },
+  ];
+  assert.equal(nearestLine(lines, 0.2, 150), "DOWN");
+});
+
 test("lines that coincide go to the earlier line", () => {
   const lines = [
     { team: "A", ys: [40, 40] },
