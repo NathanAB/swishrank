@@ -10,7 +10,7 @@ import { boxRatings, lineups, type BoxRatings, type Lineups, type SeasonBox } fr
 import { stage } from "../src/lib/teams.ts";
 import {
   accuracy, brier, compare, fitSigma, fitWiden, inSeasons, loadBox, loadPreseason, loadSeason, logLoss, loss, mean, modelRows, price,
-  TUNING, V1, windows, worseJudged, type Diff, type Row, type Scored,
+  TUNING, V1, windows, worseJudgedV2, type Diff, type Row, type Scored,
 } from "./evaluate.ts";
 import { loadVegas } from "./vegas.ts";
 
@@ -84,12 +84,12 @@ function table(head: string[], rows: (string | number)[][]) {
 const out: string[] = [];
 const section = (title: string, intro: string, body: string) => out.push(`### ${title}\n\n${intro}\n\n${body}`);
 
-type Tuned = { m: Model; ll: number; vsBase: Diff; wins: number; worse: number; worseOverTwoBlocks: number; eligible: boolean };
+type Tuned = { m: Model; ll: number; vsBase: Diff; wins: number; worse: number; eligible: boolean };
 const tuned: Tuned[] = candidates.map((m) => {
   const vsBase = compare(m.scored, baseline.scored, tuning);
-  const judged = windows(m.scored, baseline.scored, tuning).filter(worseJudged);
+  const judged = windows(m.scored, baseline.scored, tuning).filter(worseJudgedV2);
   const wins = TUNING.filter((id) => logLoss(only(m.scored, inSeasons([id]))) < logLoss(only(baseline.scored, inSeasons([id])))).length;
-  return { m, ll: vsBase.a, vsBase, wins, worse: judged.length, worseOverTwoBlocks: judged.filter((d) => d.blocks > 2).length, eligible: judged.length === 0 };
+  return { m, ll: vsBase.a, vsBase, wins, worse: judged.length, eligible: judged.length === 0 };
 });
 const byLoss = (a: Tuned, b: Tuned) => a.ll - b.ll;
 const chosen = tuned.filter((t) => t.eligible).sort(byLoss)[0] ?? null;
@@ -101,7 +101,7 @@ const v2l = V2.toLowerCase();
 
 section(
   "Table 1. Every candidate on the tuning seasons",
-  `Log loss pooled over the ${TUNING.length} tuning seasons (${only(baseline.scored, tuning).length} games), against version 1 as shipped, ${f4(logLoss(only(baseline.scored, tuning)))}. Lower is better. SIGMA, in margin units, and the early widening are each candidate's own, fitted by maximum likelihood on the tuning seasons. Windows worse counts the pooled two-week windows where the candidate is worse than version 1, judging no window whose games sit in one (season, week) block. Sorted by log loss.`,
+  `Log loss pooled over the ${TUNING.length} tuning seasons (${only(baseline.scored, tuning).length} games), against version 1 as shipped, ${f4(logLoss(only(baseline.scored, tuning)))}. Lower is better. SIGMA, in margin units, and the early widening are each candidate's own, fitted by maximum likelihood on the tuning seasons. Windows worse counts the pooled two-week windows where the candidate is worse than version 1, judging no window whose games sit in two or fewer (season, week) blocks, the deviation declared under Settings and their evidence. Sorted by log loss.`,
   table(
     ["Candidate", "SIGMA", "Early widening", "Log loss", "vs version 1 [95%]", "Seasons won", "Windows worse", "Brier", "Accuracy"],
     [...tuned].sort(byLoss).map((t) => [
@@ -117,12 +117,11 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
 {
   const v2 = lead.m;
   const s = v2.scored;
-  const twoBlock = tuned.filter((t) => t.worseOverTwoBlocks === 0).sort(byLoss);
   section(
     "Table 2. The choice",
     chosen
-      ? `Version 2 is the candidate with the lowest tuning log loss among the ${tuned.filter((t) => t.eligible).length} of ${tuned.length} that are worse than version 1 in no judged window.`
-      : `No candidate passes the window constraint, so the site keeps version 1. The tables below report the leader, the candidate with the lowest tuning log loss, to show what the rule turned down; nothing in them chooses anything. Table 6 shows the leader's windows. Not part of the plan: a window of two (season, week) blocks has an interval that runs from one block's mean to the other's, as a one-block window's has no width. If such windows were not judged either, ${twoBlock.length} of ${tuned.length} candidates would be eligible${twoBlock.length ? ` and the lowest would be ${twoBlock[0].m.label}` : ""}.`,
+      ? `Version 2 is the candidate with the lowest tuning log loss among the ${tuned.filter((t) => t.eligible).length} of ${tuned.length} that are worse than version 1 in no judged window. A window is judged when its games sit in more than two (season, week) blocks, the deviation declared under Settings and their evidence.`
+      : `No candidate passes the window constraint, so the site keeps version 1. The tables below report the leader, the candidate with the lowest tuning log loss, to show what the rule turned down; nothing in them chooses anything. Table 6 shows the leader's windows.`,
     table(
       ["Candidate", "SIGMA", "Early widening", "Tuning log loss", "vs version 1 [95%]", "Verdict", "Windows worse"],
       [[v2.label, f3(v2.sigma), v2.widen.toFixed(2), f4(lead.ll), ci(lead.vsBase), verdict(lead.vsBase), lead.worse]],
@@ -184,10 +183,10 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
 
   section(
     "Table 6. Two-week windows, tuning seasons pooled",
-    "Window w holds days 14w to 14w + 13 of each season. The constraint fails on a window marked worse; a window of one (season, week) block is not judged.",
+    "Window w holds days 14w to 14w + 13 of each season. The constraint fails on a window marked worse; a window of two or fewer (season, week) blocks is not judged.",
     table(
       ["Window", "Days", "Games", "Blocks", "Version 1 log loss", `${V2} log loss`, `${V2} - version 1 [95%]`, "Verdict"],
-      windows(s, baseline.scored, tuning).map((d) => [d.w, `${14 * d.w}-${14 * d.w + 13}`, d.n, d.blocks, f4(d.b), f4(d.a), ci(d), verdict(d) + (d.blocks === 1 ? ", one block, not judged" : d.blocks === 2 ? ", two blocks" : "")]),
+      windows(s, baseline.scored, tuning).map((d) => [d.w, `${14 * d.w}-${14 * d.w + 13}`, d.n, d.blocks, f4(d.b), f4(d.a), ci(d), verdict(d) + (d.blocks > 2 ? "" : `, ${d.blocks === 1 ? "one block" : "two blocks"}, not judged`)]),
     ),
   );
 

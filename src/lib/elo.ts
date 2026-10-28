@@ -1,7 +1,8 @@
 // Elo-style ratings for NBA teams, worked out like SRS or Massey ratings: after every game day the season's
-// ratings are fitted again, by least squares, to the margins of every game so far. 1000 is the league
-// average and nothing carries over from last season. docs/model.md holds the backtest behind every setting.
-import type { Athlete, BoxRatings, Lineup, SeasonBox, Sides } from "./players.ts";
+// ratings are fitted again, by least squares, to the margins of every game so far, each team pulled toward a
+// preseason seed from sportsbooks' win totals and each player toward his box-score rating. 1000 is the league
+// average. docs/model.md and docs/model-v2.md hold the backtests behind every setting.
+import type { Athlete, BoxRatings, Lineup, Lineups, SeasonBox, Sides } from "./players.ts";
 
 export const START = 1000;
 export const TZ = "America/New_York";
@@ -44,11 +45,15 @@ export type FitRule = { n0: number; margin: MarginRule; home: HomeRule; seed?: S
 /** `sigma` turns an expected margin into a win chance: Phi(margin / sigma). */
 export type Params = FitRule & { sigma: number };
 
-/** The site's model, chosen by the pre-registered backtest: docs/model.md, tables 1 and 2. */
-export const PARAMS: Params = { n0: 12, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 }, sigma: 2.866 };
+/** The site's model, version 2, chosen by the pre-registered backtest: docs/model-v2.md, tables 1 and 2. */
+export const PARAMS = {
+  n0: 96, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 },
+  seed: { scale: 5, fade: 120, carry: 0.7 }, b2b: 0.4, players: { a: 0.08, np: 320, halfLife: 365 },
+  sigma: 2.997,
+} satisfies Params;
 
-/** Games a team plays before its rating stops being provisional: docs/model.md, table 8. */
-export const PROVISIONAL = 26;
+/** Games a team plays before its rating stops being provisional: docs/model-v2.md, table 9. */
+export const PROVISIONAL = 8;
 
 /** What a final margin, home minus away, counts for in the fit. */
 export function counted(margin: number, rule: MarginRule): number {
@@ -307,11 +312,10 @@ export function phi(z: number): number {
 export const ELO_PER_SIGMA = (400 / Math.LN10) * 1.702;
 
 /**
- * A season's first games say little, and the model's chances for them run high: over the eleven seasons,
- * favourites it called 60% or more in the first two weeks won 61% against 66% stated. While either side has
- * played fewer than `games` games, a gap counts `widen` times less. docs/model.md, settings.
+ * A season's first games say little, and the model's chances for them run high. While either side has played
+ * fewer than `games` games, a gap counts `widen` times less, fitted on the tuning seasons: docs/model-v2.md, table 2.
  */
-export const EARLY = { games: 5, widen: 1.55 };
+export const EARLY = { games: 5, widen: 1.15 };
 
 /** The model's win chance for a rating gap in Elo points, when the less experienced side has `played` games. */
 export const winProb = (gap: number, played = Infinity) => phi(gap / (ELO_PER_SIGMA * (played < EARLY.games ? EARLY.widen : 1)));
@@ -322,17 +326,12 @@ export const played = (log: Record<Abbr, readonly unknown[]>, game: Game) => Mat
 /** Home-court-adjusted rating gap, home minus away, with `home` the home edge in Elo points. */
 export const gap = (game: Game, r: Record<Abbr, number>, home: number) => r[game.home] + (game.neutral ? 0 : home) - r[game.away];
 
-const toElo = (fit: Fit) => ({
-  r: Object.fromEntries(Object.entries(fit.r).map(([a, v]) => [a, START + (v * ELO_PER_SIGMA) / PARAMS.sigma])),
-  home: (fit.home * ELO_PER_SIGMA) / PARAMS.sigma,
-});
-
 type Pair = { h: number; a: number };
 /** One final game: the home side's pre-game chance, and each side's rating before and after its day. */
 export type Result = { game: Game; day: string; p: number; pre: Pair; post: Pair };
 export type Snapshot = { day: string; r: Record<Abbr, number> };
 export type TeamGame = { result: Result; side: "h" | "a" };
-/** `hi` and `lo` are the team's highest and lowest rating on any day of the season, 1000 included. */
+/** `hi` and `lo` are the team's highest and lowest rating on any day of the season, its seed included. */
 export type TeamStats = { hi: number; lo: number };
 
 export type Season = {
@@ -348,7 +347,12 @@ export type Season = {
   stats: Record<Abbr, TeamStats>;
   order: Abbr[];
   upcoming: Game[];
+  /** What the back-to-back adds to each game's home edge, in Elo points: the chances use it, the ratings never do. */
+  b2b: Record<string, number>;
 };
+
+/** What compute() reads beyond a season's games: each team's seed, and its players' lines, box ratings and lineups. */
+export type ModelInputs = { centres?: Record<Abbr, number>; players?: { box: SeasonBox; ratings: BoxRatings; lineups: Lineups } };
 
 /** Standard competition ranks on displayed (rounded) ratings: equal ratings share a rank, the next rank skips. */
 export function ranksOf(ratings: Record<Abbr, number>) {
@@ -361,30 +365,40 @@ const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric",
 export const dayKey = (iso: string) => dayFmt.format(new Date(iso));
 export const addDays = (key: string, n: number) => new Date(Date.parse(key + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
-export function compute(data: SeasonData): Season {
+/**
+ * The season as the site shows it. A team's rating is its team part plus the player part of the lineup it takes
+ * into its next game, on the Elo scale: 1000 plus the fitted margin units times ELO_PER_SIGMA / SIGMA.
+ */
+export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const abbrs = Object.keys(data.teams);
-  const fresh = () => Object.fromEntries(abbrs.map((a) => [a, START]));
-  let r = fresh();
-  let home = toElo(startFit(abbrs, PARAMS)).home;
+  const { centres, players } = inputs;
+  const scale = ELO_PER_SIGMA / PARAMS.sigma;
+  const days = fitSeason(data, PARAMS, { centres, players: players && { ...players, lineups: players.lineups.previous } });
+  const next: Record<Abbr, Lineup> = Object.fromEntries(abbrs.map((a) => [a, []]));
+  const shown = (fit: Fit) => Object.fromEntries(abbrs.map((a) => [a, START + (fit.r[a] + playerPart(fit, next[a])) * scale]));
+  const start = days[0]?.before ?? startFit(abbrs, PARAMS, centres);
+  const opening = shown(start);
+  let r = opening;
+  let home = start.home * scale;
   const log: Record<Abbr, TeamGame[]> = Object.fromEntries(abbrs.map((a) => [a, []]));
   const results: Result[] = [];
   const endOfDay = new Map<string, Record<Abbr, number>>();
 
-  for (const { day, games, after } of fitSeason(data, PARAMS)) {
-    const next = toElo(after);
-    for (const { game } of games) {
-      const result: Result = {
-        game, day,
-        p: winProb(gap(game, r, home), played(log, game)),
-        pre: { h: r[game.home], a: r[game.away] },
-        post: { h: next.r[game.home], a: next.r[game.away] },
-      };
+  for (const { day, games, before, after } of days) {
+    const priced = games.map((pg) => ({
+      pg,
+      p: phi(expected(before, pg) / (PARAMS.sigma * (played(log, pg.game) < EARLY.games ? EARLY.widen : 1))),
+      pre: { h: r[pg.game.home], a: r[pg.game.away] },
+    }));
+    Object.assign(next, players?.lineups.next.get(day));
+    r = shown(after);
+    home = after.home * scale;
+    for (const { pg: { game }, p, pre } of priced) {
+      const result: Result = { game, day, p, pre, post: { h: r[game.home], a: r[game.away] } };
       results.push(result);
       log[game.home].push({ result, side: "h" });
       log[game.away].push({ result, side: "a" });
     }
-    r = next.r;
-    home = next.home;
     endOfDay.set(day, r);
   }
 
@@ -393,7 +407,7 @@ export function compute(data: SeasonData): Season {
   if (results.length) {
     const first = results[0].day;
     const last = results[results.length - 1].day;
-    let cur = fresh();
+    let cur = opening;
     series.push({ day: addDays(first, -1), r: cur });
     for (let d = first; d <= last; d = addDays(d, 1)) {
       cur = endOfDay.get(d) ?? cur;
@@ -403,7 +417,7 @@ export function compute(data: SeasonData): Season {
 
   const stats = Object.fromEntries(
     abbrs.map((a) => {
-      const s: TeamStats = { hi: START, lo: START };
+      const s: TeamStats = { hi: opening[a], lo: opening[a] };
       for (const d of series) {
         s.hi = Math.max(s.hi, d.r[a]);
         s.lo = Math.min(s.lo, d.r[a]);
@@ -412,10 +426,12 @@ export function compute(data: SeasonData): Season {
     }),
   );
 
+  const second = secondNights(data);
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
   return {
     data, abbrs, r, home, rank: ranksOf(r), log, results, series, stats, order,
     upcoming: data.games.filter((g) => !g.final),
+    b2b: Object.fromEntries(data.games.map((g) => [g.id, b2bTerm(PARAMS, second.get(g.id)!) * scale])),
   };
 }
 

@@ -51,13 +51,15 @@ test("leaves out a kind with no game yet", () => {
 });
 
 test("names a team that rose on a day it did not play, and the team it had beaten that won that day", () => {
-  // A beats B, D beats C and I beats H; the next day B, C, D and I all win. A and H rest and rise, H by more,
-  // but H lost to I rather than beat it. D rises most and had beaten C, but D played.
-  const dayTwo = (g: Game): Game => ({ ...g, t: "2026-10-21T23:00Z" });
+  // A beats B, D beats C and I beats H; two days later B, C, D and I all win. A and H rest and rise, H by more,
+  // but H lost to I rather than beat it. D rises most and had beaten C, but D played. K and L open the season a
+  // year earlier, so by these days the pull toward each team's seed has faded and one game moves a rating.
+  const dayTwo = (g: Game): Game => ({ ...g, t: "2026-10-22T23:00Z" });
   const m = compute({
     season: "x",
-    teams: Object.fromEntries([..."ABCDEFGHIJ"].map((a) => [a, { name: a, short: a, color: "000000", alternateColor: "ffffff" }])),
+    teams: Object.fromEntries([..."ABCDEFGHIJKL"].map((a) => [a, { name: a, short: a, color: "000000", alternateColor: "ffffff" }])),
     games: [
+      { ...game("K beats L", "L", "K", 100, 101, true), t: "2025-10-20T23:00Z" },
       game("A beats B", "B", "A", 100, 101, true),
       game("D beats C", "C", "D", 100, 101, true),
       game("I beats H", "H", "I", 100, 101, true),
@@ -70,6 +72,6 @@ test("names a team that rose on a day it did not play, and the team it had beate
   const pick = offDay(m.results, m.series);
   assert.deepEqual(
     pick && [pick.abbr, pick.day, pick.change, pick.beaten.result.game.id, pick.win.result.game.id],
-    ["A", "2026-10-21", 2, "A beats B", "B beats E"],
+    ["A", "2026-10-22", 12, "A beats B", "B beats E"],
   );
 });

@@ -1,5 +1,6 @@
 // Games still to play, priced on the ratings as they stand now: nothing here moves a rating before tip-off,
-// so a game five days out gets the same chances it would get if it were played tonight.
+// so a game five days out gets the same chances it would get if it were played tonight, apart from a back-to-back,
+// which the schedule already shows.
 import { addDays, dayKey, gap, played, winProb, type Abbr, type Game, type Season } from "./elo.ts";
 import type { Side } from "./facts.ts";
 
@@ -23,9 +24,9 @@ export type FixtureDay = { day: string; fixtures: Fixture[] };
 /** The days the games page looks ahead: today and the six after it. */
 export const WEEK = 7;
 
-/** A game priced on `model`'s current ratings and home edge, and the games each side has played. */
-export const fixture = (game: Game, model: Pick<Season, "r" | "home" | "log">): Fixture =>
-  priced(game, winProb(gap(game, model.r, model.home), played(model.log, game)));
+/** A game priced on `model`'s current ratings, home edge and back-to-back term, and the games each side has played. */
+export const fixture = (game: Game, model: Pick<Season, "r" | "home" | "log" | "b2b">): Fixture =>
+  priced(game, winProb(gap(game, model.r, model.home) + model.b2b[game.id], played(model.log, game)));
 
 /** A game with `p`, the home side's chance. */
 export function priced(game: Game, p: number): Fixture {

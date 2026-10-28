@@ -111,36 +111,36 @@ Pre-registration SHA-256 now: `d0b48eb08211353a22300ab71eadb7ff59fc4303a2a8a5c0b
 
 ### Table 1. Every candidate on the tuning seasons
 
-Log loss pooled over the 8 tuning seasons (10206 games), against version 1 as shipped, 0.6298. Lower is better. SIGMA, in margin units, and the early widening are each candidate's own, fitted by maximum likelihood on the tuning seasons. Windows worse counts the pooled two-week windows where the candidate is worse than version 1, judging no window whose games sit in one (season, week) block. Sorted by log loss.
+Log loss pooled over the 8 tuning seasons (10206 games), against version 1 as shipped, 0.6298. Lower is better. SIGMA, in margin units, and the early widening are each candidate's own, fitted by maximum likelihood on the tuning seasons. Windows worse counts the pooled two-week windows where the candidate is worse than version 1, judging no window whose games sit in two or fewer (season, week) blocks, the deviation declared under Settings and their evidence. Sorted by log loss.
 
 | Candidate | SIGMA | Early widening | Log loss | vs version 1 [95%] | Seasons won | Windows worse | Brier | Accuracy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| a 0.08, np 320, half-life 365 | 2.997 | 1.15 | 0.6156 | -0.0142 [-0.0172, -0.0110] | 8 of 8 | 2 | 0.2135 | 66.5% |
-| a 0.08, np 640, half-life 365 | 2.980 | 1.16 | 0.6157 | -0.0142 [-0.0172, -0.0109] | 8 of 8 | 2 | 0.2135 | 66.6% |
-| a 0.08, np 160, half-life 365 | 3.033 | 1.15 | 0.6157 | -0.0141 [-0.0170, -0.0110] | 8 of 8 | 2 | 0.2135 | 66.4% |
-| a 0.08, np 320, half-life 180 | 2.953 | 1.13 | 0.6157 | -0.0141 [-0.0170, -0.0109] | 8 of 8 | 2 | 0.2135 | 66.5% |
-| a 0.08, np 640, half-life 180 | 2.933 | 1.13 | 0.6158 | -0.0141 [-0.0171, -0.0109] | 8 of 8 | 2 | 0.2135 | 66.5% |
-| a 0.11, np 320, half-life 180 | 3.120 | 1.16 | 0.6158 | -0.0140 [-0.0173, -0.0105] | 8 of 8 | 2 | 0.2135 | 66.3% |
-| a 0.11, np 640, half-life 180 | 3.106 | 1.17 | 0.6159 | -0.0140 [-0.0173, -0.0105] | 8 of 8 | 2 | 0.2135 | 66.4% |
-| a 0.08, np 160, half-life 180 | 2.994 | 1.12 | 0.6159 | -0.0140 [-0.0169, -0.0109] | 8 of 8 | 2 | 0.2136 | 66.3% |
-| a 0.11, np 320, half-life 365 | 3.190 | 1.20 | 0.6159 | -0.0139 [-0.0173, -0.0104] | 8 of 8 | 2 | 0.2136 | 66.5% |
-| a 0.11, np 160, half-life 365 | 3.213 | 1.20 | 0.6159 | -0.0139 [-0.0172, -0.0105] | 8 of 8 | 2 | 0.2136 | 66.2% |
-| a 0.11, np 160, half-life 180 | 3.150 | 1.16 | 0.6159 | -0.0139 [-0.0171, -0.0105] | 8 of 8 | 2 | 0.2136 | 66.3% |
-| a 0.11, np 640, half-life 365 | 3.180 | 1.21 | 0.6160 | -0.0139 [-0.0172, -0.0103] | 8 of 8 | 2 | 0.2136 | 66.5% |
-| a 0.15, np 320, half-life 180 | 3.386 | 1.21 | 0.6169 | -0.0130 [-0.0166, -0.0092] | 8 of 8 | 2 | 0.2140 | 66.3% |
-| a 0.15, np 160, half-life 180 | 3.400 | 1.21 | 0.6169 | -0.0130 [-0.0165, -0.0092] | 8 of 8 | 2 | 0.2140 | 66.1% |
-| a 0.15, np 640, half-life 180 | 3.382 | 1.21 | 0.6169 | -0.0129 [-0.0165, -0.0091] | 8 of 8 | 2 | 0.2140 | 66.3% |
-| a 0.15, np 160, half-life 365 | 3.497 | 1.26 | 0.6171 | -0.0127 [-0.0164, -0.0089] | 8 of 8 | 2 | 0.2141 | 66.1% |
-| a 0.15, np 320, half-life 365 | 3.494 | 1.26 | 0.6172 | -0.0127 [-0.0164, -0.0089] | 8 of 8 | 2 | 0.2141 | 66.2% |
-| a 0.15, np 640, half-life 365 | 3.496 | 1.26 | 0.6173 | -0.0125 [-0.0163, -0.0087] | 8 of 8 | 2 | 0.2142 | 66.2% |
+| a 0.08, np 320, half-life 365 | 2.997 | 1.15 | 0.6156 | -0.0142 [-0.0172, -0.0110] | 8 of 8 | 0 | 0.2135 | 66.5% |
+| a 0.08, np 640, half-life 365 | 2.980 | 1.16 | 0.6157 | -0.0142 [-0.0172, -0.0109] | 8 of 8 | 0 | 0.2135 | 66.6% |
+| a 0.08, np 160, half-life 365 | 3.033 | 1.15 | 0.6157 | -0.0141 [-0.0170, -0.0110] | 8 of 8 | 0 | 0.2135 | 66.4% |
+| a 0.08, np 320, half-life 180 | 2.953 | 1.13 | 0.6157 | -0.0141 [-0.0170, -0.0109] | 8 of 8 | 0 | 0.2135 | 66.5% |
+| a 0.08, np 640, half-life 180 | 2.933 | 1.13 | 0.6158 | -0.0141 [-0.0171, -0.0109] | 8 of 8 | 0 | 0.2135 | 66.5% |
+| a 0.11, np 320, half-life 180 | 3.120 | 1.16 | 0.6158 | -0.0140 [-0.0173, -0.0105] | 8 of 8 | 0 | 0.2135 | 66.3% |
+| a 0.11, np 640, half-life 180 | 3.106 | 1.17 | 0.6159 | -0.0140 [-0.0173, -0.0105] | 8 of 8 | 0 | 0.2135 | 66.4% |
+| a 0.08, np 160, half-life 180 | 2.994 | 1.12 | 0.6159 | -0.0140 [-0.0169, -0.0109] | 8 of 8 | 0 | 0.2136 | 66.3% |
+| a 0.11, np 320, half-life 365 | 3.190 | 1.20 | 0.6159 | -0.0139 [-0.0173, -0.0104] | 8 of 8 | 0 | 0.2136 | 66.5% |
+| a 0.11, np 160, half-life 365 | 3.213 | 1.20 | 0.6159 | -0.0139 [-0.0172, -0.0105] | 8 of 8 | 0 | 0.2136 | 66.2% |
+| a 0.11, np 160, half-life 180 | 3.150 | 1.16 | 0.6159 | -0.0139 [-0.0171, -0.0105] | 8 of 8 | 0 | 0.2136 | 66.3% |
+| a 0.11, np 640, half-life 365 | 3.180 | 1.21 | 0.6160 | -0.0139 [-0.0172, -0.0103] | 8 of 8 | 0 | 0.2136 | 66.5% |
+| a 0.15, np 320, half-life 180 | 3.386 | 1.21 | 0.6169 | -0.0130 [-0.0166, -0.0092] | 8 of 8 | 0 | 0.2140 | 66.3% |
+| a 0.15, np 160, half-life 180 | 3.400 | 1.21 | 0.6169 | -0.0130 [-0.0165, -0.0092] | 8 of 8 | 0 | 0.2140 | 66.1% |
+| a 0.15, np 640, half-life 180 | 3.382 | 1.21 | 0.6169 | -0.0129 [-0.0165, -0.0091] | 8 of 8 | 0 | 0.2140 | 66.3% |
+| a 0.15, np 160, half-life 365 | 3.497 | 1.26 | 0.6171 | -0.0127 [-0.0164, -0.0089] | 8 of 8 | 0 | 0.2141 | 66.1% |
+| a 0.15, np 320, half-life 365 | 3.494 | 1.26 | 0.6172 | -0.0127 [-0.0164, -0.0089] | 8 of 8 | 0 | 0.2141 | 66.2% |
+| a 0.15, np 640, half-life 365 | 3.496 | 1.26 | 0.6173 | -0.0125 [-0.0163, -0.0087] | 8 of 8 | 0 | 0.2142 | 66.2% |
 
 ### Table 2. The choice
 
-No candidate passes the window constraint, so the site keeps version 1. The tables below report the leader, the candidate with the lowest tuning log loss, to show what the rule turned down; nothing in them chooses anything. Table 6 shows the leader's windows. Not part of the plan: a window of two (season, week) blocks has an interval that runs from one block's mean to the other's, as a one-block window's has no width. If such windows were not judged either, 18 of 18 candidates would be eligible and the lowest would be a 0.08, np 320, half-life 365.
+Version 2 is the candidate with the lowest tuning log loss among the 18 of 18 that are worse than version 1 in no judged window. A window is judged when its games sit in more than two (season, week) blocks, the deviation declared under Settings and their evidence.
 
 | Candidate | SIGMA | Early widening | Tuning log loss | vs version 1 [95%] | Verdict | Windows worse |
 | --- | --- | --- | --- | --- | --- | --- |
-| a 0.08, np 320, half-life 365 | 2.997 | 1.15 | 0.6156 | -0.0142 [-0.0172, -0.0110] | better | 2 |
+| a 0.08, np 320, half-life 365 | 2.997 | 1.15 | 0.6156 | -0.0142 [-0.0172, -0.0110] | better | 0 |
 
 ### Table 3. What each piece adds, tuning seasons
 
@@ -151,13 +151,13 @@ Each step adds one piece to the step above and has its own SIGMA and early widen
 | Version 1 as shipped | 2.866 | 1.55 | 0.6298 |  |
 | Seed | 2.604 | 1.01 | 0.6226 | -0.0073 [-0.0099, -0.0047] |
 | Seed and back-to-back | 2.630 | 1.01 | 0.6211 | -0.0014 [-0.0025, -0.0004] |
-| Players: leader, a 0.08, np 320, half-life 365 | 2.997 | 1.15 | 0.6156 | -0.0055 [-0.0077, -0.0035] |
+| Players: version 2, a 0.08, np 320, half-life 365 | 2.997 | 1.15 | 0.6156 | -0.0055 [-0.0077, -0.0035] |
 
-### Table 4. Leader, version 1 and Vegas on the same games
+### Table 4. Version 2, version 1 and Vegas on the same games
 
 Every game with a Vegas line: the median of the sportsbooks' moneylines with their cut removed. Vegas is reported, never used to choose. The exploration seasons informed the plan and confirm nothing; 2026-27 is logged until its last game.
 
-| Seasons | Games | Vegas log loss | Version 1 log loss | Leader log loss | Leader - version 1 [95%] | Leader - Vegas [95%] |
+| Seasons | Games | Vegas log loss | Version 1 log loss | Version 2 log loss | Version 2 - version 1 [95%] | Version 2 - Vegas [95%] |
 | --- | --- | --- | --- | --- | --- | --- |
 | Tuning, 2015-16 to 2022-23 | 10162 | 0.6028 | 0.6299 | 0.6157 | -0.0142 [-0.0172, -0.0110] | +0.0128 [+0.0092, +0.0165] |
 | Exploration, 2023-24 to 2025-26 | 3962 | 0.5819 | 0.6137 | 0.6015 | -0.0122 [-0.0182, -0.0061] | +0.0195 [+0.0139, +0.0249] |
@@ -167,7 +167,7 @@ Every game with a Vegas line: the median of the sportsbooks' moneylines with the
 
 Days count from each season's first game day. The last three weeks end on the season's last regular-season game day.
 
-| Seasons | Part | Games | Version 1 log loss | Leader log loss | Leader - version 1 [95%] | Verdict |
+| Seasons | Part | Games | Version 1 log loss | Version 2 log loss | Version 2 - version 1 [95%] | Verdict |
 | --- | --- | --- | --- | --- | --- | --- |
 | Tuning | Weeks 1-2 | 799 | 0.6773 | 0.6402 | -0.0371 [-0.0565, -0.0202] | better |
 | Tuning | Weeks 3-4 | 823 | 0.6446 | 0.6144 | -0.0303 [-0.0390, -0.0209] | better |
@@ -182,9 +182,9 @@ Days count from each season's first game day. The last three weeks end on the se
 
 ### Table 6. Two-week windows, tuning seasons pooled
 
-Window w holds days 14w to 14w + 13 of each season. The constraint fails on a window marked worse; a window of one (season, week) block is not judged.
+Window w holds days 14w to 14w + 13 of each season. The constraint fails on a window marked worse; a window of two or fewer (season, week) blocks is not judged.
 
-| Window | Days | Games | Blocks | Version 1 log loss | Leader log loss | Leader - version 1 [95%] | Verdict |
+| Window | Days | Games | Blocks | Version 1 log loss | Version 2 log loss | Version 2 - version 1 [95%] | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 | 0-13 | 799 | 16 | 0.6773 | 0.6402 | -0.0371 [-0.0565, -0.0202] | better |
 | 1 | 14-27 | 823 | 16 | 0.6446 | 0.6144 | -0.0303 [-0.0390, -0.0209] | better |
@@ -203,15 +203,15 @@ Window w holds days 14w to 14w + 13 of each season. The constraint fails on a wi
 | 14 | 196-209 | 111 | 14 | 0.6395 | 0.6389 | -0.0006 [-0.0167, +0.0144] | tie |
 | 15 | 210-223 | 58 | 13 | 0.6365 | 0.6336 | -0.0029 [-0.0303, +0.0221] | tie |
 | 16 | 224-237 | 27 | 11 | 0.7042 | 0.6785 | -0.0257 [-0.0510, -0.0031] | better |
-| 17 | 238-251 | 2 | 2 | 0.8799 | 0.8758 | -0.0040 [-0.0314, +0.0234] | tie, two blocks |
-| 20 | 280-293 | 66 | 2 | 0.7014 | 0.6956 | -0.0057 [-0.0153, +0.0100] | tie, two blocks |
-| 21 | 294-307 | 55 | 2 | 0.6790 | 0.6649 | -0.0141 [-0.0255, -0.0023] | better, two blocks |
-| 22 | 308-321 | 24 | 2 | 0.6851 | 0.6792 | -0.0059 [-0.0107, -0.0025] | better, two blocks |
-| 23 | 322-335 | 15 | 2 | 0.6885 | 0.7237 | +0.0352 [+0.0329, +0.0386] | worse, two blocks |
-| 24 | 336-349 | 9 | 2 | 0.6826 | 0.7189 | +0.0363 [+0.0256, +0.0577] | worse, two blocks |
+| 17 | 238-251 | 2 | 2 | 0.8799 | 0.8758 | -0.0040 [-0.0314, +0.0234] | tie, two blocks, not judged |
+| 20 | 280-293 | 66 | 2 | 0.7014 | 0.6956 | -0.0057 [-0.0153, +0.0100] | tie, two blocks, not judged |
+| 21 | 294-307 | 55 | 2 | 0.6790 | 0.6649 | -0.0141 [-0.0255, -0.0023] | better, two blocks, not judged |
+| 22 | 308-321 | 24 | 2 | 0.6851 | 0.6792 | -0.0059 [-0.0107, -0.0025] | better, two blocks, not judged |
+| 23 | 322-335 | 15 | 2 | 0.6885 | 0.7237 | +0.0352 [+0.0329, +0.0386] | worse, two blocks, not judged |
+| 24 | 336-349 | 9 | 2 | 0.6826 | 0.7189 | +0.0363 [+0.0256, +0.0577] | worse, two blocks, not judged |
 | 25 | 350-363 | 3 | 1 | 0.6506 | 0.6223 | -0.0284 [-0.0284, -0.0284] | better, one block, not judged |
 
-### Table 7. Calibration, leader
+### Table 7. Calibration, version 2
 
 Games bucketed by the favourite's stated chance. A calibrated model's favourites win about as often as it says.
 
@@ -230,16 +230,16 @@ Games bucketed by the favourite's stated chance. A calibrated model's favourites
 
 ### Table 8. The lineup known at tip
 
-The leader with each side's lineup taken from the players who played in the game itself, at their usual minutes, with its own SIGMA (2.913) and early widening (1.21). It is the ceiling a pre-game lineup feed could reach; the site cannot know who plays.
+The version 2 with each side's lineup taken from the players who played in the game itself, at their usual minutes, with its own SIGMA (2.913) and early widening (1.21). It is the ceiling a pre-game lineup feed could reach; the site cannot know who plays.
 
-| Seasons | Games | Leader log loss | Lineup at tip log loss | At tip - leader [95%] | At tip - Vegas [95%] |
+| Seasons | Games | Version 2 log loss | Lineup at tip log loss | At tip - version 2 [95%] | At tip - Vegas [95%] |
 | --- | --- | --- | --- | --- | --- |
 | Tuning | 10206 | 0.6156 | 0.6112 | -0.0045 [-0.0061, -0.0030] | +0.0084 [+0.0055, +0.0113] |
 | Exploration | 3962 | 0.6015 | 0.5946 | -0.0069 [-0.0094, -0.0044] | +0.0126 [+0.0078, +0.0174] |
 
 ### Table 9. Provisional threshold
 
-Version 1's rule on the leader. k is the number of games the less experienced side had played before a game. E(k) is the mean excess log loss (pre-game, as priced, minus the season's final fit at SIGMA) of the tuning seasons' games with k within 2 of k. The settled level, games with k from 40 to 59, is 0.0243. The threshold is the first k from which E stays within 0.01 of it: **8 games**.
+Version 1's rule on the version 2. k is the number of games the less experienced side had played before a game. E(k) is the mean excess log loss (pre-game, as priced, minus the season's final fit at SIGMA) of the tuning seasons' games with k within 2 of k. The settled level, games with k from 40 to 59, is 0.0243. The threshold is the first k from which E stays within 0.01 of it: **8 games**.
 
 | k | Games at k | E(k) | E(k) - settled |
 | --- | --- | --- | --- |
@@ -284,7 +284,7 @@ Version 1's rule on the leader. k is the number of games the less experienced si
 | 38 | 120 | 0.0271 | +0.0028 |
 | 39 | 127 | 0.0279 | +0.0037 |
 
-### Table 10. The Elo scale, leader
+### Table 10. The Elo scale, version 2
 
 As in version 1, a rating is 1000 plus the fitted rating times 295.7 / SIGMA Elo points.
 
@@ -299,19 +299,43 @@ As in version 1, a rating is 1000 plus the fitted rating times 295.7 / SIGMA Elo
 
 The confirmation scores the whole season once, after its last game. Until then the season's games so far are logged here and judge nothing.
 
-| Season | Games | Version 1 log loss | Leader log loss |
+| Season | Games | Version 1 log loss | Version 2 log loss |
 | --- | --- | --- | --- |
 | 2026-27 | 56 | 0.6767 | 0.6129 |
 
 ### Check
 
-src/lib/elo.ts PARAMS, EARLY and PROVISIONAL match version 1, which the site keeps, `{"n0":12,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"sigma":2.866,"widen":1.55,"provisional":26}`.
+src/lib/elo.ts PARAMS, EARLY and PROVISIONAL match the choice, `{"n0":96,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"seed":{"scale":5,"fade":120,"carry":0.7},"b2b":0.4,"players":{"a":0.08,"np":320,"halfLife":365},"sigma":2.997,"widen":1.15,"provisional":8}`.
 <!-- results:end -->
+
+## Settings and their evidence
+
+Written after the results. Each setting lives in `src/lib/elo.ts` (`PARAMS`, `EARLY`, `PROVISIONAL`). `npm run backtest:v2` fails if they differ from what the tables choose.
+
+- **The candidate, `a` 0.08, `np` 320, box rating half-life 365 days.** Lowest tuning log loss of the 18, 0.6156 against version 1's 0.6298, a difference of -0.0142 [-0.0172, -0.0110], and it wins all 8 tuning seasons (tables 1 and 2). It is eligible only under the deviation below. The 12 candidates with `a` 0.08 or 0.11 differ by at most 0.0004, so the data barely separate them. Each `a` 0.15 candidate is 0.0013 to 0.0017 worse than the choice (table 1).
+- **The fixed parts.** The team seed `5.0 * (W / G - 0.5)` with prior strength `96 * exp(-day / 120)`, the back-to-back `0.4` margin units, and the home edge `0.622`, all as the pre-registration fixes them. The seed is worth -0.0073 [-0.0099, -0.0047] of tuning log loss, the back-to-back -0.0014 [-0.0025, -0.0004] more, and the players -0.0055 [-0.0077, -0.0035] more (table 3).
+- **Margins, `(|m| + 3)^0.5`.** Version 1's rule, inside the owner's limit: a 43-point win counts 3.4 times a 1-point win.
+- **`SIGMA` = 2.997 margin units.** Fitted by maximum likelihood on the tuning seasons (table 2). On the exploration seasons, which it never saw, its favourites won within 3.0 points of the stated chance in every bucket with more than 60 games (table 7).
+- **Early widening, 1.15.** Fitted by maximum likelihood on the tuning games where either side had played fewer than 5 (table 2). With the seed, a season's first games need far less widening than version 1's 1.55.
+- **The Elo scale.** As in version 1, a rating is 1000 plus the fitted rating times 295.7 / SIGMA, 98.66 Elo points per margin unit. Home court is 61.4 Elo points and a back-to-back 39.5 (table 10).
+- **Provisional until 8 games.** Table 9's rule, version 1's run on this candidate, gives 8: from 8 games on, the excess log loss stays within 0.01 of its settled level. Version 1's ratings started level and took 26.
+- **What the reader sees.** A team's displayed rating is its team part plus the player part of the lineup it takes into its next game, from the players in its previous game. Opening night shows the seed, and a team's chart and its highest and lowest ratings start from it. The back-to-back changes a game's chances and never a team's rating.
+- **Against version 1 and Vegas.** On the exploration seasons version 2's log loss is 0.6015 against version 1's 0.6137, -0.0122 [-0.0182, -0.0061], and Vegas's 0.5819 (table 4). It is better in weeks 1-2 and the last three weeks of the regular season and ties in the other parts (table 5).
+
+### Deviation from the plan
+
+The choice failed as written, on two windows, and the site switches to version 2 anyway under a deviation declared here.
+
+- Windows 23 and 24, days 322 to 349, hold 15 and 9 tuning games: the 2019-20 bubble's conference semifinals, conference finals and Finals. Each window's games sit in two (season, week) blocks. Every candidate is worse than version 1 in both. The chosen candidate's differences are +0.0352 [+0.0329, +0.0386] in window 23 and +0.0363 [+0.0256, +0.0577] in window 24 (table 6).
+- A bootstrap that resamples two blocks draws block A twice, block B twice, or one of each, so it has three possible means. Its 2.5th and 97.5th percentiles fall among them, and the "interval" spans at most from one block's mean to the other's. It describes those two weeks, not the uncertainty about them, so it is no 95% interval. This is the reason version 1 declared for a one-block window, whose interval has no width (`docs/model.md`, Deviation from the plan). The plan did not foresee the two-block case.
+- The deviation: a window whose games sit in two or fewer blocks is not judged. Nothing else changes. Under it, 18 of 18 candidates are eligible and the lowest is the one above (tables 1 and 2).
+- The owner accepted the deviation on 2026-10-28, after seeing the result.
+- The 2026-27 confirmation runs under the same rule: a window is judged only when its games sit in more than two blocks. Its verdict stays binding. If version 2's pooled 2026-27 log loss is not below version 1's, or it is worse in a judged window, the site returns to version 1, frozen as `V1` in `scripts/evaluate.ts`.
 
 ## Before the build
 
-These choices change what the reader sees, not the score. They are settled before the build, outside this plan.
+These choices change what the reader sees, not the score. The owner settled them on 2026-10-28, outside this plan.
 
-- **A team's displayed rating.** The team rating plus its current rotation's player part, on version 1's Elo scale, is one option. Another is the team rating alone.
-- **How the site explains player values.** The About page says nothing carries over from last season, and "How it works" explains a rating as a fit to margins. Both change.
-- **Where preseason totals come from each October,** and who enters them.
+- **A team's displayed rating.** The team rating plus the player part of the lineup it takes into its next game, on version 1's Elo scale.
+- **How the site explains player values.** The About page and "How it works" now say that each team starts from its preseason odds and that a rating counts who is playing.
+- **Where preseason totals come from each October,** and who enters them. Still open.

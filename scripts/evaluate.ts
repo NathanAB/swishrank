@@ -155,4 +155,10 @@ export const worse = (d: Diff) => d.lo > 0;
  */
 export const worseJudged = (d: Diff) => worse(d) && d.blocks > 1;
 
+/**
+ * Version 2's declared deviation (docs/model-v2.md): a window of two blocks has an interval that runs from one
+ * block's mean to the other's, no more a 95% interval than one block's, so only windows of three or more are judged.
+ */
+export const worseJudgedV2 = (d: Diff) => worse(d) && d.blocks > 2;
+
 export const inSeasons = (ids: string[]) => (s: Scored) => ids.includes(s.season);

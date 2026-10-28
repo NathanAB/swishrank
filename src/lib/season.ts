@@ -1,8 +1,10 @@
 // The seasons the site shows, loaded and rated once per build. seasons.json lists them; the one without
-// "end" is current and lives at the site root. Each season's games come from src/data/games/<id>.json.
+// "end" is current and lives at the site root. Each season's games come from src/data/games/<id>.json, and the
+// model also reads its box scores and preseason win totals from src/data/box/ and src/data/preseason/.
 import list from "../data/seasons.json" with { type: "json" };
-import { compute, dayKey, type Abbr, type Game, type Season, type SeasonData, type Team } from "./elo.ts";
+import { compute, dayKey, type Abbr, type Game, type ModelInputs, type Season, type SeasonData, type Team } from "./elo.ts";
 import { seasonLabel } from "./format.ts";
+import { modelInputs } from "./inputs.ts";
 import { months } from "./results.ts";
 import { conferenceSlug, gameSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
 import { CONFERENCE_ORDER } from "./teams.ts";
@@ -27,6 +29,8 @@ export const BUILT_AT = new Date();
 export const TODAY = dayKey(BUILT_AT.toISOString());
 
 const GAME_FILES = import.meta.glob<unknown>("../data/games/*.json", { eager: true, import: "default" });
+const BOX_FILES = import.meta.glob<unknown>("../data/box/*.json", { eager: true, import: "default" });
+const PRESEASON_FILES = import.meta.glob<unknown>("../data/preseason/*.json", { eager: true, import: "default" });
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isNumOrNull = (v: unknown): v is number | null => v === null || typeof v === "number";
@@ -77,12 +81,21 @@ function parseList(raw: readonly { id: string; start: string; end?: string; note
 const ENTRIES = parseList(list);
 const cache = new Map<string, SeasonView>();
 
+const file = (files: Record<string, unknown>, dir: string, id: string) => {
+  const raw = files[`../data/${dir}/${id}.json`];
+  if (raw === undefined) throw new Error(`src/data/${dir}/${id}.json is missing for season ${id}`);
+  return raw;
+};
+const seasonData = (id: string) => parseSeasonData(file(GAME_FILES, "games", id), id);
+
+let inputs: Map<string, ModelInputs> | undefined;
+const allInputs = () =>
+  (inputs ??= modelInputs(ENTRIES.all.map(({ id }) => ({ data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id) }))));
+
 function load(entry: Entry): SeasonView {
   const hit = cache.get(entry.id);
   if (hit) return hit;
-  const raw = GAME_FILES[`../data/games/${entry.id}.json`];
-  if (raw === undefined) throw new Error(`src/data/games/${entry.id}.json is missing for season ${entry.id}`);
-  const data = parseSeasonData(raw, entry.id);
+  const data = seasonData(entry.id);
   const teams = entry === ENTRIES.current ? data.teams : coloursOf(data.teams, load(ENTRIES.current).model.data.teams);
   const view: SeasonView = {
     id: entry.id,
@@ -91,7 +104,7 @@ function load(entry: Entry): SeasonView {
     start: entry.start,
     end: entry.end,
     note: entry.note,
-    model: compute({ ...data, teams }),
+    model: compute({ ...data, teams }, allInputs().get(entry.id)),
   };
   cache.set(entry.id, view);
   return view;
