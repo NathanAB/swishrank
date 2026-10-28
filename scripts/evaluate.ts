@@ -1,12 +1,19 @@
 // Scoring for the backtest and its guard test: every game's pre-game chance from a model, log loss, the
 // weekly block bootstrap and the maximum-likelihood SIGMA. docs/model.md's pre-registration defines each.
 import { readFileSync } from "node:fs";
-import { fitSeason, phi, type FitRule, type SeasonData } from "../src/lib/elo.ts";
+import { EARLY, expected, fitSeason, phi, type FitRule, type Params, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
 import { eloChances } from "./elo538.ts";
 
 export const TUNING = ["2015-16", "2016-17", "2017-18", "2018-19", "2019-20", "2020-21", "2021-22", "2022-23"];
 export const HELD_OUT = ["2023-24", "2024-25", "2025-26"];
 export const LOG_ONLY = ["2026-27"];
+
+/** Version 1 as shipped at commit 3a88d0b, kept here so its backtest stays checkable after src/lib/elo.ts moves on. */
+export const V1 = {
+  params: { n0: 12, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 }, sigma: 2.866 } satisfies Params,
+  provisional: 26,
+  early: { games: 5, widen: 1.55 },
+};
 
 export const loadSeason = (id: string): SeasonData =>
   JSON.parse(readFileSync(new URL(`../src/data/games/${id}.json`, import.meta.url), "utf8"));
@@ -22,26 +29,26 @@ export type Scored = { id: string; season: string; day: number; y: 0 | 1; p: num
 
 const dayIndex = (first: string) => (day: string) => Math.round((Date.parse(day) - Date.parse(first)) / 86_400_000);
 
-export function modelRows(data: SeasonData, rule: FitRule): Row[] {
-  const days = fitSeason(data, rule);
+export function modelRows(data: SeasonData, rule: FitRule, inputs: SeasonInputs = {}): Row[] {
+  const days = fitSeason(data, rule, inputs);
   if (!days.length) return [];
   const last = days[days.length - 1].after;
   const index = dayIndex(days[0].day);
   const played: Record<string, number> = Object.fromEntries(Object.keys(data.teams).map((a) => [a, 0]));
-  const expected = (g: (typeof days)[number]["games"][number], f: (typeof days)[number]["before"]) =>
-    f.r[g.home] - f.r[g.away] + (g.neutral ? 0 : f.home);
   const rows: Row[] = [];
   for (const { day, games, before } of days) {
-    for (const g of games) {
-      rows.push({ id: g.id, season: data.season, day: index(day), y: g.hs > g.as ? 1 : 0, e: expected(g, before), hind: expected(g, last), k: Math.min(played[g.home], played[g.away]) });
+    for (const pg of games) {
+      const g = pg.game;
+      rows.push({ id: g.id, season: data.season, day: index(day), y: g.hs > g.as ? 1 : 0, e: expected(before, pg), hind: expected(last, pg), k: Math.min(played[g.home], played[g.away]) });
     }
-    for (const g of games) { played[g.home]++; played[g.away]++; }
+    for (const { game: g } of games) { played[g.home]++; played[g.away]++; }
   }
   return rows;
 }
 
-export const price = (rows: Row[], sigma: number): Scored[] =>
-  rows.map(({ e, hind, ...rest }) => ({ ...rest, p: phi(e / sigma), ph: phi(hind / sigma) }));
+/** Each row's chance: Phi(e / sigma), with sigma `widen` times wider while either side has played fewer than EARLY.games. */
+export const price = (rows: Row[], sigma: number, widen = 1): Scored[] =>
+  rows.map(({ e, hind, ...rest }) => ({ ...rest, p: phi(e / (sigma * (rest.k < EARLY.games ? widen : 1))), ph: phi(hind / sigma) }));
 
 /** The baseline Elo's chances on the same games, in the same order as modelRows. */
 export function eloScored(data: SeasonData, like: Row[]): Scored[] {

@@ -315,11 +315,11 @@ Too young to judge; shown so the season's start can be compared later.
 
 | Season | Games | Elo log loss | Model log loss |
 | --- | --- | --- | --- |
-| 2026-27 | 43 | 0.7394 | 0.6835 |
+| 2026-27 | 56 | 0.7120 | 0.6754 |
 
 ### Check
 
-src/lib/elo.ts PARAMS match the choice, `{"n0":12,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"sigma":2.866}`. PROVISIONAL matches table 8 (26).
+Version 1's settings, frozen as V1 in scripts/evaluate.ts, match the choice, `{"n0":12,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"sigma":2.866}`. Its provisional threshold matches table 8 (26).
 <!-- results:end -->
 
 ## Settings and their evidence
