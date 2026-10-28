@@ -1,0 +1,41 @@
+---
+// A game still to play as a tile: the tip-off in the reader's time zone, then away at home, then each side's
+// win chance from today's ratings on its chance bar. The favourite's name and chance are in ink, whether home
+// or away. The whole tile opens the game's page; each team's name opens its own. The games page lists these
+// tiles; How it works shows one on its own.
+import ChanceBar from "./ChanceBar.astro";
+import LocalTime from "./LocalTime.astro";
+import type { Fixture } from "../lib/fixtures.ts";
+import { between, matchup } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  fixture: Fixture;
+  /** "li" in a list of games, "div" on its own. */
+  as?: "li" | "div";
+}
+
+const { season, fixture: f, as: Tag = "li" } = Astro.props;
+const [away, home] = f.lines;
+---
+
+<Tag class="tile">
+  <a class="cover" href={href({ kind: "game", season, game: f.game })} aria-label={matchup(team(season, away.abbr).short, team(season, home.abbr).short, f.game.neutral)}></a>
+  <p class="top num"><LocalTime at={f.game.t} /></p>
+  <div class="teams">
+    {f.lines.map((l) => (
+      <span class:list={{ fav: f.fav === l.side }}>{l.side === "h" && `${between(f.game.neutral)} `}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a></span>
+    ))}
+  </div>
+  <ChanceBar fixture={f} teams={season.model.data.teams} />
+</Tag>
+
+<style>
+  .top { min-height: 18px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
+  .teams { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
+  .teams > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fav { color: var(--text); font-weight: 500; }
+  .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
+</style>

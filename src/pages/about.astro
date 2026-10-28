@@ -2,14 +2,15 @@
 // How the ratings work, for a fan who has never heard of Elo: five steps, each one sentence and one small
 // drawing of real games. Every figure comes from elo.ts, so the page cannot disagree with the ratings, and
 // docs/model.md holds the backtest behind each setting.
-import ChanceBar from "../components/ChanceBar.astro";
+import FixtureTile from "../components/FixtureTile.astro";
 import Panel from "../components/Panel.astro";
 import ResultTile from "../components/ResultTile.astro";
 import Base from "../layouts/Base.astro";
+import { runAndTrail, seasonPlot } from "../lib/chart.ts";
 import { counted, dayKey, EARLY, gap, PARAMS, START, winProb } from "../lib/elo.ts";
 import { outcome, upset, UPSET, type Outcome } from "../lib/facts.ts";
 import { nextDays, priced, WEEK } from "../lib/fixtures.ts";
-import { between, int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
+import { int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team, TODAY } from "../lib/season.ts";
 
@@ -23,28 +24,22 @@ const name = (abbr: string) => (season ? team(season, abbr).short : abbr);
 /** A value's place on a scale from lo to hi, as a CSS percentage. */
 const at = (v: number, lo: number, hi: number) => `${((v - lo) / (hi - lo)) * 100}%`;
 
-// Step 1: every team's daily rating, ticked at the start and one round step either side of it.
+// Step 1: every team's daily rating on the season's scale (lib/chart.ts seasonPlot), each line dotted past the
+// end of its team's run, as on the rating charts.
 const LINES_H = 160;
 const lines = model && model.series.length > 1 && (() => {
-  const ser = model.series;
-  const all = ser.flatMap((d) => model.abbrs.map((a) => d.r[a]));
-  const reach = Math.max(...all.map((v) => Math.abs(v - START)));
-  const step = [200, 100, 50, 25].find((s) => s <= reach) ?? 25;
-  const lo = Math.min(START - step, ...all);
-  const hi = Math.max(START + step, ...all);
-  const y = (v: number) => 6 + ((LINES_H - 12) * (hi - v)) / (hi - lo);
-  const x = (i: number) => (i / (ser.length - 1)) * 1000;
-  const points = (a: string) => ser.map((d, i) => `${x(i).toFixed(1)},${y(d.r[a]).toFixed(1)}`).join(" ");
-  const end = (abbr: string) => ({ text: `${name(abbr)} ${Math.round(model.r[abbr])}`, points: points(abbr), y: y(model.r[abbr]) });
+  const plot = seasonPlot(model, { h: LINES_H });
+  const split = runAndTrail(model);
+  const end = (abbr: string) => ({ text: `${name(abbr)} ${Math.round(model.r[abbr])}`, ...split(abbr, plot.pts(abbr)), y: plot.y(Math.round(model.r[abbr])) });
   const top = end(model.order[0]);
   const bottom = end(model.order[model.order.length - 1]);
   // Two end labels closer than a line of text apart are pushed apart around their middle.
   const room = Math.max(0, 16 - (bottom.y - top.y)) / 2;
   const ends = [{ ...top, ly: top.y - room }, { ...bottom, ly: bottom.y + room }];
   return {
-    ticks: [START + step, START, START - step].map((t) => ({ t, y: y(t) })),
-    start: y(START),
-    others: model.order.slice(1, -1).map(points),
+    ticks: plot.ticks.map((t) => ({ t, y: plot.y(t) })),
+    start: plot.y(START),
+    drawn: [...model.order.slice(1, -1).map((a) => ({ kind: "other", ...split(a, plot.pts(a)) })), ...ends.map((e) => ({ kind: "named", ...e }))],
     ends,
     lane: `calc(${Math.max(...ends.map((e) => e.text.length))}ch + 10px)`,
     count: model.abbrs.length,
@@ -126,7 +121,6 @@ const example = shown && (() => {
     fixture: f,
     ahead: shown.ahead,
     day: weekdayDay(dayKey(g.t)),
-    at: between(g.neutral),
     rows: [
       { label: name(g.home), value: rating(r[g.home]) },
       ...(court ? [{ label: "Home court", value: signed(court) }] : []),
@@ -176,8 +170,8 @@ const lastUpset = (() => {
             <div class="field">
               <svg viewBox={`0 0 1000 ${LINES_H}`} preserveAspectRatio="none" aria-hidden="true">
                 {lines.ticks.map((t) => <path class:list={["rule", { ref: t.t === START }]} d={`M0,${t.y}H1000`} />)}
-                {lines.others.map((pts) => <polyline class="other" points={pts} />)}
-                {lines.ends.map((e) => <polyline class="named" points={e.points} />)}
+                {lines.drawn.map((l) => <polyline class={l.kind} points={l.run} />)}
+                {lines.drawn.map((l) => l.trail && <polyline class:list={[l.kind, "trail"]} points={l.trail} />)}
               </svg>
               <span class="stem" style={`top: ${lines.start}px`}></span>
               <span class="dot accent" style={`left: 0; top: ${lines.start}px`}></span>
@@ -286,14 +280,7 @@ const lastUpset = (() => {
         {example && (
           <div class="game">
             <p class="day">{example.ahead ? `Next on the games page · ${example.day}` : `The season's last game, before it started · ${example.day}`}</p>
-            <div class="tile">
-              <div class="teams">
-                {example.fixture.lines.map((l) => (
-                  <span class:list={{ fav: l.side === example.fixture.fav }}>{l.side === "h" && `${example.at} `}{name(l.abbr)}</span>
-                ))}
-              </div>
-              <ChanceBar fixture={example.fixture} teams={model!.data.teams} />
-            </div>
+            <FixtureTile as="div" season={season!} fixture={example.fixture} />
             <p class="from">Where the chances come from</p>
             <table class="moves sum">
               {example.rows.map((r) => (
@@ -354,8 +341,9 @@ const lastUpset = (() => {
   .lines path, .lines polyline { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
   .lines .rule { stroke: var(--grid); stroke-width: 1; }
   .lines .rule.ref { stroke: var(--control); }
-  .lines .other { stroke: var(--line-other); stroke-opacity: 0.55; stroke-width: 1; }
+  .lines .other { stroke: var(--line-other); stroke-opacity: var(--line-faded); stroke-width: 1.5; }
   .lines .named { stroke: var(--bar); stroke-width: 1.5; }
+  .lines .trail { stroke-dasharray: var(--line-dash); stroke-linecap: round; }
   .lines .stem { position: absolute; left: 0; bottom: 0; width: 1px; background: var(--control); }
   .lines .lane span { position: absolute; left: 10px; transform: translateY(-50%); color: var(--text); white-space: nowrap; }
   .lines .start { grid-column: 2 / 4; margin: 6px 0 0 -4px; color: var(--text); }
@@ -377,11 +365,7 @@ const lastUpset = (() => {
   .sum .total :is(th, td) { padding-top: 6px; border-top: 1px solid var(--rule); }
   /* The game as a tile on the games page shows it. */
   .game :global(.tile) { max-width: 340px; }
-  .tile .teams { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
-  .tile .teams > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tile .fav { color: var(--text); font-weight: 500; }
   .from { margin: 14px 0 4px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
-  .note { margin-top: 6px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
 
   /* Step 3: a bar per game, its length the winner's gain, on one scale at every screen width. */
   .bars { display: grid; grid-template-columns: max-content minmax(0, 480px); align-items: center; gap: 10px 16px; }

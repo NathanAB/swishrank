@@ -4,6 +4,7 @@
 // newest day first: on the index the game days of the latest week, on a month's page that month's. The month
 // switch beside the results leads to every month's page.
 import Base from "../layouts/Base.astro";
+import Empty from "./Empty.astro";
 import FixtureList from "./FixtureList.astro";
 import GameList from "./GameList.astro";
 import Panel from "./Panel.astro";
@@ -68,7 +69,7 @@ const switcher = [
             <h2 id="ahead">Coming up</h2>
             <p class="meta">The next {AHEAD_DAYS} game days. Chances use today's ratings, and each team's page lists its next {NEXT_GAMES} games.</p>
           </div>
-          {ahead.length === 0 ? <p class="empty">{noGamesAhead(season)}</p> : ahead.map((d, i) => <FixtureList season={season} day={d} lead={i === 0} />)}
+          {ahead.length === 0 ? <Empty>{noGamesAhead(season)}</Empty> : ahead.map((d, i) => <FixtureList season={season} day={d} lead={i === 0} />)}
         </section>
       )}
 
@@ -84,7 +85,7 @@ const switcher = [
             </nav>
           )}
         </div>
-        {days.length === 0 ? <p class="empty">No games yet.</p> : days.map((d) => <GameList season={season} day={d} />)}
+        {days.length === 0 ? <Empty /> : days.map((d) => <GameList season={season} day={d} />)}
       </section>
     </div>
   </Panel>
@@ -98,7 +99,6 @@ const switcher = [
   .part-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 4px; }
   h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
   .meta { color: var(--muted); }
-  .empty { padding: 4px 0 8px; color: var(--muted); }
 
   .months { display: flex; gap: 20px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
   .months a {

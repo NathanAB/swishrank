@@ -12,9 +12,7 @@
 // the rows stay ink. Given a conference, only its teams are drawn and listed, ranked among themselves, on the
 // same league-wide scale, so a rating sits at the same height in every view.
 import RatingChart from "./RatingChart.astro";
-import { clearOfMark, dateTicks, runAndTrail, seasonEndMark } from "../lib/chart.ts";
-import { START } from "../lib/elo.ts";
-import { ratingRange } from "../lib/facts.ts";
+import { clearOfMark, dateTicks, PLOT, runAndTrail, seasonEndMark, seasonPlot } from "../lib/chart.ts";
 import { rating, record } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
 import { href } from "../lib/routes.ts";
@@ -33,7 +31,6 @@ const m = season.model;
 const { order, rank } = standings(m, conference);
 
 const shown = Object.fromEntries(order.map((a) => [a, Math.round(m.r[a])]));
-const { lo, hi } = ratingRange(m);
 const n = order.length;
 // The longest nickname in the league, so the team column, and with it the chart, keeps one width in every view.
 const longest = Math.max(...m.abbrs.map((a) => m.data.teams[a].short.length));
@@ -45,15 +42,10 @@ const ROW_WIDE = 26;
 const ROW = (ROW_WIDE * m.abbrs.length) / n; // this view's row on a wide screen
 const Y = n * ROW; // the body's height, the league's in every view, and the drawing's viewBox height
 const rowY = (i: number) => (i + 0.5) * ROW;
-const top = ROW_WIDE / 2, bottom = Y - ROW_WIDE / 2; // the league's first and last row centres
-const valY = (v: number) => (hi === lo ? Y / 2 : top + ((hi - v) / (hi - lo)) * (bottom - top));
+// The scale's ends are the league's first and last row centres, half a wide row in from the body's edges.
+const plot = seasonPlot(m, { h: Y, pad: ROW_WIDE / 2, flush: true });
+const { lo, hi, ticks, x, y: valY } = plot;
 const f = (y: number) => y.toFixed(2);
-
-// Round values to label on the scale, counted from 1000 so every gap between them is the same step. At most
-// six steps across the range keeps them over 150px apart on the desktop's 960px league body.
-const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => (hi - lo) / s <= 6) ?? 500;
-const marks: number[] = [];
-for (let v = START - Math.floor((START - lo) / step) * step; v <= hi; v += step) marks.push(v);
 
 // Curves and lines are drawn bottom team first, so the top team's sit on top.
 const curves = order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) })).reverse();
@@ -61,13 +53,12 @@ const curves = order.map((a, i) => ({ a, from: valY(shown[a]), to: rowY(i) })).r
 // The chart, from the day before opening night on its left edge to the latest day on the scale's axis.
 const ser = m.series;
 const charted = ser.length >= 2;
-const X = 1000; // the plot's viewBox width
+const X = PLOT.w;
 const at = (i: number) => i / (ser.length - 1);
-// Lines run through the displayed (rounded) ratings, as the dots do, so each one ends on its dot.
-const pts = (a: string) => ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(Math.round(d.r[a])))}`);
-// Once a team's run has ended, its line goes on as a dotted trail (lib/chart.ts runAndTrail).
+// Lines run through the displayed (rounded) ratings, as the dots do, so each one ends on its dot. Once a
+// team's run has ended, its line goes on as a dotted trail (lib/chart.ts runAndTrail).
 const split = runAndTrail(m);
-const lines = order.map((a) => ({ a, ...split(a, pts(a)) })).reverse();
+const lines = order.map((a) => ({ a, ...split(a, plot.pts(a)) })).reverse();
 const seasonEnd = seasonEndMark(m);
 const PLOT_MIN = 530, MARK_LABEL = 150, MONTH_LABEL = 30, DAY_LABEL = 40;
 const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN), ser.length, seasonEnd, { mark: MARK_LABEL / PLOT_MIN, tick: MONTH_LABEL / PLOT_MIN });
@@ -103,7 +94,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
             {i === 0 && (
               <td class="lad" rowspan={n} aria-hidden="true" data-preview>
                 <div class="lad-in">
-                  {marks.map((v) => (
+                  {ticks.map((v) => (
                     <span class="tick" style={`top: calc(${(valY(v) / ROW).toFixed(4)} * var(--row))`}>{v}</span>
                   ))}
                   {charted && (
@@ -116,8 +107,8 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
                       viewBox={`0 0 ${X} ${Y}`}
                       preserveAspectRatio="none"
                     >
-                      {marks.map((v) => <path class="grid" d={`M0,${f(valY(v))}H${X}`} />)}
-                      {seasonEnd && <path class="marker" d={`M${(at(seasonEnd.i) * X).toFixed(1)},0V${Y}`} />}
+                      {ticks.map((v) => <path class="grid" d={`M0,${f(valY(v))}H${X}`} />)}
+                      {seasonEnd && <path class="marker" d={`M${x(seasonEnd.i).toFixed(1)},0V${Y}`} />}
                       <path class="cross" data-cross d={`M0,0V${Y}`} />
                       <g>
                         {lines.map((l) => (
@@ -214,14 +205,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .history { left: var(--tl); width: calc(100% - var(--tl) - var(--cv)); }
   .lad path, .lad polyline { fill: none; vector-effect: non-scaling-stroke; }
   .axis { stroke: var(--grid); stroke-width: 1; }
-  .lead { stroke: var(--line-other); stroke-width: 1.5; stroke-dasharray: 1 3.5; stroke-linecap: round; }
-  .grid { stroke: var(--grid); stroke-width: 1; }
-  .marker { stroke: var(--muted); stroke-width: 1; }
-  /* 1.5px, not 1: a 1px line on a stretched plot falls between pixels and shimmers on a standard-density screen. */
-  :is(.line, .trail) { stroke: var(--tint-rest); stroke-width: 1.5; stroke-linejoin: round; }
-  :is(.line, .trail).hov { stroke: var(--tint); stroke-width: 2.25; }
-  .trail { stroke-dasharray: 1 3.5; stroke-linecap: round; }
-  .history:has(.line.hov) { cursor: pointer; }
+  .lead { stroke: var(--line-other); stroke-width: 1.5; stroke-dasharray: var(--line-dash); stroke-linecap: round; }
   .tick {
     position: absolute; right: calc(100% - var(--tl) + 8px); transform: translateY(-50%);
     font-size: 11px; line-height: 12px; color: var(--muted);
@@ -233,13 +217,13 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .pin { stroke: var(--tint-rest); stroke-width: 6; }
   .dot.hov .pin { stroke: var(--tint); }
   /* While one team is previewed, the rest step back so its line can be followed. */
-  .lt:has(.hov) :is(.line, .trail, .lead, .dot):not(.hov) { opacity: 0.4; }
-  .lt:has(.hov) tbody tr:not(.hov) > td:not(.lad) { opacity: 0.4; }
+  .lt:has(.hov) :is(.line, .trail, .lead, .dot):not(.hov) { opacity: var(--line-dim); }
+  .lt:has(.hov) tbody tr:not(.hov) > td:not(.lad) { opacity: var(--line-dim); }
   .xs { position: absolute; inset: 0 var(--cv) 0 var(--tl); }
-  .xs span { position: absolute; bottom: 2px; left: calc(var(--at) * 100%); transform: translateX(-50%); line-height: 16px; }
+  .xs span { position: absolute; bottom: 2px; left: calc(var(--at) * 100%); transform: translateX(-50%); font-size: var(--fs-small); line-height: 16px; }
   .xs .first { transform: none; }
   .xs .last { transform: translateX(-100%); }
-  .xs .mark-label { transform: translateX(calc(-100% - 4px)); }
+  .xs .mark-label { transform: translateX(calc(-100% - 4px)); font-size: 11px; }
   .stacked { margin-bottom: 16px; }
 
   /* With the chart stacked above, the scale keeps its own width and the team column takes the rest. */

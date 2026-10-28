@@ -3,6 +3,7 @@
 // has next and every game it played. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/ every other one.
 // In a season under way the next five games run down a side column as the games page shows them, with the chart
 // and the game log beside them; a finished season has nothing ahead, so the chart and the log take the width.
+import Empty from "../../../components/Empty.astro";
 import FixtureList from "../../../components/FixtureList.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
@@ -49,7 +50,7 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
       <aside class="side">
         <Panel title="Coming up">
           {ahead.length === 0 ? (
-            <p class="empty">No games scheduled.</p>
+            <Empty>No games scheduled.</Empty>
           ) : (
             <div class="days">{ahead.map((day) => <div><FixtureList season={season} day={day} /></div>)}</div>
           )}
@@ -62,7 +63,7 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
       </Panel>
       <Panel title="Game log">
         {log.length === 0 ? (
-          <p class="empty">No games yet.</p>
+          <Empty />
         ) : (
           <Fragment>
             <TeamGames season={season} games={log} rating aria-label={`Games played by the ${me.short}, newest first`} />
@@ -91,7 +92,5 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
     .days { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px 8px; }
   }
 
-  .empty { padding: 4px 0 8px; color: var(--muted); }
-  .note { margin-top: 10px; font-size: var(--fs-small); line-height: 18px; color: var(--muted); }
   .note a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
 </style>

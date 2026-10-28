@@ -1,0 +1,9 @@
+---
+// A list or chart with nothing in it: one muted sentence, "No games yet." unless the page says what is missing.
+---
+
+<p class="empty"><slot>No games yet.</slot></p>
+
+<style>
+  .empty { padding: 4px 0 8px; color: var(--muted); }
+</style>
