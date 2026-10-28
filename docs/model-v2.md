@@ -334,7 +334,7 @@ The choice failed as written, on two windows, and the site switches to version 2
 
 ## Before the build
 
-These choices change what the reader sees, not the score. The owner settled them on 2026-10-28, outside this plan.
+These choices change what the reader sees, not the score. They were applied as defaults on 2026-10-28, outside this plan, for the owner to review.
 
 - **A team's displayed rating.** The team rating plus the player part of the lineup it takes into its next game, on version 1's Elo scale.
 - **How the site explains player values.** The About page and "How it works" now say that each team starts from its preseason odds and that a rating counts who is playing.
