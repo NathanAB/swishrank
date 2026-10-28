@@ -9,6 +9,9 @@ const intFmt = new Intl.NumberFormat("en-US");
 /** A count with thousands separators: 1,322. */
 export const int = (n: number) => intFmt.format(n);
 
+/** The article a count under 100 takes at a sentence's start, by how it is read aloud: "An 8", "An 11", "A 12". */
+export const articleFor = (n: number) => (String(n).startsWith("8") || n === 11 || n === 18 ? "An" : "A");
+
 /** A count of points, a margin or a rating gap: "1 point", "202 points". */
 export const points = (n: number) => `${int(n)} ${n === 1 ? "point" : "points"}`;
 
