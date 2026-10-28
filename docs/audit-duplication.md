@@ -10,7 +10,7 @@ Two independent reviews checked an earlier draft of this audit against the code.
 - **Chart line styles.** Widths, the dotted dash, the faded opacity and the dim are in `global.css`, under `[data-chart]` and as `--line-dash`, `--line-faded` and `--line-dim`. The share image reads the faded opacity from there too.
 - **Rating range and ticks.** The charts, the league table and the share images take a season's range from `facts.ts` `ratingRange`, and every drawing's ticks from `chart.ts` `ratingTicks`.
 - **Rows of a team's games.** The game page's Previous games and the team page's game log are one `TeamGames` list, with its hover styles inside it.
-- **Game tiles.** A game still to play is one `FixtureTile`, as a final is one `ResultTile`, on the games page and How it works.
+- **Game tiles.** A game still to play is one `FixtureTile`, as a final is one `ResultTile`, on the games page.
 - **Upset badge.** One `UpsetBadge`, replacing four copies. Whether a team's win was an upset is worked out once per game, in `teams.ts` `teamGames` and `game.ts` `gameView`.
 - **Places and ties.** "tied 9th" is `format.ts` `placeLabel`, and a tie is `teams.ts` `tied`. The chart readout's rank format is written and read in `readout.ts`.
 - **Matchups.** "Pacers at Thunder" is `format.ts` `matchup`, and "at" or "vs" is `between`, in titles, tiles, labels, URLs and descriptions.
@@ -43,7 +43,15 @@ The header cell, row rule and last-row rules are repeated in LeagueTable and `se
 - 640px appears in 11 media queries, and 1023/1024px media queries are in four files. CSS `@custom-media` would name them once, but browsers don't support it yet without a build step.
 - 11px, and most of the game and team pages' large type (40, 48, 64px), have no token.
 
-### 5. Low
+### 5. How it works' own copies (medium)
+
+- Step 5 (`explain/Matchup.astro`) draws its game's names row with a copy of `FixtureTile`'s styles, and its script redraws `ChanceBar` by reaching into its markup.
+- Step 4 (`explain/DayOff.astro`) draws its two games itself, side by side, rather than as `ResultTile`s.
+- Step 1 (`explain/SeasonFan.astro`) repeats the chart readout in `scripts/highlight.ts`, and has drifted from it: its readout keeps 24px from a fingertip, the original 12px.
+
+**Fix:** a client-side update for `FixtureTile` and `ChanceBar`, a side-by-side `ResultTile`, and one readout both charts use.
+
+### 6. Low
 
 - Visually hidden text is styled twice.
 - The logo's path is in both `Base.astro` and `public/favicon.svg`.

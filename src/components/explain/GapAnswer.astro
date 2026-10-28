@@ -1,0 +1,40 @@
+---
+// How it works, step 2's answer: the favourite's chance at the curve's gap in large type, the underdog's beside it,
+// and a bar split at that chance. It sits under the step's words while the curve (GapCurve.astro, given this id)
+// sits beside them, and the curve's script keeps it up to date. Without script it shows the 100-point gap.
+import { GAP_START, readout } from "../../lib/explain/curve.ts";
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+const said = readout(GAP_START);
+---
+
+<div class="answer" id={id} aria-live="polite" aria-atomic="true" style={`--p: ${said.p * 100}%`}>
+  <span class="side fav">Favorite</span>
+  <b class="chance fav" data-chance>{said.chances[0]}</b>
+  <span class="side dog">Underdog</span>
+  <b class="chance dog" data-chance>{said.chances[1]}</b>
+  <div class="split" aria-hidden="true"><i></i><i></i></div>
+</div>
+
+<style>
+  /* The favourite's chance as the step's largest figure, the underdog's smaller at the far end, and a bar split at
+     the chance under them, its favourite's part in the accent. Each side's name sits over its chance. */
+  .answer {
+    display: grid; grid-template-columns: auto auto; justify-content: space-between; align-items: end;
+    max-width: 320px; margin-top: 20px; font-size: var(--fs-small); line-height: 16px; color: var(--muted);
+  }
+  .side { grid-row: 1; margin-bottom: 2px; }
+  .chance { grid-row: 2; margin-bottom: 8px; color: var(--text); font-weight: 600; letter-spacing: -0.02em; }
+  .fav { grid-column: 1; }
+  .dog { grid-column: 2; text-align: right; }
+  .chance.fav { font-size: 48px; line-height: 48px; }
+  .chance.dog { font-size: 20px; line-height: 24px; color: var(--muted); font-weight: 500; }
+  .split { grid-row: 3; grid-column: 1 / -1; display: flex; gap: 2px; height: 6px; }
+  .split i { height: 100%; }
+  .split i:first-child { flex: none; width: calc(var(--p) - 1px); background: var(--accent); border-radius: 3px 0 0 3px; transition: width 150ms cubic-bezier(0.2, 0, 0, 1); }
+  .split i:last-child { flex: 1; background: var(--bar); border-radius: 0 3px 3px 0; }
+</style>

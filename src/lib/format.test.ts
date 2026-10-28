@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { localTime, monthName, nearDay, signed } from "./format.ts";
+import { figure, localTime, monthName, nearDay, points, signed } from "./format.ts";
 
 test("changes carry a sign, with a real minus", () => {
   assert.deepEqual([signed(21), signed(-1322), signed(0)], ["+21", "−1,322", "0"]);
@@ -20,4 +20,12 @@ test("a tip-off shows in the reader's zone, named, and with its weekday where it
   assert.equal(localTime(tip, "tip", "America/Los_Angeles"), "4:30 PM PST");
   assert.equal(localTime(tip, "tip", "Europe/Paris"), "Mon 1:30 AM GMT+1");
   assert.equal(localTime(tip, "stamp", "America/Chicago"), "Nov 1, 2026, 6:30 PM CST");
+});
+
+test("says point for one and points for more", () => {
+  assert.deepEqual([points(1), points(2), points(1250)], ["1 point", "2 points", "1,250 points"]);
+});
+
+test("a figure that may be negative shows a real minus and no plus", () => {
+  assert.deepEqual([figure(202), figure(0), figure(-83)], ["202", "0", "−83"]);
 });

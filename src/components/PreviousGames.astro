@@ -38,7 +38,7 @@ const n = Math.max(...sides.map((s) => s.previous.length));
 
 <style>
   /* The card clips its two edges to its rounded corners, so each edge's outer side curves and its inner one is straight. */
-  .prev { position: relative; overflow: hidden; padding: 16px calc(var(--card-pad) + 4px); background: var(--surface); border: var(--panel-edge); border-radius: var(--radius-card); }
+  .prev { position: relative; overflow: hidden; padding: var(--card-pad) calc(var(--card-pad) + 4px); background: var(--surface); border: var(--panel-edge); border-radius: var(--radius-card); }
   .edge { position: absolute; top: 0; bottom: 0; width: 4px; background: var(--tint); }
   .edge.away { left: 0; }
   .edge.home { right: 0; }
@@ -66,7 +66,7 @@ const n = Math.max(...sides.map((s) => s.previous.length));
     .away .head, .home .head { flex-direction: row; margin: 0; padding-left: 0; padding-right: 0; }
   }
   @media (max-width: 640px) {
-    .prev { padding: 16px calc(var(--card-pad) + 2px); }
+    .prev { padding: var(--card-pad) calc(var(--card-pad) + 2px); }
     h2, .head, .home .head { font-size: 18px; line-height: 24px; }
   }
 </style>

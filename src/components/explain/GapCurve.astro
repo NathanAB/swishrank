@@ -1,0 +1,181 @@
+---
+// How it works, step 2: the favourite's chance against the rating gap, with a handle on the curve the reader moves
+// by pointing along it or with the slider under it (lib/explain/curve.ts). The chance at the handle's gap is shown
+// by GapAnswer.astro, whose id `answer` names. Without script it shows the 100-point gap the page's summary names.
+import { GAP_MAX, GAP_START, height, place, readout } from "../../lib/explain/curve.ts";
+import { int, pct } from "../../lib/format.ts";
+import Range from "./Range.astro";
+
+interface Props {
+  /** The id of the GapAnswer that shows the chance at the handle's gap. */
+  answer: string;
+}
+
+const { answer } = Astro.props;
+const start = place(GAP_START);
+const said = readout(GAP_START);
+const curve = Array.from({ length: GAP_MAX / 5 + 1 }, (_, i) => `${i ? "L" : "M"}${i * 5} ${place(i * 5).y.toFixed(2)}`).join(" ");
+const gapTicks = Array.from({ length: GAP_MAX / 100 + 1 }, (_, i) => i * 100);
+const chanceTicks = [0.5, 0.75, 1];
+---
+
+<figure class="gap" data-gap-curve data-answer={answer} style={`--x: ${start.x}%; --y: ${start.y}%`}>
+  <p class="axis-title" aria-hidden="true">Chance the higher-rated team wins</p>
+  <div class="plot" data-plot aria-hidden="true">
+    <div class="draw">
+      {chanceTicks.map((p) => (
+        <Fragment>
+          <span class="grid" style={`top: ${height(p)}%`}></span>
+          <span class="ytick" style={`top: ${height(p)}%`}>{pct(p)}</span>
+        </Fragment>
+      ))}
+      <span class="guide"></span>
+      <svg viewBox={`0 0 ${GAP_MAX} 100`} preserveAspectRatio="none">
+        <path d={curve} vector-effect="non-scaling-stroke" />
+      </svg>
+      <span class="dot"></span>
+      {gapTicks.map((g) => <span class:list={["xtick", { off: Math.abs(g - GAP_START) < 50 }]} style={`left: ${(g / GAP_MAX) * 100}%`}>{int(g)}</span>)}
+      <span class="tag" data-tag>{said.tag}</span>
+    </div>
+  </div>
+  <Range class="slider" min="0" max={GAP_MAX} step="1" value={GAP_START} aria-label="Rating gap, in points" aria-valuetext={said.points} />
+</figure>
+
+<script>
+  import { cubicBezier, GAP_MAX, GAP_START, place, readout } from "../../lib/explain/curve.ts";
+
+  const SETTLE = cubicBezier(0.2, 0, 0, 1);
+  const SWEEP = cubicBezier(0.4, 0, 0.2, 1);
+  const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-gap-curve]")) {
+    const answer = document.getElementById(root.dataset.answer ?? "")!;
+    const chances = [...answer.querySelectorAll<HTMLElement>("[data-chance]")];
+    const plot = root.querySelector<HTMLElement>("[data-plot]")!;
+    const input = root.querySelector<HTMLInputElement>("input[type=range]")!;
+    const tag = root.querySelector<HTMLElement>("[data-tag]")!;
+    const ticks = [...root.querySelectorAll<HTMLElement>(".xtick")];
+
+    let frame = 0;
+    let touched = false;
+
+    const sayGap = (g: number) => {
+      const said = readout(g);
+      said.chances.forEach((c, i) => (chances[i].textContent = c));
+      answer.style.setProperty("--p", `${said.p * 100}%`);
+      input.value = String(g);
+      input.setAttribute("aria-valuetext", said.points);
+      tag.textContent = said.tag;
+    };
+
+    const drawHandle = (g: number) => {
+      const { x, y } = place(g);
+      root.style.setProperty("--x", `${x}%`);
+      root.style.setProperty("--y", `${y}%`);
+      const t = tag.getBoundingClientRect();
+      for (const tick of ticks) {
+        const r = tick.getBoundingClientRect();
+        tick.classList.toggle("off", r.right + 6 > t.left && r.left - 6 < t.right);
+      }
+    };
+
+    const halt = () => cancelAnimationFrame(frame);
+    const move = (from: number, to: number, ms: number, ease: (t: number) => number, each: (g: number) => void, then?: () => void) => {
+      halt();
+      const t0 = performance.now();
+      const step = (now: number) => {
+        const k = Math.min(1, (now - t0) / ms);
+        each(from + (to - from) * ease(k));
+        if (k < 1) frame = requestAnimationFrame(step);
+        else then?.();
+      };
+      frame = requestAnimationFrame(step);
+    };
+    let shown = GAP_START;
+    const moveHandle = (g: number) => drawHandle((shown = g));
+    // The answer is read out as the reader moves it by keys, and kept quiet while a pointer moves it or the reveal
+    // runs it, which would read out every step.
+    const quiet = (on: boolean) => answer.setAttribute("aria-live", on ? "off" : "polite");
+    const take = (g: number, pointer: boolean) => {
+      touched = true;
+      halt();
+      quiet(pointer);
+      sayGap(g);
+      moveHandle(g);
+    };
+
+    input.addEventListener("input", () => take(Number(input.value), false));
+
+    const gapAt = (clientX: number) => {
+      const r = plot.getBoundingClientRect();
+      return Math.round(Math.min(Math.max((clientX - r.left) / r.width, 0), 1) * GAP_MAX);
+    };
+    plot.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      plot.setPointerCapture(e.pointerId);
+      take(gapAt(e.clientX), true);
+    });
+    const follows = (e: PointerEvent) => e.pointerType !== "touch" || plot.hasPointerCapture(e.pointerId);
+    plot.addEventListener("pointermove", (e) => {
+      if (follows(e)) take(gapAt(e.clientX), true);
+    });
+
+    new ResizeObserver(() => drawHandle(shown)).observe(plot);
+
+    if (!still()) {
+      const seen = new IntersectionObserver(
+        ([entry]) => {
+          if (touched) return seen.disconnect();
+          if (entry.intersectionRatio < 0.4) return;
+          seen.disconnect();
+          quiet(true);
+          const run = (g: number) => {
+            sayGap(Math.round(g));
+            moveHandle(g);
+          };
+          move(GAP_START, GAP_MAX, 900, SWEEP, run, () => move(GAP_MAX, GAP_START, 500, SETTLE, run, () => quiet(false)));
+        },
+        { threshold: 0.4 },
+      );
+      seen.observe(root);
+    }
+  }
+</script>
+
+<style>
+  .gap {
+    --lane: 36px; --end: 12px; --ticks: 22px;
+    position: relative; max-width: 760px; padding: 0 var(--end) 0 var(--lane);
+    font-size: var(--fs-small); line-height: 16px; color: var(--muted);
+  }
+
+  .axis-title { margin: 0 0 10px calc(-1 * var(--lane)); }
+
+  /* The plot takes the pointer anywhere on it, and keeps the page's vertical scroll for a touch. */
+  .plot {
+    position: relative; height: 150px; margin-bottom: var(--ticks);
+    touch-action: pan-y; cursor: ew-resize; user-select: none; -webkit-user-select: none;
+  }
+  .draw { position: absolute; inset: 0; pointer-events: none; }
+  .draw svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .draw path { fill: none; stroke: var(--text); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
+  .grid { position: absolute; left: 0; right: 0; height: 1px; background: var(--grid); }
+  .ytick { position: absolute; right: calc(100% + 8px); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
+  .xtick { position: absolute; top: calc(100% + 6px); transform: translateX(-50%); font-variant-numeric: tabular-nums; transition: opacity 150ms ease; }
+  .xtick.off { opacity: 0; }
+  .guide { position: absolute; left: var(--x); top: var(--y); bottom: 0; width: 1px; background: var(--control); }
+  /* The handle: the slider's thumb in small, ringed in the accent, growing a little while a mouse is over the plot. */
+  .dot {
+    position: absolute; left: var(--x); top: var(--y); width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+    background: var(--text); box-shadow: 0 0 0 3px var(--accent); transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  @media (hover: hover) { .plot:hover .dot { transform: scale(1.2); } }
+  /* The gap's tag rides the axis under the dot, spanning it in the proportion the dot spans the plot. */
+  .tag {
+    position: absolute; top: calc(100% + 6px); left: var(--x); transform: translateX(calc(-1 * var(--x)));
+    color: var(--text); font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+
+  /* The slider reaches half a thumb past the plot at each end, so the thumb's centre stands under the dot's gap. */
+  .gap .slider { width: calc(100% + var(--thumb)); margin-inline: calc(-1 * var(--thumb) / 2); }
+</style>

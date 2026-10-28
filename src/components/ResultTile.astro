@@ -2,7 +2,7 @@
 // One final game as a tile: away over home, each with its score and, smaller, its rating change as displayed.
 // The whole tile opens the game's page; each team's name opens its own.
 // The winner is in ink. An upset's tile lights up in the accent, with a badge naming the winner and the chance
-// the ratings gave them. The games page lists these tiles; How it works shows one on its own.
+// the ratings gave them. The games page lists these tiles.
 import UpsetBadge from "./UpsetBadge.astro";
 import { upset, type Outcome } from "../lib/facts.ts";
 import { between, matchup, pct, signed } from "../lib/format.ts";
@@ -12,15 +12,13 @@ import { team, type SeasonView } from "../lib/season.ts";
 interface Props {
   season: SeasonView;
   outcome: Outcome;
-  /** "li" in a list of games, "div" on its own. */
-  as?: "li" | "div";
 }
 
-const { season, outcome: o, as: Tag = "li" } = Astro.props;
+const { season, outcome: o } = Astro.props;
 const isUpset = upset(o);
 ---
 
-<Tag class:list={["tile", { upset: isUpset }]}>
+<li class:list={["tile", { upset: isUpset }]}>
   <a class="cover" href={href({ kind: "game", season, game: o.result.game })} aria-label={`${matchup(team(season, o.away.abbr).short, team(season, o.home.abbr).short, o.result.game.neutral)}, ${o.away.score}–${o.home.score}`}></a>
   {isUpset && (
     <p class="top">
@@ -37,7 +35,7 @@ const isUpset = upset(o);
       <span class:list={["ch num", { paid: isUpset && l.won }]}>{signed(l.change)}</span>
     </div>
   ))}
-</Tag>
+</li>
 
 <style>
   /* Name, score and rating change on one grid, so the two lines' figures line up. */

@@ -1,0 +1,142 @@
+---
+// How it works, step 4: why a team rose on a day it did not play (lib/method.ts offDay). Its win over a team, then,
+// a row down and shifted so that team stands in the same column, that team's later win, each game one box as the
+// games page draws a game; a line in that team's colour joins it across the two games, since playing in both is
+// what links them, and an arrow runs from the second game back up to the first team with the points it gained.
+// Scrolled into view, the games arrive and then the arrow draws from the second game to the first. Without script,
+// or with reduced motion, it shows the finished drawing. Before a season has such a day it renders nothing.
+import { record, signed, weekdayDay } from "../../lib/format.ts";
+import { offDay } from "../../lib/method.ts";
+import { team, type SeasonView } from "../../lib/season.ts";
+import { tintStyles } from "../../lib/tint.ts";
+
+interface Props {
+  season: SeasonView;
+}
+
+const { season } = Astro.props;
+const { model } = season;
+const rest = offDay(model.results, model.series);
+const tint = tintStyles(model.data.teams);
+const name = (abbr: string) => team(season, abbr).short;
+const shown = rest && (() => {
+  const side = (l: { abbr: string; score: number }) => ({ name: name(l.abbr), score: l.score, tint: tint[l.abbr] });
+  const [first, then] = [rest.beaten, rest.win].map((o) => ({
+    day: weekdayDay(o.result.day),
+    winner: side(o.winner),
+    loser: side(o.loser),
+    score: record(o.winner.score, o.loser.score),
+  }));
+  return { first, then, gain: signed(rest.change), risen: name(rest.abbr), link: first.loser };
+})();
+---
+
+{shown && (
+  <div
+    class="chain"
+    data-chain
+    role="img"
+    aria-label={`${shown.first.winner.name} beat ${shown.first.loser.name} ${shown.first.score} on ${shown.first.day}. ${shown.then.winner.name} beat ${shown.then.loser.name} ${shown.then.score} on ${shown.then.day}. The ${shown.link.name} played in both games, so their win made the ${shown.risen} win count for more: ${shown.gain} to the ${shown.risen}, without playing.`}
+  >
+    {[shown.first, shown.then].map((g, i) => (
+      <div class:list={["game", i ? "g2" : "g1"]}>
+        <p class="date">{g.day}</p>
+        <span class="side win" style={g.winner.tint}>
+          <span class="nm"><i class="key"></i>{g.winner.name}</span>
+          <b class="sc">{g.winner.score}</b>
+        </span>
+        <span class="verb">beat</span>
+        <span class="side" style={g.loser.tint}>
+          <span class="nm"><i class="key"></i>{g.loser.name}</span>
+          <b class="sc">{g.loser.score}</b>
+        </span>
+      </div>
+    ))}
+    <span class="link" style={shown.link.tint}></span>
+    <span class="transfer">
+      <span class="bend"></span>
+      <span class="gain"><b>{shown.gain}</b> to {shown.risen}</span>
+    </span>
+  </div>
+)}
+
+<script>
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const root of document.querySelectorAll<HTMLElement>("[data-chain]")) {
+    if (still) continue;
+    root.classList.add("armed");
+    new IntersectionObserver((entries, seen) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      seen.disconnect();
+      root.classList.add("go");
+    }, { threshold: 0.4 }).observe(root);
+  }
+</script>
+
+<style>
+  /* Five columns, team, verb, team, verb, team: the first game's box spans the first three and the second's the
+     last three, so the team in both games stands in one column. A game's box has a fixed height, so the arrow's
+     elbow can meet the middle of the second. */
+  .chain {
+    --tile: 78px; --verb: 32px; --gap: 8px; --ease: cubic-bezier(0.2, 0, 0, 1);
+    position: relative; max-width: 560px; display: grid; column-gap: var(--gap);
+    grid-template-columns: minmax(0, 1fr) var(--verb) minmax(0, 1fr) var(--verb) minmax(0, 1fr);
+    grid-template-rows: var(--tile) 28px var(--tile);
+  }
+
+  /* A game: its date over its two sides, the winner in ink, each side keyed in its team's colour. */
+  .game {
+    display: grid; grid-template-columns: subgrid; grid-template-rows: auto 1fr; align-items: center; row-gap: 4px;
+    padding: 8px 0; background: var(--raised); border-radius: 4px; color: var(--muted);
+  }
+  .g1 { grid-column: 1 / 4; grid-row: 1; }
+  .g2 { grid-column: 3 / 6; grid-row: 3; }
+  .date { grid-column: 1 / -1; padding: 0 10px; font-size: var(--fs-small); line-height: 16px; }
+  /* Each side is centred in its column, so the line between the two games and the arrow's head meet its middle. */
+  .side { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 0 10px; }
+  .side.win { color: var(--text); }
+  .nm { display: flex; align-items: center; gap: 6px; font-size: var(--fs-small); line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .key { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--tint); }
+  .sc { font-size: 20px; line-height: 24px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .win .sc { font-weight: 600; }
+  .verb { text-align: center; font-size: var(--fs-small); }
+
+  /* The team in both games, joined from one box to the other by a line in its colour. */
+  .link { grid-column: 3; grid-row: 2; justify-self: center; width: 2px; background: var(--tint); }
+
+  /* The arrow: from the second game, left along its middle and up into the first team's side, with the gain
+     beside it. */
+  .transfer { position: relative; grid-column: 1; grid-row: 2 / 4; }
+  .bend {
+    --line: 2px; --head: 12px;
+    position: absolute; left: 50%; top: 0; right: calc(-1 * (var(--verb) + 2 * var(--gap))); bottom: calc(var(--tile) / 2 - 1px);
+    border-left: var(--line) solid var(--accent); border-bottom: var(--line) solid var(--accent); border-bottom-left-radius: 12px;
+  }
+  .bend::before {
+    content: ""; position: absolute; left: -7px; top: -8px;
+    border-inline: 6px solid transparent; border-bottom: 9px solid var(--accent);
+  }
+  .gain {
+    position: absolute; left: calc(50% + 10px); top: 4px; white-space: nowrap;
+    font-size: var(--fs-small); line-height: 16px; color: var(--text);
+  }
+  .gain b { margin-right: 2px; font-size: 18px; line-height: 20px; font-weight: 600; color: var(--accent); }
+
+  /* On a phone the three columns share about 300px, so the gaps and the names shrink to keep each name whole, and
+     the gain stacks beside the arrow. */
+  @media (max-width: 480px) {
+    .chain { --verb: 26px; --gap: 4px; }
+    .side, .date { padding: 0 6px; }
+    .nm { gap: 4px; font-size: 11px; }
+    .key { width: 6px; height: 6px; }
+    .gain { display: flex; flex-direction: column; top: 0; font-size: 11px; line-height: 14px; }
+  }
+
+  .armed :is(.game, .link) { opacity: 0; transform: translateY(8px); }
+  .armed .bend { clip-path: inset(100% calc(-1 * var(--line)) calc(-1 * var(--line)) 100%); }
+  .armed .gain { opacity: 0; transform: scale(0.8); }
+  .go :is(.game, .link) { opacity: 1; transform: none; transition: opacity 300ms var(--ease), transform 300ms var(--ease); }
+  .go :is(.g2, .link) { transition-delay: 400ms; }
+  .go .bend { clip-path: inset(calc(-1 * var(--head)) calc(-1 * var(--line)) calc(-1 * var(--line)) calc(-1 * var(--head))); transition: clip-path 700ms cubic-bezier(0.4, 0, 0.2, 1) 900ms; }
+  .go .gain { opacity: 1; transform: none; transition: opacity 200ms var(--ease) 1500ms, transform 200ms var(--ease) 1500ms; }
+</style>
