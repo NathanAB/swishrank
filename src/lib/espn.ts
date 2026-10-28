@@ -2,6 +2,24 @@
 // here, so a re-fetch keeps them.
 import { dayKey, type Abbr, type Game, type Team } from "./elo.ts";
 
+/** The pauses between tries of one scoreboard request: ESPN now and then sends an empty body, twice in a row. */
+export const RETRY_WAITS = [5_000, 20_000, 60_000];
+
+/** One day's scoreboard events from `url`, tried again after each of `waits` when ESPN fails or sends no JSON. */
+export async function fetchEvents(url: string, waits = RETRY_WAITS, get: typeof fetch = fetch): Promise<EspnEvent[]> {
+  for (let i = 0; ; i++) {
+    try {
+      const res = await get(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return ((await res.json()) as { events?: EspnEvent[] }).events ?? [];
+    } catch (err) {
+      if (i === waits.length) throw new Error(`ESPN ${url}: ${(err as Error).message}`);
+      console.warn(`ESPN ${url}: ${(err as Error).message}, trying again in ${waits[i] / 1000}s`);
+      await new Promise((r) => setTimeout(r, waits[i]));
+    }
+  }
+}
+
 type Competitor = {
   homeAway: "home" | "away";
   score?: string;
