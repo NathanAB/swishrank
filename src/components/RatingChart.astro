@@ -137,7 +137,7 @@ const label = `Daily rating of ${teams.length === m.abbrs.length ? "all " : ""}$
         {labels.map((l, k) => {
           const lx = GAP + (k % 2) * COL;
           return (
-            <g>
+            <g data-team={l.a} data-preview={team ? undefined : ""}>
               <path class:list={["leader", { own: l.a === team }]} data-team={l.a} style={tint[l.a]} d={`M2,${l.y.toFixed(1)}L6,${l.y.toFixed(1)}L${GAP - 5},${l.ly.toFixed(1)}L${lx - 3},${l.ly.toFixed(1)}`} />
               <text class:list={["lab", { own: l.a === team }]} data-team={l.a} x={lx} y={(l.ly + 4).toFixed(1)}>
                 {text(l.a)}

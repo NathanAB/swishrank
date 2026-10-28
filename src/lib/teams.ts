@@ -39,7 +39,7 @@ export function place(model: Season, abbr: Abbr): string {
 }
 
 export type Phase = "regular" | "play-in" | "playoffs";
-/** What kind of game it was, and a short tag for it ("Finals game 3", "Cup", "Berlin"), if any. */
+/** What kind of game it was, and a short tag for it ("Finals game 3", "NBA Cup", "Berlin"), if any. */
 export type Stage = { phase: Phase; label: string | null };
 
 // ESPN's game notes, tried in order. "NBA Cup - Semifinals" is a regular-season game, so the conference
@@ -50,10 +50,10 @@ const STAGES: readonly (readonly [RegExp, Phase, string])[] = [
   [/^(East|West) Semifinals - Game (\d+)$/, "playoffs", "$1 semis game $2"],
   [/^(East|West) 1st Round - Game (\d+)$/, "playoffs", "1st round game $2"],
   [/^NBA Play-In\b.*$/, "play-in", "Play-In"],
-  [/^NBA (?:Cup|In-Season Tournament) Championship$/, "regular", "Cup final"],
-  [/^NBA (?:Cup|In-Season Tournament) - Semifinals$/, "regular", "Cup semifinal"],
-  [/^NBA (?:Cup|In-Season Tournament) - Quarterfinals$/, "regular", "Cup quarterfinal"],
-  [/^NBA (?:Cup|In-Season Tournament) - Group Play$/, "regular", "Cup"],
+  [/^NBA (?:Cup|In-Season Tournament) Championship$/, "regular", "NBA Cup final"],
+  [/^NBA (?:Cup|In-Season Tournament) - Semifinals$/, "regular", "NBA Cup semifinal"],
+  [/^NBA (?:Cup|In-Season Tournament) - Quarterfinals$/, "regular", "NBA Cup quarterfinal"],
+  [/^NBA (?:Cup|In-Season Tournament) - Group Play$/, "regular", "NBA Cup"],
   [/^NBA (.+?) Games?(?: \d{4})?$/, "regular", "$1"],
 ];
 
@@ -101,8 +101,7 @@ export function runEnds(model: Season): Record<Abbr, string | null> {
 export function highLow(s: TeamStats): { value: string; unit?: string } {
   if (s.W + s.L === 0) return { value: DASH };
   const value = `${rating(s.hi)} / ${rating(s.lo)}`;
-  if (s.lo === START) return { value, unit: `never below ${START}` };
-  if (s.hi === START) return { value, unit: `never above ${START}` };
+  if (s.lo === START || s.hi === START) return { value, unit: `${START} is the starting rating` };
   return { value };
 }
 

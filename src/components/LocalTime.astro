@@ -1,0 +1,15 @@
+---
+// A moment the reader sees in their own time zone. The page is built ahead of time, so it carries US Eastern,
+// and scripts/local-time.ts rewrites it in the browser's zone once the page loads.
+import { easternTime, type Moment } from "../lib/format.ts";
+
+interface Props {
+  /** The moment, as an ISO string. */
+  at: string;
+  kind?: Moment;
+}
+
+const { at, kind = "tip" } = Astro.props;
+---
+
+<time datetime={at} data-local={kind}>{easternTime(new Date(at), kind)}</time>

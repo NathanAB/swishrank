@@ -1,16 +1,49 @@
 ---
 // What GitHub Pages serves for any path under the site that has no page, such as a mistyped team or a month
-// with no games, in the site's own frame.
+// with no games, in the site's own frame. A path that most likely meant a page, such as /teams/Knicks/ or the
+// current season under its id, goes on to that page (routes.ts guessPath).
 import Base from "../layouts/Base.astro";
-import { href } from "../lib/routes.ts";
-import { currentSeason } from "../lib/season.ts";
+import { months } from "../lib/results.ts";
+import { href, slugify, teamSlug, type Guesses } from "../lib/routes.ts";
+import { allSeasons, currentSeason } from "../lib/season.ts";
+
+// The NBA's own codes and the common short names, where they differ from ESPN's abbreviations and nicknames.
+const MORE: Record<string, string[]> = {
+  NY: ["NYK"], GS: ["GSW"], SA: ["SAS"], NO: ["NOP"], UTAH: ["UTA"], WSH: ["WAS"], PHI: ["Sixers"], POR: ["Blazers"],
+  MIN: ["Wolves"], LAL: ["LA Lakers"], LAC: ["LA Clippers"], CLE: ["Cavs"], DAL: ["Mavs"], PHX: ["PHO"], BKN: ["BRK"],
+  CHA: ["CHO"],
+};
+const season = currentSeason();
+const aliases = Object.fromEntries(
+  Object.entries(season.model.data.teams).flatMap(([abbr, t]) =>
+    [abbr, t.short, t.name, t.short.replace(/\s+/g, ""), ...(MORE[abbr] ?? [])].map((name) => [slugify(name), teamSlug(abbr)]),
+  ),
+);
+const guesses: Guesses = {
+  current: season.id,
+  aliases,
+  months: Object.fromEntries(allSeasons().flatMap((s) => months(s.model).map((m) => [m.key, s.id]))),
+};
 ---
 
 <Base title="Page not found">
   <Fragment slot="lede">
-    There is no page here. Try the <a href={href({ kind: "home", season: currentSeason() })}>ratings</a>.
+    There is no page here. Try the <a href={href({ kind: "home", season })}>ratings</a>.
   </Fragment>
+  <div data-guess={JSON.stringify(guesses)} hidden></div>
 </Base>
+
+<script>
+  import { guessPath, withBase } from "../lib/routes.ts";
+
+  const el = document.querySelector<HTMLElement>("[data-guess]");
+  const base = withBase("");
+  if (el && location.pathname.startsWith(base)) {
+    const to = guessPath(location.pathname.slice(base.length) || "/", JSON.parse(el.dataset.guess ?? "{}"));
+    // Only a guess that has a page is worth leaving the address the reader typed for.
+    if (to) fetch(withBase(to), { method: "HEAD" }).then((r) => r.ok && location.replace(withBase(to) + location.search + location.hash), () => {});
+  }
+</script>
 
 <style>
   a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }

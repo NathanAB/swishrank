@@ -51,9 +51,22 @@ export const monthShort = (month: string) => dayPart(`${month}-01`, { month: "sh
 /** What the week ahead calls a day near `today`: "Tonight" for today, "Tomorrow" for the next, null for a later one. */
 export const nearDay = (day: string, today: string) => (day === today ? "Tonight" : day === addDays(today, 1) ? "Tomorrow" : null);
 
-/** Tip-off time in US Eastern: 7:30 PM. */
-export const tipTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
+/** How a moment shows: a tip-off as its time, the footer's update as its date and time. */
+export type Moment = "tip" | "stamp";
 
-/** A moment in US Eastern with its zone: Oct 25, 1:43 PM ET. */
-export const stamp = (at: Date) =>
-  `${at.toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ET`;
+/** A moment as the build writes it, in US Eastern with its zone: 7:30 PM ET, or Oct 25, 2026, 1:43 PM ET. */
+export const easternTime = (at: Date, kind: Moment) =>
+  `${at.toLocaleString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit", ...(kind === "stamp" && { year: "numeric", month: "short", day: "numeric" }) })} ET`;
+
+/**
+ * A moment in the reader's time zone (`zone`, the browser's own when left out), named: 4:30 PM PDT. Games
+ * are listed under their US Eastern day, so a tip-off that falls on another day where the reader is says
+ * which: Sun 1:30 AM GMT+1.
+ */
+export function localTime(at: Date, kind: Moment, zone?: string): string {
+  const clock: Intl.DateTimeFormatOptions = { timeZone: zone, hour: "numeric", minute: "2-digit", timeZoneName: "short" };
+  if (kind === "stamp") return at.toLocaleString("en-US", { ...clock, year: "numeric", month: "short", day: "numeric" });
+  const time = at.toLocaleTimeString("en-US", clock);
+  const day = (timeZone?: string) => at.toLocaleDateString("en-CA", { timeZone });
+  return day(zone) === day(TZ) ? time : `${at.toLocaleDateString("en-US", { timeZone: zone, weekday: "short" })} ${time}`;
+}

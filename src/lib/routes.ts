@@ -114,3 +114,39 @@ export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string
     }
   }
 }
+
+/** A name as a URL segment would spell it: "Trail Blazers" and "trail%20blazers" both become trail-blazers. */
+export const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** What guessPath knows of the site: the current season's id, each team name's slug, and each month's season. */
+export type Guesses = {
+  current: string;
+  /** A team's nickname, full name or code, slugified, to its slug. */
+  aliases: Record<string, string>;
+  /** A month with games, YYYY-MM, to its season's id. */
+  months: Record<string, string>;
+};
+
+/**
+ * The page a path with no page most likely meant, or null when there is no better guess: the not-found page
+ * sends the reader there. Case is ignored, a season may be written with the en dash the site shows, the
+ * current season's id is dropped since that season lives at the root, a team may be named by any of its
+ * aliases, and a month of games goes under the season it belongs to. A guess is its own guess, so a guess
+ * that has no page either stops there.
+ */
+export function guessPath(path: string, { current, aliases, months }: Guesses): string | null {
+  let parts: string[];
+  try {
+    parts = path.split("/").filter(Boolean).map((p) => decodeURIComponent(p).toLowerCase().replace(/[–—]/g, "-"));
+  } catch {
+    return null;
+  }
+  if (parts[0] === current) parts.shift();
+  const t = parts.indexOf("teams");
+  if (t >= 0 && parts[t + 1]) parts[t + 1] = aliases[slugify(parts[t + 1])] ?? parts[t + 1];
+  const g = parts.indexOf("games");
+  const owner = g >= 0 && parts[g + 1] ? months[parts[g + 1]] : undefined;
+  if (owner) parts = [...(owner === current ? [] : [owner]), ...parts.slice(g)];
+  const guess = `/${parts.map(encodeURIComponent).join("/")}${parts.length ? "/" : ""}`;
+  return guess === path ? null : guess;
+}

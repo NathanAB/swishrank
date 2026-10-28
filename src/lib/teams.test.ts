@@ -14,7 +14,7 @@ test("the conference map agrees with the data's Cup groups and playoff rounds", 
   for (const { season, games } of seasons) {
     for (const g of games) {
       const named = g.note?.match(/^(?:NBA Play-In - )?(East|West)\b/)?.[1];
-      const want = named ?? (stage(g.note).label === "Cup" ? conferenceOf(g.home) : undefined);
+      const want = named ?? (stage(g.note).label === "NBA Cup" ? conferenceOf(g.home) : undefined);
       if (want === undefined) continue;
       for (const abbr of [g.home, g.away]) if (conferenceOf(abbr) !== want) wrong.push(`${season} ${g.id}: ${abbr} is not ${want}`);
     }
@@ -40,7 +40,7 @@ test("a conference's table holds only its teams, ranked from 1 among themselves"
 });
 
 test("Cup semifinals are regular-season games and conference semifinals are playoffs", () => {
-  assert.deepEqual(stage("NBA Cup - Semifinals"), { phase: "regular", label: "Cup semifinal" });
+  assert.deepEqual(stage("NBA Cup - Semifinals"), { phase: "regular", label: "NBA Cup semifinal" });
   assert.deepEqual(stage("East Semifinals - Game 3"), { phase: "playoffs", label: "East semis game 3" });
 });
 
@@ -58,8 +58,8 @@ test("a team's next games are the games page's week: today and the six days afte
 
 test("the high and low say when one of them is just the 1000 every team starts at", () => {
   assert.deepEqual(highLow({ W: 70, L: 32, hi: 1307.2, lo: 994.4 }), { value: "1307 / 994" });
-  assert.deepEqual(highLow({ W: 3, L: 0, hi: 1040.6, lo: 1000 }), { value: "1041 / 1000", unit: "never below 1000" });
-  assert.deepEqual(highLow({ W: 0, L: 3, hi: 1000, lo: 962 }), { value: "1000 / 962", unit: "never above 1000" });
+  assert.deepEqual(highLow({ W: 3, L: 0, hi: 1040.6, lo: 1000 }), { value: "1041 / 1000", unit: "1000 is the starting rating" });
+  assert.deepEqual(highLow({ W: 0, L: 3, hi: 1000, lo: 962 }), { value: "1000 / 962", unit: "1000 is the starting rating" });
   assert.deepEqual(highLow({ W: 0, L: 0, hi: 1000, lo: 1000 }), { value: "—" });
 });
 

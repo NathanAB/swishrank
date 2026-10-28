@@ -1,10 +1,11 @@
 ---
 // A game's two win chances, away then home, each at its end of a bar split at that chance, each part in its
-// team's colour. The favourite's chance is in ink. The games page's tiles and How it works share it.
+// team's colour, told apart where the two teams' colours are alike (lib/tint.ts pairStyles). The favourite's
+// chance is in ink. The games page's tiles and How it works share it.
 import type { Abbr, Team } from "../lib/elo.ts";
 import type { Fixture, FixtureLine } from "../lib/fixtures.ts";
 import { pct } from "../lib/format.ts";
-import { tintStyles } from "../lib/tint.ts";
+import { pairStyles } from "../lib/tint.ts";
 
 interface Props {
   fixture: Fixture;
@@ -12,15 +13,15 @@ interface Props {
 }
 
 const { fixture: { lines, fav }, teams } = Astro.props;
-const tint = tintStyles(teams);
 const [away, home] = lines;
+const tint = pairStyles(teams[away.abbr], teams[home.abbr]);
 const num = (l: FixtureLine) => ["num", { r: l === home, fav: l.side === fav }];
 ---
 
 <div class="odds">
   <span class:list={num(away)}>{pct(away.chance)}</span>
   <span class="bar" aria-hidden="true" style={`grid-template-columns: ${away.chance}fr ${home.chance}fr`}>
-    {lines.map((l) => <i data-team={l.abbr} style={tint[l.abbr]} />)}
+    {lines.map((l, i) => <i data-team={l.abbr} style={tint[i]} />)}
   </span>
   <span class:list={num(home)}>{pct(home.chance)}</span>
 </div>
