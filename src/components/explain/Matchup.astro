@@ -1,6 +1,6 @@
 ---
-// How it works, step 5: a game's chance worked out as a sum in large figures, the home team's rating plus home
-// court less the visitor's, giving the gap; under it, each side's chance on the games page's bar. The reader picks
+// How it works, step 5: a game's chance worked out as a sum in large figures, the home team's rating less the
+// visitor's plus home court, giving the gap; under it, each side's chance on the games page's bar. The reader picks
 // one of the next few games; a season with no games ahead shows its last game, as the ratings stood before it.
 // Without script it shows the first game.
 import ChanceBar from "../ChanceBar.astro";
@@ -52,18 +52,18 @@ const data = {
 
     <div class="sum" role="img" aria-label={told(view.w, view.names)} data-sum>
       <span class="term" style={view.tint[1]} data-tint="home">
-        <span class="label"><i class="key"></i><span data-fill="home">{view.names.home}</span></span>
+        <span class="label"><span data-fill="home">{view.names.home}</span><i class="key"></i></span>
         <span class="fig" data-fill="home-rating">{figure(view.w.home)}</span>
+      </span>
+      <span class="op">{MINUS}</span>
+      <span class="term" style={view.tint[0]} data-tint="away">
+        <span class="label"><span data-fill="away">{view.names.away}</span><i class="key"></i></span>
+        <span class="fig" data-fill="away-rating">{figure(view.w.away)}</span>
       </span>
       <span class="op" data-court hidden={!view.w.court}>+</span>
       <span class="term" data-court hidden={!view.w.court}>
         <span class="label">Home court</span>
         <span class="fig" data-fill="court">{figure(view.w.court)}</span>
-      </span>
-      <span class="op">{MINUS}</span>
-      <span class="term" style={view.tint[0]} data-tint="away">
-        <span class="label"><i class="key"></i><span data-fill="away">{view.names.away}</span></span>
-        <span class="fig" data-fill="away-rating">{figure(view.w.away)}</span>
       </span>
       <span class="rule" aria-hidden="true"></span>
       <span class="op">=</span>
@@ -179,8 +179,9 @@ const data = {
   .fig { grid-column: 3; justify-self: end; font-size: var(--fig); font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
   .gap .fig { font-size: var(--total); color: var(--accent); }
   .rule { grid-column: 1 / -1; height: 1px; margin-top: 2px; background: var(--rule); }
-  /* Each team's name is keyed to its part of the bar below by a swatch of the same mark. */
-  .key { display: inline-block; width: 12px; height: 6px; margin-right: 8px; border-radius: 3px; vertical-align: 1px; background: var(--tint); }
+  /* Each team's name is keyed to its part of the bar below by a dot in its colour, after the name, so every name
+     starts at the same edge. */
+  .key { display: inline-block; width: 8px; height: 8px; margin-left: 8px; border-radius: 50%; vertical-align: 1px; background: var(--tint); }
 
   @container (min-width: 600px) {
     .games { display: flex; flex-wrap: wrap; column-gap: 20px; }

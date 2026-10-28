@@ -105,7 +105,7 @@ const game = opener && {
     </Panel></li>
 
     <li><Panel title="Each game's chance, worked out">
-      <p class="say">Add home court to the home team's rating and subtract the visitor's. The curve in step 2 turns that gap into each team's chance.</p>
+      <p class="say">Take the home team's rating, subtract the visitor's and add home court. The curve in step 2 turns that gap into each team's chance.</p>
       <Fragment slot="side">{season && <Matchup season={season} />}</Fragment>
     </Panel></li>
   </ol>
