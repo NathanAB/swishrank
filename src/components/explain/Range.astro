@@ -1,0 +1,25 @@
+---
+// The slider the How it works graphics share: a round thumb in ink on a thin track, the width of its parent. The
+// graphic places it with its own class; other attributes land on the input too.
+import type { HTMLAttributes } from "astro/types";
+
+type Props = Omit<HTMLAttributes<"input">, "type">;
+
+const { class: cls, ...rest } = Astro.props;
+---
+
+<input {...rest} type="range" class:list={["range", cls]} />
+
+<style>
+  .range {
+    display: block; width: 100%; height: 40px; margin: 0;
+    background: none; cursor: pointer; appearance: none; -webkit-appearance: none;
+  }
+  .range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--control); }
+  .range::-moz-range-track { height: 4px; border-radius: 2px; background: var(--control); }
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none; width: var(--thumb); height: var(--thumb); margin-top: calc(2px - var(--thumb) / 2);
+    border: 0; border-radius: 50%; background: var(--text);
+  }
+  .range::-moz-range-thumb { width: var(--thumb); height: var(--thumb); border: 0; border-radius: 50%; background: var(--text); }
+</style>

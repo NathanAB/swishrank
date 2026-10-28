@@ -1,97 +1,40 @@
 ---
 // How the ratings work, for a fan who has never heard of Elo: a three-line summary, five steps that each pair a
-// sentence or two with a small drawing of real games, then the fine print. Every figure comes from elo.ts, so the page
-// cannot disagree with the ratings, and docs/model.md holds the backtest behind each setting.
-import FixtureTile from "../components/FixtureTile.astro";
+// sentence or two with a drawing of real games the reader can play with (components/explain/), then the fine
+// print. Every figure is worked out from the season's games by lib/, so the page cannot disagree with the ratings,
+// and docs/model.md holds the backtest behind each setting.
+import DayOff from "../components/explain/DayOff.astro";
+import GapAnswer from "../components/explain/GapAnswer.astro";
+import GapCurve from "../components/explain/GapCurve.astro";
+import Matchup from "../components/explain/Matchup.astro";
+import SeasonFan from "../components/explain/SeasonFan.astro";
+import WinPair from "../components/explain/WinPair.astro";
+import WinValue from "../components/explain/WinValue.astro";
 import Panel from "../components/Panel.astro";
 import UpsetBadge from "../components/UpsetBadge.astro";
 import Base from "../layouts/Base.astro";
-import { runAndTrail, seasonPlot } from "../lib/chart.ts";
-import { counted, EARLY, gap, PARAMS, START, winProb } from "../lib/elo.ts";
+import { EARLY, START, winProb } from "../lib/elo.ts";
 import { UPSET } from "../lib/facts.ts";
-import { nextDays, priced, WEEK } from "../lib/fixtures.ts";
-import { int, MINUS, pct, rating, record, signed, weekdayDay } from "../lib/format.ts";
+import { int, pct, signed, weekdayDay } from "../lib/format.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
-import { allSeasons, team, TODAY } from "../lib/season.ts";
-import { tintStyles } from "../lib/tint.ts";
+import { allSeasons, team } from "../lib/season.ts";
 
-// The newest season with a game: its ratings for step 1, its results for step 3, its opener and a team's day off
-// for step 4.
 const season = allSeasons().find((s) => s.model.results.length > 0) ?? null;
 const model = season?.model ?? null;
 const { opener, contrasts } = examples(model?.results ?? []);
 const name = (abbr: string) => (season ? team(season, abbr).short : abbr);
 
-/** A value's place on a scale from lo to hi, as a CSS percentage. */
-const at = (v: number, lo: number, hi: number) => `${((v - lo) / (hi - lo)) * 100}%`;
-
-// Step 1: every team's daily rating on the season's scale (lib/chart.ts seasonPlot), each line dotted past the
-// end of its team's run, as on the rating charts. The two labelled teams are in their colours, the rest grey.
-const LINES_H = 160;
-const lines = model && model.series.length > 1 && (() => {
-  const plot = seasonPlot(model, { h: LINES_H });
-  const split = runAndTrail(model);
-  const colour = tintStyles(model.data.teams);
-  const end = (a: string) => ({ tint: colour[a], text: `${name(a)} ${Math.round(model.r[a])}`, ...split(a, plot.pts(a)), y: plot.y(Math.round(model.r[a])) });
-  const top = end(model.order[0]);
-  const bottom = end(model.order[model.order.length - 1]);
-  // Two end labels closer than a line of text apart are pushed apart around their middle.
-  const room = Math.max(0, 16 - (bottom.y - top.y)) / 2;
-  const ends = [{ ...top, ly: top.y - room }, { ...bottom, ly: bottom.y + room }];
-  return {
-    ticks: plot.ticks.map((t) => ({ t, y: plot.y(t) })),
-    start: plot.y(START),
-    drawn: [...model.order.slice(1, -1).map((a) => ({ kind: "other", tint: undefined, ...split(a, plot.pts(a)) })), ...ends.map((e) => ({ kind: "named", ...e }))],
-    ends,
-    lane: `calc(${Math.max(...ends.map((e) => e.text.length))}ch + 10px)`,
-    count: model.abbrs.length,
-  };
-})();
-
-// Step 2: the favourite's chance against the rating gap, 0 to 400 points, on a 50% to 100% scale, and home
-// court's place on it.
-const GAP_MAX = 400;
-const y = (p: number) => (1 - (p - 0.5) / 0.5) * 100;
-const curve = Array.from({ length: GAP_MAX / 5 + 1 }, (_, i) => `${i ? "L" : "M"}${i * 5} ${y(winProb(i * 5)).toFixed(2)}`).join(" ");
 const edge = Math.round(model?.home ?? 0);
-const home = { x: at(edge, 0, GAP_MAX), y: `${y(winProb(edge))}%`, chance: pct(winProb(edge)) };
-const gapTicks = [0, 100, 200, 300, 400];
-const chanceTicks = [0.5, 0.75, 1];
+const GAP_ANSWER = "gap-answer";
 
-// Step 3: how much more a big win counts than a 1-point win, the three wins as bars of the winner's gain on one
-// scale, and how many times the favourite's close win the underdog's close win earns.
-const LABEL: Record<ContrastKind, (margin: number) => string> = {
-  close: (m) => `Favorite wins by ${m}`,
-  upset: (m) => `Underdog wins by ${m}`,
-  blowout: (m) => `Favorite wins by ${m}`,
-};
-const blowout = contrasts.find((c) => c.kind === "blowout")?.margin ?? 43;
-const blowoutTimes = (counted(blowout, PARAMS.margin) / counted(1, PARAMS.margin)).toFixed(1);
-const most = Math.max(1, ...contrasts.map((c) => c.game.winner.change));
-const bars = contrasts.map(({ kind, game: o, margin }) => ({
-  label: LABEL[kind](margin),
-  change: o.winner.change,
-  width: `calc(${Math.max(0, o.winner.change) / most} * (100% - 40px))`,
-}));
 const gain = (kind: ContrastKind) => contrasts.find((c) => c.kind === kind)?.game.winner.change ?? 0;
-const times = gain("close") > 0 ? Math.round(gain("upset") / gain("close")) : 0;
+const upsetTimes = gain("close") > 0 ? Math.round(gain("upset") / gain("close")) : 0;
 const TIMES: Record<number, string> = { 2: "twice", 3: "three times", 4: "four times", 5: "five times" };
-const upsetSay = times >= 2
-  ? `An underdog's close win earns about ${TIMES[times] ?? `${times} times`} what a favorite's does, because it was unexpected.`
+const upsetSay = upsetTimes >= 2
+  ? `An underdog's close win earns about ${TIMES[upsetTimes] ?? `${upsetTimes} times`} what a favorite's does, because it was unexpected.`
   : "An underdog's win earns more than a favorite's, because it was unexpected.";
 
-// Step 4: a team that rose on a day it did not play, through a team it had beaten, told in date order: its own
-// win, that team's later one, then the rise. Before a season has such a day, the opener's two teams, before and after.
 const rest = model && offDay(model.results, model.series);
-const restShown = rest && {
-  rows: [rest.beaten, rest.win].map((o) => ({
-    day: weekdayDay(o.result.day),
-    winner: name(o.winner.abbr),
-    loser: name(o.loser.abbr),
-    score: record(o.winner.score, o.loser.score),
-  })),
-  rise: `${name(rest.abbr)} ${signed(rest.change)}`,
-};
 const game = opener && {
   day: weekdayDay(opener.result.day),
   score: [opener.winner, opener.loser].map((s) => `${name(s.abbr)} ${s.score}`).join(", "),
@@ -102,34 +45,6 @@ const game = opener && {
     change: s.change,
   })),
 };
-
-// Step 5: one game priced as the games page prices it and worked through: the first game the games page lists,
-// or in a finished season its last game, as the ratings stood before tip-off.
-const ahead = model && nextDays(model, TODAY, WEEK).flatMap((d) => d.fixtures)[0];
-const last = model?.results.at(-1);
-const shown = model && (ahead
-  ? { fixture: ahead, r: model.r }
-  : last && { fixture: priced(last.game, last.p), r: { [last.game.home]: last.pre.h, [last.game.away]: last.pre.a } });
-const example = shown && (() => {
-  const { fixture: f, r } = shown;
-  const g = f.game;
-  const court = g.neutral ? 0 : Math.round(model!.home);
-  const sum = Math.round(r[g.home]) + court - Math.round(r[g.away]);
-  // The favourite's chance on the curve, named when the tile's differs: early in a season it sits closer to 50%.
-  const curved = pct(winProb(Math.abs(gap(g, r, model!.home))));
-  const shownChance = pct(f.lines.find((l) => l.side === f.fav)!.chance);
-  return {
-    fixture: f,
-    held: curved !== shownChance && curved,
-    rows: [
-      { op: "", label: name(g.home), value: rating(r[g.home]) },
-      ...(court ? [{ op: "+", label: "Home court", value: int(court) }] : []),
-      { op: MINUS, label: name(g.away), value: rating(r[g.away]) },
-    ],
-    gap: sum < 0 ? `${MINUS}${int(-sum)}` : int(sum),
-  };
-})();
-
 ---
 
 <Base
@@ -151,96 +66,25 @@ const example = shown && (() => {
   <ol class="steps">
     <li><Panel title={`Everyone starts at ${START}`}>
       <p class="say">Last season doesn't count, because rosters change too much over a summer.</p>
-      <Fragment slot="side">
-        {lines && (
-          <figure
-            class="lines"
-            role="img"
-            aria-label={`Every team's rating by day: all ${lines.count} start at ${START} on opening night and now run from ${lines.ends[1].text}, the lowest, to ${lines.ends[0].text}, the highest.`}
-            style={`--h: ${LINES_H}px; --lane: ${lines.lane}`}
-          >
-            <div class="ticks">
-              {lines.ticks.map((t) => <span class:list={{ ref: t.t === START }} style={`top: ${t.y}px`}>{t.t}</span>)}
-            </div>
-            <div class="field">
-              <svg viewBox={`0 0 1000 ${LINES_H}`} preserveAspectRatio="none" aria-hidden="true">
-                {lines.ticks.map((t) => <path class:list={["rule", { ref: t.t === START }]} d={`M0,${t.y}H1000`} />)}
-                {lines.drawn.map((l) => <polyline class={l.kind} style={l.tint} points={l.run} />)}
-                {lines.drawn.map((l) => l.trail && <polyline class:list={[l.kind, "trail"]} style={l.tint} points={l.trail} />)}
-              </svg>
-              <span class="dot accent" style={`left: 0; top: ${lines.start}px`}></span>
-              {lines.ends.map((e) => <span class="dot team" style={`${e.tint}; left: 100%; top: ${e.y}px`}></span>)}
-            </div>
-            <div class="lane">
-              {lines.ends.map((e) => <span style={`top: ${e.ly}px`}>{e.text}</span>)}
-            </div>
-          </figure>
-        )}
-      </Fragment>
+      <Fragment slot="side">{season && <SeasonFan season={season} />}</Fragment>
     </Panel></li>
 
     <li><Panel title="The gap between two teams sets the odds">
-      <p class="say">A team rated 100 points higher wins about {pct(winProb(100))} of the time, and 200 points higher about {pct(winProb(200))}. Home court is worth {int(edge)} points, so a home team is a {home.chance} favorite over an equal rival.</p>
-      <figure
-        slot="side"
-        class="curve"
-        role="img"
-        aria-label={`A rating gap of ${int(edge)} points gives the higher-rated team a ${home.chance} chance, and ${int(GAP_MAX)} points gives ${pct(winProb(GAP_MAX))}.`}
-      >
-        <p class="axis-title">Chance the higher-rated team wins</p>
-        <div class="plot">
-          {chanceTicks.map((p) => (
-            <Fragment>
-              <span class="grid" style={`top: ${y(p)}%`}></span>
-              <span class="ytick" style={`top: ${y(p)}%`}>{pct(p)}</span>
-            </Fragment>
-          ))}
-          <span class="guide v" style={`left: ${home.x}; top: ${home.y}`}></span>
-          <span class="guide h" style={`width: ${home.x}; top: ${home.y}`}></span>
-          <svg viewBox={`0 0 ${GAP_MAX} 100`} preserveAspectRatio="none" aria-hidden="true">
-            <path d={curve} vector-effect="non-scaling-stroke" />
-          </svg>
-          <span class="dot accent" style={`left: ${home.x}; top: ${home.y}`}></span>
-          <span class="mark" style={`left: ${home.x}; top: ${home.y}`}>{int(edge)} points, {home.chance}</span>
-          {gapTicks.map((g) => <span class="xtick" style={`left: ${at(g, 0, GAP_MAX)}`}>{int(g)}</span>)}
-        </div>
-        <p class="axis-title x">Rating gap, in points</p>
-      </figure>
+      <p class="say">A team rated 100 points higher wins about {pct(winProb(100))} of the time, and 200 points higher about {pct(winProb(200))}. Home court is worth {int(edge)} points, so a home team is a {pct(winProb(edge))} favorite over an equal rival.</p>
+      <GapAnswer id={GAP_ANSWER} />
+      <Fragment slot="side"><GapCurve answer={GAP_ANSWER} /></Fragment>
     </Panel></li>
 
     <li><Panel title="Beating good teams, and winning big, counts more">
-      <p class="say">{upsetSay} Winning big helps too, but less with each point. A {blowout}-point win counts {blowoutTimes} times as much as a 1-point win.</p>
-      <Fragment slot="side">
-        {bars.length > 0 && (
-          <div class="bars">
-            {bars.map((b) => (
-              <Fragment>
-                <span class="label">{b.label}</span>
-                <span class="bar"><span class="fill" style={`width: ${b.width}`}></span><b class="v">{signed(b.change)}</b></span>
-              </Fragment>
-            ))}
-          </div>
-        )}
-      </Fragment>
+      <p class="say">{upsetSay} Winning big helps too, but less with each point.</p>
+      {season && <WinPair season={season} />}
+      <Fragment slot="side">{season && <WinValue season={season} />}</Fragment>
     </Panel></li>
 
     <li><Panel title="Every rating is redone each day">
       <p class="say">Each morning's ratings use every result so far. A win counts for more once the beaten team proves strong, so a team can rise without playing.</p>
       <Fragment slot="side">
-        {restShown ? (
-          <table class="moves story">
-            {restShown.rows.map((r) => (
-              <tr>
-                <th scope="row">{r.day}</th>
-                <td class="plain"><b>{r.winner}</b> beat {r.loser} <span class="pts">{r.score}</span></td>
-              </tr>
-            ))}
-            <tr class="rise">
-              <th scope="row"><span class="arrow" aria-hidden="true">→</span></th>
-              <td class="plain"><b>{restShown.rise}</b>, without playing</td>
-            </tr>
-          </table>
-        ) : game && (
+        {rest ? <DayOff season={season!} /> : game && (
           <div class="game">
             <p class="day">Opening night, {game.day}</p>
             <p class="score">{game.score}</p>
@@ -262,31 +106,7 @@ const example = shown && (() => {
 
     <li><Panel title="Each game's chance, worked out">
       <p class="say">Add home court to the home team's rating and subtract the visitor's. The curve in step 2 turns that gap into each team's chance.</p>
-      <Fragment slot="side">
-        {example && (
-          <div class="worked">
-            <table class="moves sum">
-              {example.rows.map((r) => (
-                <tr>
-                  <td class="op">{r.op}</td>
-                  <th scope="row">{r.label}</th>
-                  <td>{r.value}</td>
-                </tr>
-              ))}
-              <tr class="total">
-                <td class="op">=</td>
-                <th scope="row">Rating gap</th>
-                <td>{example.gap}</td>
-              </tr>
-            </table>
-            <span class="arrow" aria-hidden="true">→</span>
-            <div class="result">
-              <FixtureTile as="div" season={season!} fixture={example.fixture} />
-              {example.held && <p class="note">Closer to 50% than the curve's {example.held}, until both teams have played {EARLY.games} games.</p>}
-            </div>
-          </div>
-        )}
-      </Fragment>
+      <Fragment slot="side">{season && <Matchup season={season} />}</Fragment>
     </Panel></li>
   </ol>
 
@@ -342,41 +162,10 @@ const example = shown && (() => {
   }
 
   .say { line-height: 22px; }
-
-  figure { position: relative; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
   b { color: var(--text); font-weight: 500; }
 
-  /* A dot is 8px with a 2px ring of the card's colour, so dots that overlap stay apart. */
-  .dot {
-    position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
-    background: var(--bar); box-shadow: 0 0 0 2px var(--surface);
-  }
-  .dot.accent { background: var(--accent); }
-
-  /* Step 1: a tick lane, the plot, and a lane for the two end labels. */
-  .lines { max-width: 880px; display: grid; grid-template-columns: 36px minmax(0, 1fr) var(--lane); grid-template-rows: var(--h); }
-  .lines .ticks, .lines .field, .lines .lane { position: relative; height: var(--h); }
-  .lines .ticks span { position: absolute; right: 8px; transform: translateY(-50%); }
-  .lines .ticks .ref { color: var(--text); }
-  .lines svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-  .lines path, .lines polyline { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
-  .lines .rule { stroke: var(--grid); stroke-width: 1; }
-  .lines .rule.ref { stroke: var(--control); }
-  .lines .other { stroke: var(--line-other); stroke-opacity: var(--line-faded); stroke-width: 1.5; }
-  .lines .named { stroke: var(--tint); stroke-width: 2; }
-  .lines .dot.team { background: var(--tint); }
-  .lines .trail { stroke-dasharray: var(--line-dash); stroke-linecap: round; }
-  .lines .lane span { position: absolute; left: 10px; transform: translateY(-50%); color: var(--text); white-space: nowrap; }
-
-  /* Step 4: two results in date order, each winner in bold, then the rise they caused. Before a season has one,
-     the opener's day and score, then each team's rating before and after. */
-  .story td { padding: 3px 0; }
-  .story b { font-weight: 600; }
-  .story .pts { margin-left: 6px; color: var(--muted); }
-  .story :is(th, .pts) { white-space: nowrap; }
-  .story .rise :is(th, td) { padding-top: 8px; }
-  .story .rise b { color: var(--accent); }
-  .arrow { color: var(--muted); }
+  /* Step 4, before a season has a team that rose without playing: the opener's day and score, then each team's
+     rating before and after. */
   .day { font-size: var(--fs-small); line-height: 16px; color: var(--muted); margin-bottom: 4px; }
   .score { font-size: var(--fs-card); line-height: 24px; font-weight: 600; margin-bottom: 8px; }
   .moves { border-collapse: collapse; font-variant-numeric: tabular-nums; }
@@ -385,40 +174,5 @@ const example = shown && (() => {
   .moves .to { padding: 2px 8px; color: var(--muted); }
   .moves .change { padding-left: 16px; font-weight: 600; }
   .moves .up { color: var(--accent); }
-  .moves .plain { text-align: left; }
   .moves .down { color: var(--muted); }
-
-  /* Step 5: the sum down to the gap, each line led by its operator, then an arrow to the game as the games page
-     shows it; on a phone the three stack and the arrow points down. */
-  .worked { display: flex; align-items: center; gap: 12px 24px; }
-  .worked .arrow { font-size: 20px; line-height: 1; }
-  .result { flex: 1 1 auto; max-width: 340px; }
-  .sum .op { padding-right: 8px; text-align: center; color: var(--muted); }
-  .sum .total :is(th, td) { padding-top: 6px; border-top: 1px solid var(--rule); }
-  @media (max-width: 640px) {
-    .worked { flex-direction: column; align-items: flex-start; }
-    .worked .arrow { transform: rotate(90deg); margin-left: 48px; }
-    .result { align-self: stretch; }
-  }
-
-  /* Step 3: a bar per game, its length the winner's gain, on one scale at every screen width. */
-  .bars { display: grid; grid-template-columns: max-content minmax(0, 480px); align-items: center; gap: 10px 16px; }
-  .bar { display: flex; align-items: center; gap: 8px; }
-  .fill { flex: none; height: 6px; min-width: 2px; background: var(--accent); border-radius: 0 3px 3px 0; }
-  .v { font-variant-numeric: tabular-nums; }
-
-  /* Step 2: the curve. The svg stretches to the plot, and its 2px stroke stays 2px. */
-  .curve { max-width: 760px; padding-left: 36px; padding-right: 12px; }
-  .axis-title { margin: 0 0 10px -36px; }
-  .axis-title.x { margin: 26px 0 0; text-align: center; }
-  .plot { position: relative; height: 150px; }
-  .plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-  .plot path { fill: none; stroke: var(--text); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
-  .grid { position: absolute; left: 0; right: 0; height: 1px; background: var(--grid); }
-  .ytick { position: absolute; right: calc(100% + 8px); transform: translateY(-50%); }
-  .xtick { position: absolute; top: calc(100% + 6px); transform: translateX(-50%); }
-  .guide { position: absolute; background: var(--control); }
-  .guide.v { width: 1px; bottom: 0; }
-  .guide.h { left: 0; height: 1px; }
-  .mark { position: absolute; margin: 6px 0 0 10px; color: var(--text); white-space: nowrap; }
 </style>

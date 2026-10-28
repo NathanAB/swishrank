@@ -47,6 +47,8 @@
   --gap: 24px;
   --card-pad: clamp(20px, 1vw + 6px, 32px);
   --radius-card: 6px;
+  /* The thumb of How it works' sliders, which its drawings line their marks up with. */
+  --thumb: 20px;
   --bar-height: 52px;
   /* A switch's or the season menu's height in a card's header; 44px touch targets on a phone. */
   --control-h: 28px;

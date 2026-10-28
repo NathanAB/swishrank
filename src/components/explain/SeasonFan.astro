@@ -1,0 +1,347 @@
+---
+// How it works, step 1: every team's daily rating on the season's scale (lib/chart.ts seasonPlot), all level at
+// 1000 on the eve of opening night and spread apart since, each line dotted past the end of its team's run, as on
+// the rating charts. Every line is grey but the top- and bottom-rated teams', which are in their colours and
+// labelled at their ends.
+//
+// Scrolled into view, the lines draw from opening night to the latest day in one sweep behind a thin cursor that
+// names the day it is drawing (lib/explain/fan.ts sweepDay); the two end dots and labels and the date labels
+// arrive as it lands. Pointing anywhere on the plot picks the nearer of the two
+// labelled teams' lines (lib/pick.ts), over the rest dimmed, and reads out its rating that day. Without script, or
+// with reduced motion, the drawing shows its final frame.
+import { dateTicks, PLOT, runAndTrail, seasonPlot } from "../../lib/chart.ts";
+import { START, type Abbr } from "../../lib/elo.ts";
+import { spread } from "../../lib/explain/fan.ts";
+import { rating, shortDay } from "../../lib/format.ts";
+import { scaleAttr } from "../../lib/readout.ts";
+import { team, type SeasonView } from "../../lib/season.ts";
+import { tintStyles } from "../../lib/tint.ts";
+
+interface Props {
+  season: SeasonView;
+}
+
+const { season } = Astro.props;
+const m = season.model;
+const H = 160;
+const W = PLOT.w;
+const TICK_LANE = 36;
+/** An end label's width per character, and a date label's width, in px at 12px. */
+const CHAR = 7;
+const DATE = 40;
+const n = m.series.length;
+
+const fan = n > 1 && (() => {
+  const plot = seasonPlot(m, { h: H });
+  const split = runAndTrail(m);
+  const tint = tintStyles(m.data.teams);
+  const name = (a: Abbr) => team(season, a).short;
+  const top = m.order[0];
+  const bottom = m.order[m.order.length - 1];
+  const line = (a: Abbr, named: boolean) => ({ abbr: a, name: name(a), tint: tint[a], named, ...split(a, plot.pts(a)) });
+  const end = (a: Abbr) => ({ abbr: a, tint: tint[a], text: `${name(a)} ${rating(m.r[a])}`, y: plot.y(Math.round(m.r[a])) });
+  const ends = [end(top), end(bottom)];
+  const [topLy, bottomLy] = spread(ends[0].y, ends[1].y, 16);
+  const lane = 10 + CHAR * Math.max(...ends.map((e) => e.text.length));
+
+  const days = m.series.map((d) => d.day);
+  const beside = ((1024 - 2 * 24 - 2 * 20 - 56) * 3) / 5;
+  const phone = 360 - 2 * 16 - 2 * 16;
+  const dates = [
+    { phone: false, list: dateTicks(days, DATE / (beside - TICK_LANE - lane)) },
+    { phone: true, list: dateTicks(days, DATE / (phone - TICK_LANE - lane)) },
+  ];
+
+  return {
+    ticks: plot.ticks.map((t) => ({ t, y: plot.y(t) })),
+    start: plot.y(START),
+    scale: scaleAttr({ hi: plot.hi, yHi: plot.y(plot.hi), lo: plot.lo, yLo: plot.y(plot.lo) }),
+    drawn: [...m.order.slice(1, -1).map((a) => line(a, false)), line(top, true), line(bottom, true)],
+    ends: [{ ...ends[0], ly: topLy }, { ...ends[1], ly: bottomLy }],
+    lane,
+    dates,
+    at: (i: number) => `${((plot.x(i) / W) * 100).toFixed(2)}%`,
+    label:
+      `Every team's rating each day from opening night, ${shortDay(days[1])}. All ${m.abbrs.length} start at ${START}, ` +
+      `and by ${shortDay(days[n - 1])} they run from ${ends[1].text}, the lowest, to ${ends[0].text}, the highest.`,
+  };
+})();
+---
+
+{fan && (
+  <div class="fan" data-fan data-from={m.series[0].day} style={`--h: ${H}px; --ticks: ${TICK_LANE}px; --lane: ${fan.lane}px`}>
+    <div class="draw" role="img" aria-label={fan.label}>
+      <div class="ticks">
+        {fan.ticks.map((t) => <span class:list={{ ref: t.t === START }} style={`top: ${t.y}px`}>{t.t}</span>)}
+      </div>
+      <div class="field" data-field>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          {fan.ticks.map((t) => <path class:list={["rule", { ref: t.t === START }]} d={`M0,${t.y}H${W}`} />)}
+          <path class="cursor" data-cursor d={`M0,0V${H}`} />
+        </svg>
+        <svg class="lines" data-lines data-scale={fan.scale} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          <g>
+            {fan.drawn.map((l) => (
+              <polyline class:list={["line", l.named ? "named" : "other"]} data-abbr={l.abbr} data-name={l.name} style={l.tint} points={l.run} />
+            ))}
+            {fan.drawn.map((l) => l.trail && (
+              <polyline class:list={["line", "trail", l.named ? "named" : "other"]} data-abbr={l.abbr} data-trail style={l.tint} points={l.trail} />
+            ))}
+          </g>
+        </svg>
+        <span class="dot start" style={`top: ${fan.start}px`}></span>
+        {fan.ends.map((e) => <span class="dot end" data-abbr={e.abbr} style={`${e.tint}; top: ${e.y}px`}></span>)}
+        <span class="dot here" data-here hidden></span>
+      </div>
+      <div class="lane">
+        {fan.ends.map((e) => <span class="label" data-abbr={e.abbr} style={`top: ${e.ly}px`}>{e.text}</span>)}
+      </div>
+      <div class="axis">
+        {fan.dates.map((set) => (
+          <div class:list={["dates", { phone: set.phone }]}>
+            {set.list.map((d) => <span class:list={{ last: d.i === n - 1 }} style={`left: ${fan.at(d.i)}`}>{d.text}</span>)}
+          </div>
+        ))}
+        <span class="when" data-when></span>
+      </div>
+    </div>
+    <div class="tip" data-tip aria-live="polite" hidden></div>
+  </div>
+)}
+
+<script>
+  import { addDays } from "../../lib/elo.ts";
+  import { sweepDay } from "../../lib/explain/fan.ts";
+  import { shortDay, weekdayDay } from "../../lib/format.ts";
+  import { dayAt, nearestLine } from "../../lib/pick.ts";
+  import { parseScale, ratingAt } from "../../lib/readout.ts";
+
+  const SWEEP: KeyframeAnimationOptions = { duration: 1600, easing: "linear", fill: "forwards" };
+  const FEEDBACK: KeyframeAnimationOptions = { duration: 150, easing: "cubic-bezier(0.2, 0, 0, 1)" };
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /** How far the readout keeps from the pointer, in px: further from a fingertip, which covers more. */
+  const CLEAR = { pointer: 12, finger: 24 };
+
+  type Phase = "waiting" | "sweeping" | "rest";
+
+  function mount(root: HTMLElement) {
+    const one = <T extends Element>(selector: string) => root.querySelector<T>(selector)!;
+    const field = one<HTMLElement>("[data-field]");
+    const svg = one<SVGSVGElement>("[data-lines]");
+    const group = one<SVGGElement>("[data-lines] g");
+    const cursor = one<SVGPathElement>("[data-cursor]");
+    const when = one<HTMLElement>("[data-when]");
+    const here = one<HTMLElement>("[data-here]");
+    const tip = one<HTMLElement>("[data-tip]");
+    const scale = parseScale(svg.dataset.scale ?? "");
+    const from = root.dataset.from ?? "";
+    const W = svg.viewBox.baseVal.width;
+
+    const strokes = (abbr: string) => [...svg.querySelectorAll<SVGPolylineElement>(`polyline[data-abbr="${abbr}"]`)];
+    const runs = [...svg.querySelectorAll<SVGPolylineElement>("polyline:not([data-trail])")];
+    const runOf = (abbr: string) => runs.find((r) => r.dataset.abbr === abbr);
+    const ys = (line: SVGPolylineElement | null) => Array.from(line?.points ?? [], (p) => p.y);
+    const joined = (run: number[], trail: number[]) => [...run, ...trail.slice(1)];
+    const lines = runs.map((run) => {
+      const trail = svg.querySelector<SVGPolylineElement>(`polyline[data-trail][data-abbr="${run.dataset.abbr}"]`);
+      return { team: run.dataset.abbr ?? "", ys: joined(ys(run), ys(trail)) };
+    });
+    const n = lines[0]?.ys.length ?? 0;
+    const named = [...svg.querySelectorAll<SVGPolylineElement>("polyline.named")];
+    const picks = lines.filter((l) => named.some((p) => p.dataset.abbr === l.team));
+
+    let phase: Phase = "waiting";
+    let picked: string | null = null;
+    let shown = "";
+
+    const lift = (team: string | null) => {
+      for (const el of root.querySelectorAll(".lift")) el.classList.remove("lift");
+      root.classList.toggle("picking", team !== null);
+      if (team === null) {
+        group.append(...named);
+        return;
+      }
+      for (const el of root.querySelectorAll(`[data-abbr="${team}"]`)) el.classList.add("lift");
+      group.append(...strokes(team));
+    };
+
+    function rest() {
+      if (picked === null) return;
+      picked = null;
+      shown = "";
+      lift(null);
+      cursor.classList.remove("on");
+      here.hidden = true;
+      tip.hidden = true;
+    }
+
+    function place(e: PointerEvent) {
+      const area = root.getBoundingClientRect();
+      const px = e.clientX - area.left;
+      const py = e.clientY - area.top;
+      const w = tip.offsetWidth;
+      const h = tip.offsetHeight;
+      const touch = e.pointerType === "touch";
+      const gap = touch ? CLEAR.finger : CLEAR.pointer;
+      const highest = touch ? -h : 0;
+      const left = px + gap + w > area.width ? px - gap - w : px + gap;
+      const top = Math.min(Math.max(highest, py - h - gap), area.height - h);
+      tip.style.transform = `translate(${Math.max(0, left)}px, ${top}px)`;
+    }
+
+    function read(e: PointerEvent) {
+      if (phase !== "rest" || !scale) return;
+      const box = field.getBoundingClientRect();
+      const fx = (e.clientX - box.left) / box.width;
+      const team = nearestLine(picks, fx, e.clientY - box.top);
+      const line = lines.find((l) => l.team === team);
+      if (!team || !line) return rest();
+      const day = dayAt(fx, n);
+      if (team !== picked) {
+        picked = team;
+        lift(team);
+        here.style.setProperty("--tint", runOf(team)?.style.getPropertyValue("--tint") ?? "");
+      }
+      if (shown !== `${team} ${day}`) {
+        shown = `${team} ${day}`;
+        const x = day / (n - 1);
+        cursor.style.transform = `translateX(${x * W}px)`;
+        cursor.classList.add("on");
+        here.style.left = `${x * 100}%`;
+        here.style.top = `${line.ys[day]}px`;
+        here.hidden = false;
+        const date = document.createElement("span");
+        date.textContent = weekdayDay(addDays(from, day));
+        const name = document.createElement("b");
+        name.textContent = runOf(team)?.dataset.name ?? team;
+        const value = document.createElement("strong");
+        value.textContent = String(ratingAt(line.ys[day], scale));
+        const row = document.createElement("span");
+        row.append(name, value);
+        tip.replaceChildren(date, row);
+        tip.hidden = false;
+      }
+      place(e);
+    }
+
+    field.addEventListener("pointermove", read);
+    field.addEventListener("pointerdown", read);
+    // A finger lifting also leaves the plot, but its readout stays until the next touch elsewhere; a finger that
+    // starts to scroll the page hands the gesture to the browser, which cancels it.
+    field.addEventListener("pointerleave", (e) => {
+      if (e.pointerType !== "touch") rest();
+    });
+    field.addEventListener("pointercancel", rest);
+    document.addEventListener("pointerdown", (e) => {
+      if (!(e.target instanceof Node && field.contains(e.target))) rest();
+    });
+
+    let running: Animation[] = [];
+
+    function sweep() {
+      phase = "sweeping";
+      root.classList.add("armed", "sweeping");
+      running = [
+        svg.animate([{ clipPath: "inset(0)" }], SWEEP),
+        cursor.animate([{ transform: "translateX(0px)" }, { transform: `translateX(${W}px)` }], SWEEP),
+        when.animate([{ left: "0%", transform: "translateX(0%)" }, { left: "100%", transform: "translateX(-100%)" }], SWEEP),
+      ];
+      const [clip] = running;
+      const frame = () => {
+        if (phase !== "sweeping") return;
+        when.textContent = shortDay(addDays(from, sweepDay(clip.effect?.getComputedTiming().progress ?? 0, n)));
+        requestAnimationFrame(frame);
+      };
+      frame();
+      clip.finished.then(land, () => {});
+    }
+
+    function land() {
+      phase = "rest";
+      when.textContent = shortDay(addDays(from, n - 1));
+      cursor.style.transform = `translateX(${W}px)`;
+      when.style.left = "100%";
+      when.style.transform = "translateX(-100%)";
+      root.classList.remove("armed", "sweeping");
+      for (const a of running) a.cancel();
+      running = [];
+      for (const el of root.querySelectorAll(".end")) el.animate([{ opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1 }], FEEDBACK);
+      for (const el of root.querySelectorAll(".label")) el.animate([{ opacity: 0, scale: 0.85 }, { opacity: 1, scale: 1 }], FEEDBACK);
+      for (const el of root.querySelectorAll(".dates")) el.animate([{ opacity: 0 }, { opacity: 1 }], FEEDBACK);
+      for (const el of [cursor, when]) el.animate([{ opacity: 1 }, { opacity: 0 }], FEEDBACK);
+    }
+
+    if (still) {
+      phase = "rest";
+      return;
+    }
+    root.classList.add("armed");
+    const seen = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.intersectionRatio >= 0.4)) return;
+        seen.disconnect();
+        sweep();
+      },
+      { threshold: 0.4 },
+    );
+    seen.observe(root);
+  }
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-fan]")) mount(root);
+</script>
+
+<style>
+  .fan {
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+    position: relative; max-width: 880px; font-size: var(--fs-small); line-height: 16px; color: var(--muted);
+  }
+  /* A tick lane, the plot, and a lane for the two end labels; under the plot, its dates. */
+  .draw { display: grid; grid-template-columns: var(--ticks) minmax(0, 1fr) var(--lane); grid-template-rows: var(--h) 20px; }
+  .ticks, .field, .lane { position: relative; height: var(--h); }
+  .ticks span { position: absolute; right: 8px; transform: translateY(-50%); font-variant-numeric: tabular-nums; }
+  .ticks .ref { color: var(--text); }
+  /* A finger drawn sideways reads the lines; one drawn up or down scrolls the page. */
+  .field { touch-action: pan-y pinch-zoom; }
+  .field svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  path, polyline { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+  .rule { stroke: var(--grid); stroke-width: 1; }
+  .rule.ref { stroke: var(--control); }
+  .cursor { stroke: var(--text); stroke-opacity: 0.35; stroke-width: 1; opacity: 0; }
+  .sweeping .cursor, .cursor.on { opacity: 1; }
+  .line { transition: opacity 150ms var(--ease), stroke 150ms var(--ease), stroke-opacity 150ms var(--ease); }
+  .other { stroke: var(--line-other); stroke-opacity: var(--line-faded); stroke-width: 1.5; }
+  .named, .line.lift { stroke: var(--tint); stroke-opacity: 1; stroke-width: 2; }
+  .trail { stroke-dasharray: var(--line-dash); stroke-linecap: round; }
+  .picking [data-abbr]:not(.lift) { opacity: var(--line-dim); }
+
+  /* A dot is 8px with a 2px ring of the card's colour, so dots that overlap stay apart. */
+  .dot {
+    position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--surface); pointer-events: none;
+  }
+  .start { left: 0; background: var(--accent); }
+  .end { left: 100%; background: var(--tint); }
+  .here { background: var(--tint); }
+  .label {
+    position: absolute; left: 10px; transform: translateY(-50%); transform-origin: left center;
+    color: var(--text); white-space: nowrap;
+  }
+  .fan:not(.armed) :is(.end, .label) { transition: opacity 150ms var(--ease); }
+
+  .axis { grid-column: 2; position: relative; }
+  .axis span { position: absolute; top: 4px; white-space: nowrap; }
+  .dates span { transform: translateX(-50%); }
+  .dates .last { transform: translateX(-100%); }
+  .dates.phone { display: none; }
+  @media (max-width: 640px) {
+    .dates { display: none; }
+    .dates.phone { display: block; }
+  }
+  /* Set like the date labels, so it settles onto the last one as it fades. */
+  .when { left: 0; color: var(--text); opacity: 0; }
+  .sweeping .when { opacity: 1; }
+
+  /* Before and while the lines draw: they show up to the sweep's front, and what arrives as it lands waits. */
+  .armed .lines { clip-path: inset(0 100% 0 0); }
+  .armed :is(.end, .label, .dates) { opacity: 0; }
+</style>

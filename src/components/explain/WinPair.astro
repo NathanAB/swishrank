@@ -1,0 +1,68 @@
+---
+// How it works, step 3's surprise: two real wins by the same margin, a favorite's and an underdog's, as bars of the
+// winner's rating gain on one scale. It sits under the step's words, beside the margin the reader drags
+// (WinValue.astro). Scrolled into view the bars grow; without script, or with reduced motion, they show at full
+// length. The two wins only say something side by side, so neither is drawn alone.
+import { signed } from "../../lib/format.ts";
+import { examples, type ContrastKind } from "../../lib/method.ts";
+import type { SeasonView } from "../../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+}
+
+const { contrasts } = examples(Astro.props.season.model.results);
+const of = (kind: ContrastKind) => contrasts.find((c) => c.kind === kind);
+const close = of("close");
+const upset = of("upset");
+const pair = close && upset ? [close, upset] : [];
+const most = Math.max(1, ...pair.map((c) => c.game.winner.change));
+const rows = pair.map(({ kind, game: o, margin }) => ({
+  label: `${kind === "upset" ? "Underdog" : "Favorite"} wins by ${margin}`,
+  gain: signed(o.winner.change),
+  share: Math.max(0, o.winner.change) / most,
+  hero: kind === "upset",
+}));
+---
+
+{rows.length > 0 && (
+  <table class="pair" data-win-pair>
+    {rows.map((r, i) => (
+      <tr class:list={{ hero: r.hero }} style={`--share: ${r.share}; --i: ${i}`}>
+        <th scope="row">{r.label}</th>
+        <td><span class="bar"><span class="fill"></span><b>{r.gain}</b></span></td>
+      </tr>
+    ))}
+  </table>
+)}
+
+<script>
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const root of document.querySelectorAll<HTMLElement>("[data-win-pair]")) {
+    if (still) continue;
+    root.dataset.reveal = "ready";
+    new IntersectionObserver((entries, seen) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      seen.disconnect();
+      root.dataset.reveal = "run";
+    }, { threshold: 0.4 }).observe(root);
+  }
+</script>
+
+<style>
+  /* What each win was, then a bar of the winner's gain on one scale. The underdog's gain is the point, so its bar
+     takes the accent. */
+  .pair { width: 100%; max-width: 360px; margin-top: 20px; border-collapse: collapse; }
+  .pair th { padding: 0 16px 0 0; text-align: left; font-weight: 400; line-height: 22px; white-space: nowrap; vertical-align: middle; }
+  .pair tr + tr > * { padding-top: 14px; }
+  .pair td { width: 100%; vertical-align: middle; }
+  .bar { display: flex; align-items: center; gap: 8px; }
+  .fill {
+    flex: none; width: calc(var(--share) * (100% - 40px)); min-width: 2px; height: 6px;
+    background: var(--bar); border-radius: 0 3px 3px 0; transform-origin: left;
+  }
+  .hero .fill { background: var(--accent); }
+  .bar b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pair[data-reveal="ready"] .fill { transform: scaleX(0); }
+  .pair[data-reveal="run"] .fill { transition: transform 600ms cubic-bezier(0.2, 0, 0, 1) calc(var(--i) * 80ms); }
+</style>

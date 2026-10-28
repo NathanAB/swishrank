@@ -1,0 +1,141 @@
+---
+// How it works, step 3's margin: a margin the reader drags from 1 point up, drawn as one column per margin, each as
+// tall as what a win by that many points counts, so each column rises less than the one before. The two same-margin
+// wins sit under the step's words (WinPair.astro).
+import { counted, PARAMS } from "../../lib/elo.ts";
+import { MOST, points, times, worth } from "../../lib/explain/margin.ts";
+import { examples } from "../../lib/method.ts";
+import type { SeasonView } from "../../lib/season.ts";
+import Range from "./Range.astro";
+
+interface Props {
+  season: SeasonView;
+}
+
+const { season } = Astro.props;
+const { contrasts } = examples(season.model.results);
+
+const start = Math.min(MOST, contrasts.find((c) => c.kind === "blowout")?.margin ?? MOST);
+const columns = Array.from({ length: MOST }, (_, i) => counted(i + 1, PARAMS.margin) / counted(MOST, PARAMS.margin));
+---
+
+<div class="win" data-win-value>
+  <div class="margin" style={`--n: ${MOST}`}>
+    <div
+      class="field"
+      data-field
+      role="img"
+      aria-label={`One column for each winning margin from 1 to ${MOST} points, as tall as what that win counts. A ${MOST}-point win counts ${times(MOST)} times a 1-point win, and each extra point adds less than the one before.`}
+    >
+      {columns.map((v, i) => <span class:list={["col", { on: i < start }]} style={`--v: ${v}`}></span>)}
+    </div>
+    <Range min="1" max={MOST} step="1" value={start} aria-label="Winning margin" aria-valuetext={points(start)} />
+    <p class="ends" aria-hidden="true"><span>{points(1)}</span><span>{points(MOST)}</span></p>
+    <p class="readout" aria-live="polite" data-readout>{worth(start).map((part, i) => (i === 1 ? <b class="x">{part}</b> : <span>{part}</span>))}</p>
+  </div>
+</div>
+
+<script>
+  import { points, worth } from "../../lib/explain/margin.ts";
+
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-win-value]")) {
+    const input = root.querySelector<HTMLInputElement>("input[type=range]")!;
+    const field = root.querySelector<HTMLElement>("[data-field]")!;
+    const readout = root.querySelector<HTMLElement>("[data-readout]")!;
+    const cols = [...field.children];
+    const end = Number(input.value);
+    let sweep: Animation | null = null;
+
+    const show = (n: number) => {
+      input.value = String(n);
+      input.setAttribute("aria-valuetext", points(n));
+      cols.forEach((c, i) => c.classList.toggle("on", i < n));
+      worth(n).forEach((part, i) => (readout.children[i].textContent = part));
+    };
+    const stop = () => {
+      sweep?.cancel();
+      sweep = null;
+      root.removeAttribute("aria-busy");
+    };
+
+    input.addEventListener("input", () => {
+      stop();
+      show(Number(input.value));
+    });
+
+    const pick = (e: PointerEvent) => {
+      const box = field.getBoundingClientRect();
+      stop();
+      show(Math.min(cols.length, Math.max(1, Math.ceil(((e.clientX - box.left) / box.width) * cols.length))));
+    };
+    field.addEventListener("pointerdown", (e) => {
+      field.setPointerCapture(e.pointerId);
+      if (e.pointerType !== "touch") pick(e);
+    });
+    for (const type of ["pointermove", "pointerup"] as const) {
+      field.addEventListener(type, (e) => {
+        if (field.hasPointerCapture(e.pointerId) || (type === "pointermove" && e.pointerType !== "touch")) pick(e);
+      });
+    }
+
+    const play = () => {
+      root.setAttribute("aria-busy", "true");
+      const run = root.animate(null, { duration: 1200, delay: 300, easing: "cubic-bezier(0.4, 0, 0.2, 1)" });
+      sweep = run;
+      const frame = () => {
+        if (!sweep) return;
+        if (run.playState === "finished") {
+          stop();
+          show(end);
+          return;
+        }
+        show(Math.round(1 + (run.effect?.getComputedTiming().progress ?? 0) * (end - 1)));
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    };
+
+    if (!still) {
+      show(1);
+      new IntersectionObserver((entries, seen) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        seen.disconnect();
+        play();
+      }, { threshold: 0.4 }).observe(root);
+    }
+  }
+</script>
+
+<style>
+  .win { display: grid; gap: 32px; container-type: inline-size; }
+
+  /* The margin: a slot per margin, each centred over where the slider's thumb stands for that many points, so the
+     thumb always sits under the last filled column. Each column takes 60% of its slot, so the filled run stays a
+     row of marks rather than one block of colour. */
+  .field {
+    display: flex; height: 112px;
+    margin-inline: calc(var(--thumb) / 2 - (100% - var(--thumb)) / (2 * (var(--n) - 1)));
+    cursor: ew-resize; touch-action: pan-y;
+  }
+  .col { flex: 1 1 0; display: flex; align-items: flex-end; justify-content: center; min-width: 0; }
+  .col::before {
+    content: ""; width: min(100% - 2px, 60%); height: calc(var(--v) * 100%);
+    background: var(--control); border-radius: 2px 2px 0 0;
+    transition: background-color 150ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  .col.on::before { background: var(--accent); }
+  .col:hover::before { background: var(--muted); }
+  .col.on:hover::before { background: color-mix(in oklab, var(--accent) 70%, var(--text)); }
+
+  .ends { position: relative; height: 16px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
+  .ends span { position: absolute; top: 0; white-space: nowrap; }
+  .ends span:first-child { left: 0; }
+  .ends span:last-child { right: 0; }
+  .readout { margin-top: 12px; font-size: var(--fs-card); line-height: 24px; font-weight: 500; }
+  .readout .x { color: var(--accent); font-weight: 600; }
+  /* Where the longest sentence takes two lines, every sentence gets two, so the card keeps its height as the margin
+     moves. */
+  @container (max-width: 520px) { .readout { min-height: 48px; } }
+</style>
