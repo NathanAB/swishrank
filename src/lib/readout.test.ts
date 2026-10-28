@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseScale, ratingAt, readout, scaleAttr } from "./readout.ts";
+import { parseRanks, parseScale, ranksAttr, ratingAt, readout, scaleAttr } from "./readout.ts";
 
 const scale = { hi: 1100, yHi: 10, lo: 900, yLo: 210 };
 const y = (v: number) => 10 + (1100 - v);
@@ -22,4 +22,9 @@ test("the rank on a day counts the lines above, and equal ratings share it", () 
   assert.deepEqual(readout(lines, scale, 1, "C"), { rating: 1020, rank: 2, tied: true });
   assert.deepEqual(readout(lines, scale, 0, "B"), { rating: 1000, rank: 1, tied: true });
   assert.equal(readout(lines, scale, 2, "A"), null);
+});
+
+test("a line's league ranks read back as the chart wrote them, ties included", () => {
+  const days = [{ rank: 3, tied: false }, { rank: 3, tied: true }, { rank: 12, tied: false }];
+  assert.deepEqual(parseRanks(ranksAttr(days)), days);
 });

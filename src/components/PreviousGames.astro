@@ -1,0 +1,72 @@
+---
+// Each team's last games before this one, up to five (lib/teams.ts RECENT), in one card: the away team's on the left, the home team's on the
+// right, mirrored as the header's blocks are, so each list reads from the card's outer edge in and the two
+// rating changes stand either side of a rule down the middle. The card's title sits between the two team names
+// in its first row, and each team's colour runs down the card's edge on its side. A win's row is in ink and a
+// loss's in grey; an upset win carries the upset badge, with its rating gain in the accent. Each row opens
+// that game (TeamGames). Below 1024px the two lists stack.
+import TeamGames from "./TeamGames.astro";
+import type { GameView } from "../lib/game.ts";
+import { record } from "../lib/format.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+import { recordOf } from "../lib/teams.ts";
+
+interface Props {
+  season: SeasonView;
+  view: GameView;
+  paint: Record<string, string>;
+}
+
+const { season, view, paint } = Astro.props;
+const sides = [view.away, view.home];
+// As many games as the longer list holds, so a team early in its season isn't promised five.
+const n = Math.max(...sides.map((s) => s.previous.length));
+---
+
+<section class="prev" aria-labelledby="h-prev">
+  {sides.map((s) => <span class:list={["edge", s.side]} style={paint[s.abbr]} aria-hidden="true" />)}
+  <div class="cols">
+    <h2 id="h-prev">{n > 1 ? `Previous ${n} games` : n === 1 ? "Previous game" : "Previous games"}</h2>
+    {sides.map((s) => (
+      <div class:list={["side", s.side]}>
+        <p class="head"><b>{team(season, s.abbr).short}</b><span class="num">{s.previous.length ? record(...recordOf(s.previous)) : "No games yet."}</span></p>
+        <TeamGames season={season} games={[...s.previous].reverse()} mirror={s.side === "home"} />
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  /* The card clips its two edges to its rounded corners, so each edge's outer side curves and its inner one is straight. */
+  .prev { position: relative; overflow: hidden; padding: 16px calc(var(--card-pad) + 4px); background: var(--surface); border: var(--panel-edge); border-radius: var(--radius-card); }
+  .edge { position: absolute; top: 0; bottom: 0; width: 4px; background: var(--tint); }
+  .edge.away { left: 0; }
+  .edge.home { right: 0; }
+
+  .cols { position: relative; display: grid; grid-template-columns: 1fr 1fr; }
+  h2 { position: absolute; top: 0; left: 50%; transform: translateX(-50%); font-size: 20px; line-height: 28px; font-weight: 700; white-space: nowrap; }
+  /* The rule down the middle runs beside the game rows only, clear of the title. */
+  .cols::after { content: ""; position: absolute; top: 56px; bottom: 16px; left: 50%; width: 1px; background: var(--border); }
+  .side.away { padding-right: 40px; }
+  .side.home { padding-left: 40px; }
+  .head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); font-size: 20px; line-height: 28px; color: var(--muted); }
+  .head b { color: var(--text); font-weight: 600; }
+  .home .head { flex-direction: row-reverse; }
+  /* The two headings' rules reach into the middle gap and meet, so one line runs under the whole first row. */
+  .away .head { margin-right: -40px; padding-right: 40px; }
+  .home .head { margin-left: -40px; padding-left: 40px; }
+
+  /* Side by side, a list needs about 470px for its date, name, result, score and change. Below that the two
+     lists stack, and read alike: from the left. */
+  @media (max-width: 1023px) {
+    .cols { grid-template-columns: 1fr; row-gap: 16px; }
+    h2 { position: static; transform: none; }
+    .cols::after { content: none; }
+    .side.away, .side.home { padding: 0; }
+    .away .head, .home .head { flex-direction: row; margin: 0; padding-left: 0; padding-right: 0; }
+  }
+  @media (max-width: 640px) {
+    .prev { padding: 16px calc(var(--card-pad) + 2px); }
+    h2, .head, .home .head { font-size: 18px; line-height: 24px; }
+  }
+</style>

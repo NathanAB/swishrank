@@ -1,0 +1,84 @@
+---
+// A team's played games as a list of rows, each opening the game's page: the date, the opponent and any stage
+// (a playoff round, the play-in, the NBA Cup), W or L, the score and the rating change, and with `rating` the
+// rating it left the team at. A win's row is in ink and a loss's in grey; an upset win carries the upset badge,
+// with its rating gain in the accent. Under the pointer or keyboard focus a row's highlight reaches 8px past its
+// columns, clear of the rule below it, and the row turns to ink with the opponent's name underlined. With
+// `mirror` the rows read from the right on a wide screen, as the home side of a game's page does. Each row lays
+// itself out by its own width, so the list fits a side column, half a card or a full one.
+import UpsetBadge from "./UpsetBadge.astro";
+import { pct, rating as shown, record, shortDay, signed, weekdayDay } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+import { venueWord, type TeamGame } from "../lib/teams.ts";
+
+interface Props {
+  season: SeasonView;
+  games: readonly TeamGame[];
+  /** Show the rating each game left the team at. */
+  rating?: boolean;
+  mirror?: boolean;
+  "aria-label"?: string;
+}
+
+const { season, games, rating = false, mirror = false, "aria-label": label } = Astro.props;
+---
+
+<ol aria-label={label}>
+  {games.map((g) => (
+    <li>
+      <a class:list={["row", { won: g.us.won, mirror }]} href={href({ kind: "game", season, game: g.result.game })}>
+        <span class:list={["in", { rated: rating }]}>
+          <span class="day" title={weekdayDay(g.result.day)}>{shortDay(g.result.day)}</span>
+          <span class="opp">
+            <span class="nm">{venueWord(g.venue)} {team(season, g.them.abbr).short}</span>
+            {g.upset && <UpsetBadge class="up" title={`Won with a ${pct(g.us.chance)} chance`} compact />}
+            {g.stage.label && <span class="tag">{g.stage.label}</span>}
+          </span>
+          <span class="wl">{g.us.won ? "W" : "L"}</span>
+          <span class="num sc">{record(g.us.score, g.them.score)}</span>
+          <span class:list={["num chg", { paid: g.upset }]}>{signed(g.us.change)}</span>
+          {rating && <span class="num rt">{shown(g.us.rating)}</span>}
+        </span>
+      </a>
+    </li>
+  ))}
+</ol>
+
+<style>
+  li + li { border-top: 1px solid var(--rule); }
+  .row { position: relative; isolation: isolate; display: block; container-type: inline-size; color: var(--muted); }
+  .row::before { content: ""; position: absolute; inset: 0 -8px 1px; z-index: -1; border-radius: 4px; transition: background-color 120ms ease; }
+  .won, .row:is(:hover, :focus-visible) { color: var(--text); }
+  .row:is(:hover, :focus-visible)::before { background: color-mix(in oklab, var(--text) 10%, var(--surface)); }
+  .row:is(:hover, :focus-visible) .nm { text-decoration: underline; text-underline-offset: 3px; }
+
+  .in { display: grid; grid-template-columns: 72px minmax(0, 1fr) 20px 96px 48px; align-items: center; column-gap: 16px; min-height: 48px; font-size: var(--fs-card); white-space: nowrap; }
+  .rated { grid-template-columns: 72px minmax(0, 1fr) 20px 96px 48px 56px; }
+  .won .wl { font-weight: 600; }
+  .day { color: var(--muted); }
+  .num { text-align: right; }
+  /* The name gives way to the badge when the row is short of room, so an upset never loses its badge; the
+     stage gives way first. */
+  .opp { display: flex; align-items: center; min-width: 0; }
+  .nm { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .up { margin: 0 6px; }
+  .tag { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; margin-left: 8px; font-size: var(--fs-small); color: var(--muted); }
+  /* Mirrored only where two lists stand side by side (PreviousGames.astro stacks them below 1024px). */
+  @media (min-width: 1024px) {
+    .mirror .in { direction: rtl; }
+    .mirror .in > * { direction: ltr; text-align: right; }
+    .mirror .in > .num { text-align: left; }
+    .mirror .opp { justify-content: flex-end; }
+  }
+  /* A phone's row: the rating gives way, as the page's header shows the latest one, and so does the stage. */
+  @container (max-width: 459px) {
+    .in, .rated { grid-template-columns: 46px minmax(0, 1fr) 14px 72px 30px; column-gap: 8px; min-height: 44px; font-size: 15px; }
+    .rt, .tag { display: none; }
+  }
+  /* In a side column the date gives way too, so the opponent keeps its room. */
+  @container (max-width: 299px) {
+    .in, .rated { grid-template-columns: minmax(0, 1fr) 14px 72px 30px; }
+    .day { display: none; }
+  }
+</style>

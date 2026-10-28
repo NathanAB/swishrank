@@ -33,7 +33,6 @@
   --font: var(--font-public-sans), system-ui, sans-serif;
   --fs-title: 22px;
   --fs-card: 16px;
-  --fs-kpi: 28px;
   --fs-body: 14px;
   --fs-small: 12px;
 
@@ -43,7 +42,7 @@
   --gap: 24px;
   --card-pad: clamp(20px, 1vw + 6px, 32px);
   --radius-card: 6px;
-  --bar-height: 44px;
+  --bar-height: 52px;
   /* A switch's or the season menu's height in a card's header; 44px touch targets on a phone. */
   --control-h: 28px;
 }
@@ -72,6 +71,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+/* Every page's title. A page with a header of its own sizes its h1 there (TeamHeader.astro). */
+h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
 ul, ol { padding: 0; list-style: none; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
@@ -91,8 +92,18 @@ svg { display: block; }
 .tip i { margin-left: 6px; font-style: normal; }
 .tip > span { display: block; }
 
-/* A game's tile, on the games page and How it works. */
-.tile { min-width: 0; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; }
+/* A link over the whole of a game's tile (.cover), which opens the game's page; the team names' own links in it
+   sit above it. */
+.cover { position: absolute; inset: 0; border-radius: inherit; }
+.cover:focus-visible { outline-offset: -2px; }
+.tile a:not(.cover) { position: relative; z-index: 1; }
+
+/* A game's tile, on the games page and How it works, lighter under the pointer. */
+.tile { position: relative; min-width: 0; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; transition: background-color 120ms ease; }
+.tile:has(> .cover:hover) { background: color-mix(in oklab, var(--text) 10%, var(--raised)); }
+
+/* An upset winner's rating gain, in the accent wherever a game shows it, beside its UpsetBadge. */
+.paid { color: var(--accent); font-weight: 600; }
 
 /* Every figure in a column or a strip lines up digit for digit. */
 .num, table { font-variant-numeric: tabular-nums; }

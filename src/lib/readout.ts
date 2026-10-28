@@ -14,6 +14,14 @@ export function parseScale(attr: string): Scale | null {
   return [hi, yHi, lo, yLo].every(Number.isFinite) ? { hi, yHi, lo, yLo } : null;
 }
 
+/** A league rank, with whether another team shares it. */
+export type Place = { rank: number; tied: boolean };
+
+/** A line's league rank by day as a chart writes it in its data-ranks attribute: "3,3t", tied 3rd on the second day. */
+export const ranksAttr = (days: readonly Place[]) => days.map((d) => `${d.rank}${d.tied ? "t" : ""}`).join(",");
+
+export const parseRanks = (attr: string): Place[] => attr.split(",").map((s) => ({ rank: parseInt(s, 10), tied: s.endsWith("t") }));
+
 /** The displayed rating at height `y`. A scale whose two heights meet holds one rating, its `hi`. */
 export const ratingAt = (y: number, s: Scale) => Math.round(s.yHi === s.yLo ? s.hi : s.hi + ((y - s.yHi) * (s.lo - s.hi)) / (s.yLo - s.yHi));
 

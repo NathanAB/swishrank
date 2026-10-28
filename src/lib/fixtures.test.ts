@@ -7,7 +7,7 @@ const game = (id: string, t: string, away: string, home: string, more: Partial<G
   id, t, home, away, hs: null, as: null, final: false, neutral: false, note: null, ...more,
 });
 
-test("the week ahead is seven US Eastern days from today, in tip-off order, empty days kept", () => {
+test("the week ahead is the game days among the seven US Eastern days from today, in tip-off order", () => {
   const model = compute({
     season: "2026-27",
     teams: { A: { name: "A A", short: "A", color: "000000", alternateColor: "ffffff" }, B: { name: "B B", short: "B", color: "000000", alternateColor: "ffffff" } },
@@ -26,11 +26,6 @@ test("the week ahead is seven US Eastern days from today, in tip-off order, empt
     week.map((d) => [d.day, d.fixtures.map((f) => f.game.id)]),
     [
       ["2026-10-25", ["early", "late"]],
-      ["2026-10-26", []],
-      ["2026-10-27", []],
-      ["2026-10-28", []],
-      ["2026-10-29", []],
-      ["2026-10-30", []],
       ["2026-10-31", ["last"]],
     ],
   );

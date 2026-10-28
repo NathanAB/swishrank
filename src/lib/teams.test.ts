@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { compute, type Game, type SeasonData } from "./elo.ts";
-import { conferenceOf, highLow, nextGames, regularSeasonEnd, runEnds, stage, standings } from "./teams.ts";
+import { conferenceOf, nextGames, regularSeasonEnd, runEnds, stage, standings, standingsRecord, weekAgo } from "./teams.ts";
 
 const dir = new URL("../data/games/", import.meta.url);
 const seasons: SeasonData[] = readdirSync(dir).map((f) => JSON.parse(readFileSync(new URL(f, dir), "utf8")));
@@ -39,28 +39,41 @@ test("a conference's table holds only its teams, ranked from 1 among themselves"
   assert.deepEqual(standings(model, "East"), { order: ["BOS", "NY"], rank: { BOS: 1, NY: 2 } });
 });
 
-test("Cup semifinals are regular-season games and conference semifinals are playoffs", () => {
-  assert.deepEqual(stage("NBA Cup - Semifinals"), { phase: "regular", label: "NBA Cup semifinal" });
-  assert.deepEqual(stage("East Semifinals - Game 3"), { phase: "playoffs", label: "East semis game 3" });
+test("Cup semifinals are regular-season games in the standings, the Cup final is outside them, and conference semifinals are playoffs", () => {
+  assert.deepEqual(stage("NBA Cup - Semifinals"), { phase: "regular", label: "NBA Cup semifinal", standings: true });
+  assert.deepEqual(stage("NBA Cup Championship"), { phase: "regular", label: "NBA Cup final", standings: false });
+  assert.deepEqual(stage("East Semifinals - Game 3"), { phase: "playoffs", label: "East semis game 3", standings: false });
 });
 
-test("a team's next games are the games page's week: today and the six days after it, in US Eastern days", () => {
+test("a team's next games are its next five from today on, however far ahead", () => {
   const game = (id: string, t: string): Game => ({ id, t, home: "A", away: "B", hs: null, as: null, final: false, neutral: false, note: null });
   const model = compute({
     season: "2026-27",
     teams: { A: { name: "A A", short: "A", color: "000000", alternateColor: "ffffff" }, B: { name: "B B", short: "B", color: "000000", alternateColor: "ffffff" } },
-    // 11:30 PM Eastern on the 31st is already November 1 in UTC; the next evening is the eighth day.
-    games: [game("yesterday", "2026-10-24T23:00Z"), game("last", "2026-11-01T03:30Z"), game("first", "2026-10-25T23:00Z"), game("eighth", "2026-11-01T23:00Z")],
+    // Yesterday's game and the sixth are left out.
+    games: [
+      game("yesterday", "2026-10-24T23:00Z"), game("second", "2026-10-27T23:00Z"), game("first", "2026-10-25T23:00Z"),
+      game("third", "2026-10-30T23:00Z"), game("fourth", "2026-11-03T23:00Z"), game("fifth", "2026-11-09T23:00Z"), game("sixth", "2026-11-12T23:00Z"),
+    ],
   });
-  assert.deepEqual(nextGames(model, "A", "2026-10-25").map((g) => g.id), ["first", "last"]);
+  assert.deepEqual(nextGames(model, "A", "2026-10-25").map((g) => g.id), ["first", "second", "third", "fourth", "fifth"]);
 });
 
+test("a team's record in the standings leaves out its playoff games", () => {
+  const teams = { A: { name: "A A", short: "A", color: "000000", alternateColor: "ffffff" }, B: { name: "B B", short: "B", color: "000000", alternateColor: "ffffff" } };
+  const final = (id: string, t: string, note: string | null): Game => ({ id, t, home: "A", away: "B", hs: 110, as: 100, final: true, neutral: false, note });
+  const model = compute({ season: "2025-26", teams, games: [final("r", "2026-04-10T23:00Z", null), final("p", "2026-04-20T23:00Z", "West 1st Round - Game 1")] });
+  assert.deepEqual(standingsRecord(model, "A"), [1, 0]);
+});
 
-test("the high and low say when one of them is just the 1000 every team starts at", () => {
-  assert.deepEqual(highLow({ W: 70, L: 32, hi: 1307.2, lo: 994.4 }), { value: "1307 / 994" });
-  assert.deepEqual(highLow({ W: 3, L: 0, hi: 1040.6, lo: 1000 }), { value: "1041 / 1000", unit: "1000 is the starting rating" });
-  assert.deepEqual(highLow({ W: 0, L: 3, hi: 1000, lo: 962 }), { value: "1000 / 962", unit: "1000 is the starting rating" });
-  assert.deepEqual(highLow({ W: 0, L: 0, hi: 1000, lo: 1000 }), { value: "—" });
+test("a week ago is the ratings seven days before the latest, and none until the season has played a week or once it is a week past", () => {
+  const final = (id: string, t: string): Game => ({ id, t, home: "A", away: "B", hs: 110, as: 100, final: true, neutral: false, note: null });
+  const teams = { A: { name: "A A", short: "A", color: "000000", alternateColor: "ffffff" }, B: { name: "B B", short: "B", color: "000000", alternateColor: "ffffff" } };
+  const days = (n: number) => Array.from({ length: n }, (_, i) => final(`g${i}`, `2026-10-${String(20 + i).padStart(2, "0")}T23:00Z`));
+  assert.equal(weekAgo(compute({ season: "2026-27", teams, games: days(7) }), "2026-10-27"), null);
+  // The ninth game day is Oct 28.
+  assert.equal(weekAgo(compute({ season: "2026-27", teams, games: days(9) }), "2026-11-04")?.day, "2026-10-21");
+  assert.equal(weekAgo(compute({ season: "2026-27", teams, games: days(9) }), "2026-11-05"), null);
 });
 
 test("in every finished season the champion's run alone goes on to the end, and each other team's ends at its last game", () => {

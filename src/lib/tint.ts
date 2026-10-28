@@ -98,3 +98,70 @@ export function pairStyles(away: Pick<Team, "color" | "alternateColor">, home: P
   const [a, h] = pairs.find((p) => gap(p) >= MIN_APART) ?? pairs.reduce((best, p) => (gap(p) > gap(best) ? p : best), line);
   return [style(a), style(h)];
 }
+
+/** A colour in OKLab: lightness 0 to 1, then the two colour axes. */
+const okLab = (hex: string): [number, number, number] => {
+  const [r, g, b] = channels(hex).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+};
+
+/**
+ * A game page's team block: every team's at this one OKLab lightness and at most this colour strength
+ * (chroma), in its own hue, so a loud red and a quiet navy read alike.
+ */
+const BLOCK = { l: 0.34, c: 0.06 };
+/** Below this OKLab distance two blocks, once at BLOCK, read as one colour. */
+const BLOCKS_APART = 0.05;
+
+/** Where a colour lands on the block's colour plane once brought to BLOCK. */
+const asBlock = (hex: string) => {
+  const [, a, b] = okLab(hex);
+  const c = Math.hypot(a, b);
+  const k = c ? Math.min(c, BLOCK.c) / c : 0;
+  return [a * k, b * k];
+};
+
+/** How far a colour's lightness moves when it is brought to a block's. */
+const darkening = (hex: string) => Math.abs(okLab(hex)[0] - BLOCK.l);
+
+/**
+ * The colour each team takes on a game page, away then home, as six hex digits: its primary or its alternate.
+ * Of the four pairs, those that still look apart as blocks qualify, and of those the pair that changes least
+ * when darkened to the block's lightness wins, so a gold or a silver gives way to a darker partner: the
+ * Cavaliers are wine and the Pacers navy. With no pair apart, the furthest apart wins.
+ */
+export function gameColours(away: Pick<Team, "color" | "alternateColor">, home: Pick<Team, "color" | "alternateColor">): [string, string] {
+  const pairs = [away.color, away.alternateColor].flatMap((a) => [home.color, home.alternateColor].map((h) => [a.toLowerCase(), h.toLowerCase()]));
+  const gap = ([a, h]: string[]) => Math.hypot(asBlock(a)[0] - asBlock(h)[0], asBlock(a)[1] - asBlock(h)[1]);
+  const cost = (p: string[]) => p.reduce((t, hex) => t + darkening(hex), 0);
+  const apart = pairs.filter((p) => gap(p) >= BLOCKS_APART).sort((p, q) => cost(p) - cost(q));
+  const [a, h] = apart[0] ?? pairs.reduce((best, p) => (gap(p) > gap(best) ? p : best));
+  return [a, h];
+}
+
+/**
+ * A team's style attribute on a game page: --fill, its block, at BLOCK in the colour's hue, and --tint, the
+ * colour lifted to at least 0.62 lightness to show on the dark card, for its block's edge and its chart line.
+ * Both are written out as oklch() values, which every browser the site supports reads.
+ */
+function gameStyle(hex: string): string {
+  const [l, a, b] = okLab(hex);
+  const c = Math.hypot(a, b);
+  const h = ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360;
+  return `--fill: oklch(${BLOCK.l} ${Math.min(c, BLOCK.c).toFixed(4)} ${h.toFixed(1)}); --tint: oklch(${Math.max(l, 0.62).toFixed(3)} ${c.toFixed(4)} ${h.toFixed(1)})`;
+}
+
+/** A team's style attribute on a page about it alone: of its two colours, the one that darkens least. */
+export const teamPaint = (team: Pick<Team, "color" | "alternateColor">) =>
+  gameStyle([team.color, team.alternateColor].map((hex) => hex.toLowerCase()).sort((a, b) => darkening(a) - darkening(b))[0]);
+
+/** Two teams' style attributes for a game page, away then home, in the colours gameColours picks. */
+export const gamePaint = (away: Pick<Team, "color" | "alternateColor">, home: Pick<Team, "color" | "alternateColor">) =>
+  gameColours(away, home).map(gameStyle) as [string, string];

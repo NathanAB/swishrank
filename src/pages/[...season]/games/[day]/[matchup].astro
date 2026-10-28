@@ -1,0 +1,65 @@
+---
+// One game's page, played or to come: the matchup and when it is, centred, over the two teams' blocks with the
+// score or the win chances (TeamBlock), both teams' ratings through the season with the game's day marked, and
+// each team's last five games before it. /games/<day>/<away>-at-<home>/ is the current season's,
+// /<id>/games/... every other season's; a game at a neutral site reads <away>-vs-<home>.
+import Base from "../../../../layouts/Base.astro";
+import LocalTime from "../../../../components/LocalTime.astro";
+import Panel from "../../../../components/Panel.astro";
+import PreviousGames from "../../../../components/PreviousGames.astro";
+import RatingChart from "../../../../components/RatingChart.astro";
+import TeamBlock from "../../../../components/TeamBlock.astro";
+import type { Game } from "../../../../lib/elo.ts";
+import { dayWithYear, longDay, matchup } from "../../../../lib/format.ts";
+import { gameView } from "../../../../lib/game.ts";
+import { gameDescription } from "../../../../lib/meta.ts";
+import type { Route } from "../../../../lib/routes.ts";
+import { gamePaths, team, type SeasonView } from "../../../../lib/season.ts";
+import { gamePaint } from "../../../../lib/tint.ts";
+
+export function getStaticPaths() {
+  return gamePaths();
+}
+
+interface Props {
+  season: SeasonView;
+  game: Game;
+}
+
+const { season, game } = Astro.props;
+const route: Route = { kind: "game", season, game };
+const view = gameView(season.model, game);
+const [awayPaint, homePaint] = gamePaint(team(season, game.away), team(season, game.home));
+const paint = { [game.away]: awayPaint, [game.home]: homePaint };
+const title = matchup(team(season, game.away).short, team(season, game.home).short, game.neutral);
+const meta = [view.stage.label, view.series].filter(Boolean).join(" · ");
+---
+
+<Base title={title} docTitle={`${title}, ${dayWithYear(view.day)}`} description={gameDescription(season, view)} route={route} ownHeading>
+  <div class="game">
+    <section aria-labelledby="h-game">
+      <header class="title">
+        <h1 id="h-game">{title}</h1>
+        <p class="when">{longDay(view.day)} · <LocalTime at={game.t} />{meta && ` · ${meta}`}</p>
+      </header>
+      <div class="blocks">
+        {[view.away, view.home].map((side) => <TeamBlock season={season} view={view} side={side} paint={paint[side.abbr]} />)}
+      </div>
+    </section>
+    <Panel title="Rating this season" meta="Point at the chart for any day's ratings">
+      <RatingChart season={season} focus={[game.away, game.home]} paint={paint} mark={view.played ? { day: view.day, label: "This game" } : undefined} />
+    </Panel>
+    <PreviousGames season={season} view={view} paint={paint} />
+  </div>
+</Base>
+
+<style>
+  .game > :global(* + *) { margin-top: var(--gap); }
+  .title { margin-bottom: 16px; text-align: center; }
+  .when { margin-top: 2px; font-size: var(--fs-card); line-height: 24px; color: var(--muted); }
+  .blocks { display: flex; gap: 2px; }
+
+  @media (max-width: 640px) {
+    .when { font-size: var(--fs-body); line-height: 20px; }
+  }
+</style>

@@ -13,6 +13,7 @@ import { monthName, monthShort } from "../lib/format.ts";
 import { monthRoute, months, recentDays } from "../lib/results.ts";
 import { href, type Route } from "../lib/routes.ts";
 import { TODAY, noGamesAhead, type SeasonView } from "../lib/season.ts";
+import { NEXT_GAMES } from "../lib/teams.ts";
 
 interface Props {
   season: SeasonView;
@@ -35,7 +36,7 @@ const days = shown ? shown.days : recentDays(m, WEEK);
 // The next few game days, on the index of the season in progress. A full week runs to about 50 games, which
 // on a phone pushes last night's results thousands of pixels down; each team's page lists its own week.
 const AHEAD_DAYS = 3;
-const ahead = month === undefined && season.current ? nextDays(m, TODAY, WEEK).filter((d) => d.fixtures.length).slice(0, AHEAD_DAYS) : null;
+const ahead = month === undefined && season.current ? nextDays(m, TODAY, WEEK).slice(0, AHEAD_DAYS) : null;
 // Side by side only when both have games, so a week ahead with none never stands as a column of its own.
 const split = Boolean(ahead?.length) && days.length > 0;
 
@@ -65,7 +66,7 @@ const switcher = [
         <section class="part" aria-labelledby="ahead">
           <div class="part-head">
             <h2 id="ahead">Coming up</h2>
-            <p class="meta">The next {AHEAD_DAYS} game days. Chances use today's ratings, and each team's page lists its next {WEEK} days.</p>
+            <p class="meta">The next {AHEAD_DAYS} game days. Chances use today's ratings, and each team's page lists its next {NEXT_GAMES} games.</p>
           </div>
           {ahead.length === 0 ? <p class="empty">{noGamesAhead(season)}</p> : ahead.map((d, i) => <FixtureList season={season} day={d} lead={i === 0} />)}
         </section>

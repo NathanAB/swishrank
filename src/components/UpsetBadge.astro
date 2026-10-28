@@ -1,0 +1,27 @@
+---
+// The badge an upset win carries wherever a game shows: a filled tag in the accent with a bolt and the word.
+// facts.ts upset decides which wins are upsets. `compact` keeps only the bolt on a phone, for a narrow row; the
+// word stays for screen readers. Other attributes (class, title) land on the badge, so a parent can place it
+// with its own scoped class, as with Panel.astro.
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends HTMLAttributes<"span"> {
+  compact?: boolean;
+}
+
+const { compact = false, class: cls, ...rest } = Astro.props;
+---
+
+<span {...rest} class:list={["badge", cls, { compact }]}><svg viewBox="0 0 10 12" aria-hidden="true"><path d="M6 0 0 7h4l-1 5 6-7H5z" /></svg><span class="word">Upset</span></span>
+
+<style>
+  .badge {
+    flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 3px; vertical-align: 1px;
+    background: var(--accent); color: var(--surface); font-size: 11px; line-height: 16px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  svg { width: 8px; height: 10px; fill: currentColor; }
+  @media (max-width: 640px) {
+    .compact { padding: 1px 4px; }
+    .compact .word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
+</style>

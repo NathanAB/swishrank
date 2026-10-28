@@ -2,9 +2,10 @@
 // and description, built from the season model the page shows. Ranks, records and ratings come from the
 // helpers the tables use, so a description never disagrees with the page under it.
 import { START, type Abbr } from "./elo.ts";
-import { rating, record } from "./format.ts";
+import { longDay, matchup, pct, rating, record } from "./format.ts";
+import type { GameView } from "./game.ts";
 import type { SeasonView } from "./season.ts";
-import { place, standings, type Conference } from "./teams.ts";
+import { place, standings, standingsRecord, type Conference } from "./teams.ts";
 
 /** The site's name: the wordmark, every document title and every share image. */
 export const SITE_NAME = "SwishRank";
@@ -42,13 +43,25 @@ export function homeDescription(season: Shown, conference?: Conference): string 
   return `${lede} ${leaders(season, conference)}`;
 }
 
-/** "The Celtics are 9th of 30 at 1532 after 4 games (3–1)." and what the page holds. */
+/** "The Celtics are 9th of 30 at 1032 with a 3–1 record." and what the page holds. */
 export function teamDescription(season: Pick<SeasonView, "model" | "current">, abbr: Abbr): string {
   const m = season.model;
-  const { W, L } = m.stats[abbr];
+  const [W, L] = standingsRecord(m, abbr);
   const name = `The ${m.data.teams[abbr].short}`;
   const holds = season.current ? "Rating chart, game log and next games." : "Rating chart and game log.";
   if (W + L === 0) return `${name} have not played yet; every team starts at ${START}. ${holds}`;
-  const games = `${W + L} ${W + L === 1 ? "game" : "games"}`;
-  return `${name} ${season.current ? "are" : "finished"} ${place(m, abbr)} of ${m.abbrs.length} at ${rating(m.r[abbr])} after ${games} (${record(W, L)}). ${holds}`;
+  return `${name} ${season.current ? "are" : "finished"} ${place(m, abbr)} of ${m.abbrs.length} at ${rating(m.r[abbr])} with a ${record(W, L)} record. ${holds}`;
+}
+
+/** "The Pacers beat the Thunder 117–114 on Friday, January 23, with a 5% chance." or the chances of a game to come. */
+export function gameDescription(season: Pick<SeasonView, "model">, view: GameView): string {
+  const short = (a: Abbr) => season.model.data.teams[a].short;
+  const { away, home } = view;
+  const when = longDay(view.day);
+  const winner = [away, home].find((s) => s.line?.won);
+  const loser = winner === away ? home : away;
+  if (winner?.line && loser.line) {
+    return `The ${short(winner.abbr)} beat the ${short(loser.abbr)} ${record(winner.line.score, loser.line.score)} on ${when}, with a ${pct(winner.chance)} chance. Win chances, rating changes and both teams' recent games.`;
+  }
+  return `${matchup(`The ${short(away.abbr)}`, `the ${short(home.abbr)}`, view.game.neutral)} on ${when}: ${pct(away.chance)} to ${pct(home.chance)} on today's ratings. Win chances and both teams' recent games.`;
 }

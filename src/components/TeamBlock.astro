@@ -1,0 +1,93 @@
+---
+// One team's block at the top of a game's page: its abbreviation and name, its score or win chance large and
+// vertically centred, then its rating, place and record, on a fill in the team's colour with that colour down
+// its outer edge (lib/tint.ts gamePaint). A played game adds the team's chance at tip-off, and an upset winner
+// carries the upset badge with its rating gain in the accent. The game's page sets the two side by side, away
+// then home, meeting at a 2px gap as a chance bar's two parts do, each as wide as its share of the points or
+// the chances (lib/game.ts blockShare); the home block mirrors the away one, its figures read from its outer
+// edge in. The team's colour is a real border, so the outer corners round and the stripe's inner edge stays
+// straight. A block lays itself out by its own width, which its share decides as much as the screen does: the
+// name and figures beside the big number where there is room, stacked under it where there is not. The record
+// is the regular season's in a regular-season game and the postseason's after it.
+import UpsetBadge from "./UpsetBadge.astro";
+import { blockShare, type GameSide, type GameView } from "../lib/game.ts";
+import { pct, rating, record, signed } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  view: GameView;
+  side: GameSide;
+  /** The team's --fill and --tint. */
+  paint: string;
+}
+
+const { season, view, side: s, paint } = Astro.props;
+const share = blockShare(view, s);
+---
+
+<a class:list={["block", s.side, { dim: s.line?.won === false }]} href={href({ kind: "team", season, abbr: s.abbr })} style={`${paint}; --w: ${share.toFixed(3)}`}>
+  <span class="in">
+    <span class="id"><span class="ab">{s.abbr}</span><span class="nm">{team(season, s.abbr).name}</span></span>
+    <span class="big num">{s.line ? s.line.score : pct(s.chance)}</span>
+    <dl class="stats">
+      {view.played && (
+        <div><dt>Win chance</dt><dd class="num">{pct(s.chance)}{s.upset && <UpsetBadge />}</dd></div>
+      )}
+      <div>
+        <dt>Rating</dt>
+        <dd class="num">{rating(s.rating)}{s.line && <span class:list={["chg", { paid: s.upset }]}>{signed(s.line.change)}</span>}</dd>
+      </div>
+      <div><dt>Rank</dt><dd class="num">{s.place}</dd></div>
+      <div><dt>{view.stage.phase === "regular" ? "Record" : "Postseason"}</dt><dd class="num">{record(...s.record)}</dd></div>
+    </dl>
+  </span>
+</a>
+
+<style>
+  .block {
+    flex: var(--w) 1 0; min-width: 0; container-type: inline-size;
+    background: var(--fill); border-left: 4px solid var(--tint); border-radius: 4px 0 0 4px;
+    animation: grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .block.home { text-align: right; border-left: 0; border-right: 4px solid var(--tint); border-radius: 0 4px 4px 0; }
+  @keyframes grow { from { flex-grow: 0.5; } }
+  @media (prefers-reduced-motion: reduce) { .block { animation: none; } }
+  .in { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id big" "st big"; align-items: center; column-gap: 16px; row-gap: 14px; padding: 16px 20px; }
+  .home .in { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "big id" "big st"; }
+  .id { grid-area: id; min-width: 0; display: flex; flex-direction: column; }
+  .ab { font-size: 40px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; }
+  .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .big { grid-area: big; font-size: 64px; line-height: 64px; font-weight: 700; letter-spacing: -0.03em; }
+  .dim :is(.ab, .big) { color: var(--muted); }
+  .stats { grid-area: st; display: flex; flex-wrap: wrap; gap: 6px 24px; }
+  .home .stats { flex-direction: row-reverse; justify-content: flex-start; }
+  dt { font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
+  dd { display: flex; align-items: baseline; gap: 6px; height: 24px; font-size: 18px; line-height: 24px; font-weight: 600; white-space: nowrap; }
+  .home dd { justify-content: flex-end; }
+  /* An upset winner's gain keeps the accent's weight (global.css .paid). */
+  .chg:not(.paid) { font-weight: 400; }
+  .chg { font-size: var(--fs-body); }
+
+  /* About half a 1024px page: too narrow for a played game's four figures in a row beside the big number, so
+     they stand two by two, mirrored in the home block, rather than leave one on a line of its own. A game to
+     come has three, which fit in a row. */
+  @container (max-width: 559px) {
+    .stats:has(> :nth-child(4)) { display: grid; grid-template-columns: repeat(2, max-content); }
+    .home .stats:has(> :nth-child(4)) { direction: rtl; }
+    .home .stats > div { direction: ltr; }
+  }
+
+  /* Too narrow for the big figure beside the rest: about 100px of abbreviation, 150px of figure, the gap and
+     the padding. */
+  @container (max-width: 359px) {
+    .in, .home .in { grid-template-columns: 1fr; grid-template-areas: "id" "big" "st"; row-gap: 8px; padding: 12px; }
+    .nm { display: none; }
+    .ab { font-size: 24px; line-height: 28px; }
+    .big { font-size: 40px; line-height: 44px; }
+    .stats, .home .stats { display: flex; flex-direction: column; gap: 4px; direction: ltr; }
+    .stats > div { display: flex; flex-direction: column; }
+    dd { height: auto; font-size: 15px; line-height: 20px; }
+  }
+</style>
