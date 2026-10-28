@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dayKey, type SeasonData } from "./elo.ts";
-import { canonicalNote, lostFinals, parse, type EspnEvent } from "./espn.ts";
+import { canonicalNote, fetchEvents, lostFinals, parse, type EspnEvent } from "./espn.ts";
 import { stage } from "./teams.ts";
 
 const side = (homeAway: "home" | "away", id: string, abbreviation: string) => ({
@@ -54,4 +54,14 @@ test("a final game without two whole scores stops the fetch instead of counting 
 test("a fetch that no longer has a game as final is caught before it overwrites the season", () => {
   const g = (id: string, final: boolean) => ({ id, t: "2026-10-25T23:00Z", home: "A", away: "B", hs: final ? 1 : null, as: final ? 0 : null, final, neutral: false, note: null });
   assert.deepEqual(lostFinals([g("1", true), g("2", true), g("3", false)], [g("1", true), g("3", true), g("4", false)]), ["2"]);
+});
+
+test("a scoreboard request tries again when ESPN sends an empty body, and gives up only after every wait", async () => {
+  const replies = (bodies: string[]) => {
+    let n = 0;
+    return (async () => new Response(bodies[Math.min(n++, bodies.length - 1)])) as unknown as typeof fetch;
+  };
+  const events = [{ id: "1" }];
+  assert.deepEqual(await fetchEvents("u", [0, 0, 0], replies(["", "", "", JSON.stringify({ events })])), events);
+  await assert.rejects(fetchEvents("u", [0, 0], replies(["", "", "", JSON.stringify({ events })])), /ESPN u: Unexpected end of JSON input/);
 });

@@ -6,7 +6,7 @@
 // ESPN's scoreboard takes one date per request (date ranges return 400), so this walks the season day by day.
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { lostFinals, parse } from "../src/lib/espn.ts";
+import { fetchEvents, lostFinals, parse } from "../src/lib/espn.ts";
 
 const SEASONS = JSON.parse(await readFile(new URL("../src/data/seasons.json", import.meta.url), "utf8"));
 const OUT_DIR = new URL("../src/data/games/", import.meta.url);
@@ -16,18 +16,7 @@ const FIXTURE_DAYS = 7;
 const DAY = 86_400_000;
 const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
 
-// One retry after a pause, for a dropped connection or a brief rate limit.
-async function fetchDay(day, retry = true) {
-  try {
-    const res = await fetch(URL_FOR(day.replaceAll("-", "")));
-    if (!res.ok) throw new Error(`ESPN ${day}: HTTP ${res.status}`);
-    return (await res.json()).events ?? [];
-  } catch (err) {
-    if (!retry) throw err;
-    await new Promise((r) => setTimeout(r, 5000));
-    return fetchDay(day, false);
-  }
-}
+const fetchDay = (day) => fetchEvents(URL_FOR(day.replaceAll("-", "")));
 
 async function fetchSeason(season) {
   const today = Date.now();
