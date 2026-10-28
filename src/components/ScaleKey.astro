@@ -12,8 +12,7 @@ const { class: cls, ...rest } = Astro.props;
 ---
 
 <p {...rest} class:list={["key", cls]}>
-  The ratings use the Elo points scale from chess. Every team starts the season at {rating(START)}, the league
-  average. A team rated 100 points higher wins about {pct(winProb(100))} of the time.<slot /> <a href={href({ kind: "about" })}>How it works</a>
+  The ratings use the Elo points scale from chess. Every team starts the season at {rating(START)}, the league average. A team rated 100 points higher wins about {pct(winProb(100))} of the time.<slot /> <a href={href({ kind: "about" })}>How it works</a>
 </p>
 
 <style>

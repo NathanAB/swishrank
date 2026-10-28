@@ -59,7 +59,7 @@ const final = (o: Outcome) =>
 const restShown = rest && {
   head: `${name(rest.abbr)} ${signed(rest.change)} on ${weekdayDay(rest.day)}, without playing`,
   rows: [rest.beaten, rest.win].map((o) => ({ day: weekdayDay(o.result.day), score: final(o) })),
-  why: `The ${name(rest.beaten.loser.abbr)} won, which showed they're stronger, so the ${name(rest.abbr)} win over them now counts for more.`,
+  why: `The ${name(rest.beaten.loser.abbr)} then won, so they look stronger, and the ${name(rest.abbr)} win over them counts for more.`,
 };
 const game = opener && {
   day: weekdayDay(opener.result.day),
@@ -91,7 +91,7 @@ const gain = (kind: ContrastKind) => contrasts.find((c) => c.kind === kind)?.gam
 const times = gain("close") > 0 ? Math.round(gain("upset") / gain("close")) : 0;
 const TIMES: Record<number, string> = { 2: "twice", 3: "three times", 4: "four times", 5: "five times" };
 const upsetSay = times >= 2
-  ? `An underdog's close win earns about ${TIMES[times] ?? `${times} times`} what a favorite's does, because the ratings didn't expect it.`
+  ? `An underdog's close win earns about ${TIMES[times] ?? `${times} times`} what a favorite's does, because it was unexpected.`
   : "An upset or a bigger win earns more than a favorite's close win.";
 
 // Step 4: the favourite's chance against the rating gap, 0 to 400 points, on a 50% to 100% scale, and home
@@ -154,15 +154,15 @@ const lastUpset = (() => {
 
 <Base
   title="How the ratings work"
-  description={`Every NBA team starts each season at ${START}, the league average, and after each day of games the ratings are fitted again to every game so far.`}
+  description={`Every NBA team starts the season at ${START}, the league average, and every rating is worked out again after each day of games.`}
   route={{ kind: "about" }}
 >
-  <Fragment slot="lede">Each rating is a number for how well a team has played this season. It uses the Elo scale from chess, where {START} is the league average and higher is better.</Fragment>
+  <Fragment slot="lede">A rating says how well a team has played this season. It uses the Elo scale from chess, where {START} is the league average and higher is better.</Fragment>
 
   <ol class="steps">
     <li><Panel title={`Everyone starts at ${START}`}>
       <div class="step">
-        <p class="say">Rosters change too much over a summer for last season to count. The games spread the teams out from there.</p>
+        <p class="say">Rosters change too much over a summer for last season to count.</p>
         {lines && (
           <figure
             class="lines"
@@ -194,7 +194,7 @@ const lastUpset = (() => {
 
     <li><Panel title="Every day, every game again">
       <div class="step">
-        <p class="say">After each day of games, every rating is worked out again from scratch, to best fit every result so far. So a win counts for more once the beaten team proves strong, and a team can rise on a day it doesn't play.</p>
+        <p class="say">After each day of games, every rating is worked out again from every result so far. So a win counts for more once the beaten team proves strong, and a team can rise on a day it doesn't play.</p>
         {restShown ? (
           <div class="game">
             <p class="score">{restShown.head}</p>
@@ -230,7 +230,7 @@ const lastUpset = (() => {
 
     <li><Panel title="Each extra point counts a little less">
       <div class="step">
-        <p class="say">A {blowout}-point win counts only {blowoutTimes} times as much as a 1-point win, so points scored after a game is already decided can't change a rating much. {upsetSay} Each game also counts for less as more games are played, so the same win moves a rating less in spring than in October.</p>
+        <p class="say">A {blowout}-point win counts only {blowoutTimes} times as much as a 1-point win, so points scored once a game is decided barely matter. {upsetSay} Later in the season, each game moves a rating less.</p>
         {bars.length > 0 && (
           <div class="bars">
             <span></span>
@@ -248,7 +248,7 @@ const lastUpset = (() => {
 
     <li><Panel title="A bigger gap, a bigger favorite">
       <div class="step">
-        <p class="say">Before a game starts, the gap between the two ratings gives each team its chance to win. The team more likely to win is the favorite, and the other team is the underdog. The chances come from how often past favorites won by each gap, and they stay within about one percentage point of the chess Elo formula, 1 / (1 + 10^(−gap / 400)). Home court is worth {int(edge)} points, measured over eight past seasons, so a home team is a {home.chance} favorite over an equal rival.</p>
+        <p class="say">The gap between two ratings sets each team's chance to win. The team more likely to win is the favorite, and the other is the underdog. The chances follow how often past favorites won at each gap, within about one percentage point of the chess Elo formula, 1 / (1 + 10^(−gap / 400)). Home court is worth {int(edge)} points, so a home team is a {home.chance} favorite over an equal rival.</p>
         <figure
           class="curve"
           role="img"
@@ -279,9 +279,9 @@ const lastUpset = (() => {
     <li><Panel title="A chance for every game">
       <div class="step">
         <div class="say">
-          <p>The games page gives both teams a chance to win every game still to play. Take the home team's rating, add home court, and subtract the visitor's rating. The bigger that gap, the bigger the favorite, along the curve above.</p>
-          <p>A team's first {EARLY.games} games say little about it. Until both teams have played that many, the gap counts for less, and the chance stays closer to 50%.</p>
-          <p>A 70% favorite still loses about 3 games in 10. When a team wins with less than a {UPSET}% chance, the games page marks it as an upset, like the latest one shown here.</p>
+          <p>For each game still to play, take the home team's rating, add home court, and subtract the visitor's. The curve above turns that gap into each team's chance.</p>
+          <p>A few games say little about a team, so until both teams have played {EARLY.games}, the chances stay closer to 50%.</p>
+          <p>A 70% favorite still loses about 3 games in 10. A win by a team given under {UPSET}% is marked as an upset, like the latest one shown here.</p>
         </div>
         {example && (
           <div class="game">
@@ -315,7 +315,7 @@ const lastUpset = (() => {
                 <p class="from">The latest upset · {lastUpset.when}</p>
                 <ResultTile as="div" season={lastUpset.season} outcome={lastUpset.outcome} />
                 {lastUpset.season.id !== season?.id && (
-                  <p class="note">That game came late in a season, when one game moves a rating less, so it earned less than the wins above.</p>
+                  <p class="note">It came late in a season, so it earned less than the wins above.</p>
                 )}
               </Fragment>
             )}
@@ -324,19 +324,10 @@ const lastUpset = (() => {
       </div>
     </Panel></li>
   </ol>
-
-  <p class="proof">
-    The settings were chosen on eight past seasons and then checked on three more. <a href="https://github.com/NathanAB/nba-elo/blob/main/docs/model.md">The model notes</a>
-    have every result, including how often favorites really won at each stated chance, where the check fell short of
-    its written plan, and the one rule added after it.
-  </p>
-
 </Base>
 
 <style>
   .steps { display: grid; gap: var(--gap); }
-  .proof { margin-top: var(--gap); max-width: 720px; color: var(--muted); }
-  .proof a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
   /* A step's words at a fixed measure beside its drawing, so every drawing starts at the same edge; stacked
      where the two do not fit side by side. */
   .step { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; gap: 16px 56px; padding-bottom: 8px; }
