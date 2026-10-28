@@ -4,9 +4,9 @@
   "main": "index.js",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
-  // The same times as deploy.yml's schedule, in UTC.
+  // 3:17 AM Eastern in winter, 4:17 AM in summer: after the latest West Coast game ends, even in overtime.
   "triggers": {
-    "crons": ["17 5 * * *", "17 10 * * *", "17 15 * * *"]
+    "crons": ["17 8 * * *"]
   },
   "vars": {
     "REPO": "NathanAB/nba-elo"

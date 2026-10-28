@@ -1,5 +1,5 @@
 // GitHub delays and drops scheduled workflow runs, so this Worker starts the deploy workflow on Cloudflare's cron
-// instead. The workflow's own schedule stays as a backup; an extra run with no new scores commits nothing.
+// instead. The workflow's own schedule runs later as a backup; an extra run with no new scores commits nothing.
 export default {
   async scheduled(controller, env) {
     const response = await fetch(

@@ -6,13 +6,10 @@ on:
   push:
     branches: [main]
   schedule:
-    # Once most games have ended (12:17 AM Eastern in winter, 1:17 AM in summer), so the night's results are
-    # up before morning; after the last West Coast game ends (about 6 AM Eastern); and an afternoon retry
-    # because GitHub can delay or drop scheduled runs. Minutes off the hour avoid its busiest time. A run with
-    # no new scores commits nothing.
-    - cron: "17 5 * * *"
-    - cron: "17 10 * * *"
-    - cron: "17 15 * * *"
+    # A backup for the Cloudflare Worker in cron/, which starts this workflow at 08:17 UTC. GitHub can delay or
+    # drop scheduled runs, so this run comes four hours later (8:17 AM Eastern in winter, 9:17 AM in summer). A
+    # run with no new scores commits nothing.
+    - cron: "17 12 * * *"
   workflow_dispatch:
 
 permissions:
