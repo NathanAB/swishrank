@@ -2,7 +2,9 @@
 // A card: a titled section on the surface tone. Every block on a page sits in one. Other attributes
 // (class, data-*) land on the section, so a page can place the card with its own scoped classes. The
 // "aside" slot sits at the header's right end, such as a switch for what the card shows and the season
-// menu. A page's first card carries the page's h1 as its title (level 1), so the page has one header row.
+// menu. The "side" slot is a column right of the title and body from the card's top, such as a drawing
+// beside the words that explain it, and drops under them where the two do not fit side by side. A page's
+// first card carries the page's h1 as its title (level 1), so the page has one header row.
 import type { HTMLAttributes } from "astro/types";
 
 interface Props extends Omit<HTMLAttributes<"section">, "title"> {
@@ -21,28 +23,35 @@ const headingId = hid ?? `h-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 const Heading = level === 1 ? "h1" : "h2";
 ---
 
-<section {...rest} class:list={["panel", { first: level === 1 }, cls]} aria-labelledby={headingId}>
+<section {...rest} class:list={["panel", { first: level === 1, split: Astro.slots.has("side") }, cls]} aria-labelledby={headingId}>
   <header class="head">
     <Heading id={headingId}>{title}</Heading>
     {meta && <p class="meta">{meta}</p>}
     {Astro.slots.has("aside") && <div class="aside"><slot name="aside" /></div>}
   </header>
   <div class="body"><slot /></div>
+  {Astro.slots.has("side") && <div class="side"><slot name="side" /></div>}
 </section>
 
 <style>
   .panel {
-    min-width: 0; padding: 10px var(--card-pad) 12px;
+    min-width: 0; padding: var(--card-pad);
     background: var(--surface); border: var(--panel-edge); border-radius: var(--radius-card);
   }
   .head { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; margin-bottom: 6px; }
   /* The page's header row, with its h1 and controls, gets room to breathe above what it heads. */
-  .first { padding-top: 16px; }
   .first > .head { margin-bottom: 16px; }
   h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
   .meta { min-width: 0; color: var(--muted); }
   .aside { display: flex; align-items: center; gap: 8px; margin-left: auto; }
   @media (max-width: 640px) {
     .aside { flex-grow: 1; flex-wrap: wrap; justify-content: flex-end; }
+  }
+  /* Words at a fixed share of the card beside the side column, so every side column starts at the same edge. */
+  .split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: auto 1fr; column-gap: 56px; }
+  .split > .side { grid-column: 2; grid-row: 1 / 3; min-width: 0; }
+  @media (max-width: 1023px) {
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .split > .side { grid-column: auto; grid-row: auto; margin-top: 16px; }
   }
 </style>

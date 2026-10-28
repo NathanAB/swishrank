@@ -2,8 +2,8 @@
 // The shell every page shares: the head with its canonical link and link-preview tags, the top bar (mark,
 // wordmark and nav) and the footer. A page with a season carries its h1
 // and the season menu in its first card's header (Panel.astro, level 1) and says so with `ownHeading`; a
-// page without one, such as the about page, gets its h1 and optional lede from the shell. Pages fill the
-// default slot.
+// page without one, such as the about page, gets its h1, an optional lede and an optional aside from the shell.
+// Pages fill the default slot.
 import { Font } from "astro:assets";
 import "../styles/global.css";
 import LocalTime from "../components/LocalTime.astro";
@@ -89,6 +89,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
         <div class="title">
           <h1>{title}</h1>
           {Astro.slots.has("lede") && <p class="lede"><slot name="lede" /></p>}
+          {Astro.slots.has("aside") && <div class="aside"><slot name="aside" /></div>}
         </div>
       )}
       <slot />
@@ -130,6 +131,15 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
   .title { min-width: 0; margin-bottom: var(--gap); }
   .lede { margin-top: 6px; font-size: 15px; line-height: 22px; color: var(--muted); }
   .lede :global(b) { color: var(--text); font-weight: 500; }
+  /* The "aside" slot, such as the about page's summary, sits right of the h1 and lede at the width its content
+     needs, with the two level with its foot, or under them where the two do not fit side by side. */
+  .title:has(> .aside) { display: grid; grid-template-columns: minmax(0, 1fr) max-content; grid-template-rows: 1fr auto; column-gap: 56px; }
+  .title:has(> .aside) > h1 { align-self: end; }
+  .title > .aside { grid-column: 2; grid-row: 1 / 3; }
+  @media (max-width: 1023px) {
+    .title:has(> .aside) { grid-template-columns: minmax(0, 1fr); }
+    .title > .aside { grid-column: auto; grid-row: auto; justify-self: start; margin-top: 16px; }
+  }
 
 
   .foot { border-top: 1px solid var(--border); color: var(--muted); }
