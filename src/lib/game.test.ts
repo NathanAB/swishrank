@@ -19,7 +19,7 @@ const games = [
 ];
 const model = compute({ season: "2025-26", teams, games });
 
-test("a game lists each team's last five games before it, oldest first, an upset win marked, and the record it left", () => {
+test("a game lists each team's last five games before it, oldest first, an upset marked on both sides, and the record it left", () => {
   const view = gameView(model, games.find((g) => g.id === "upset")!);
   assert.deepEqual(view.home.previous.map((g) => g.result.game.id), ["b2", "b3", "b4", "b5", "b6"]);
   assert.deepEqual(view.away.previous.map((g) => g.result.game.id), ["i2", "i3", "i4", "i5", "i6"]);
@@ -27,6 +27,7 @@ test("a game lists each team's last five games before it, oldest first, an upset
   assert.deepEqual(view.away.record, [1, 6]);
   const next = gameView(model, games.find((g) => g.id === "next")!);
   assert.deepEqual(next.away.previous.map((g) => [g.result.game.id, g.upset]), [["i3", false], ["i4", false], ["i5", false], ["i6", false], ["upset", true]]);
+  assert.deepEqual(next.home.previous.map((g) => [g.result.game.id, g.upset]), [["b3", false], ["b4", false], ["b5", false], ["b6", false], ["upset", true]]);
 });
 
 test("a played game shows its chances at tip-off and an upset; a game to come shows today's chances and ratings", () => {
