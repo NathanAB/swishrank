@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { figure, localTime, monthName, nearDay, points, signed } from "./format.ts";
+import { articleFor, figure, localTime, monthName, nearDay, points, signed } from "./format.ts";
 
 test("changes carry a sign, with a real minus", () => {
   assert.deepEqual([signed(21), signed(-1322), signed(0)], ["+21", "−1,322", "0"]);
@@ -28,4 +28,8 @@ test("says point for one and points for more", () => {
 
 test("a figure that may be negative shows a real minus and no plus", () => {
   assert.deepEqual([figure(202), figure(0), figure(-83)], ["202", "0", "−83"]);
+});
+
+test("a count takes an where it is read with a vowel sound", () => {
+  assert.deepEqual([1, 8, 11, 12, 18, 43, 80].map(articleFor), ["A", "An", "An", "A", "An", "A", "An"]);
 });
