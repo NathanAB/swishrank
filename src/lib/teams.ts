@@ -104,7 +104,7 @@ export type Venue = "home" | "away" | "neutral";
 /** How a game's line names the opponent's venue: "at" away, "vs" at home or on neutral ground. */
 export const venueWord = (venue: Venue) => (venue === "away" ? "at" : "vs");
 
-/** One of the team's final games from its side: `us` is the team, `them` the opponent; `upset`, won as one. */
+/** One of the team's final games from its side: `us` is the team, `them` the opponent; `upset`, the game was one, won or lost. */
 export type TeamGame = { result: Result; us: Line; them: Line; venue: Venue; stage: Stage; upset: boolean };
 
 export function teamGames(model: Season, abbr: Abbr): TeamGame[] {
@@ -116,7 +116,7 @@ export function teamGames(model: Season, abbr: Abbr): TeamGame[] {
       them: side === "h" ? o.away : o.home,
       venue: result.game.neutral ? "neutral" : side === "h" ? "home" : "away",
       stage: stage(result.game.note),
-      upset: (side === "h" ? o.home : o.away).won && upset(o),
+      upset: upset(o),
     };
   });
 }

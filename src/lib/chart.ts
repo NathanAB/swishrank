@@ -1,6 +1,6 @@
-// What every drawing of a season's ratings shares: the rating charts on the home, team and game pages and the
-// league-lines file draw on one plot (seasonPlot); those, the league table's chart and the share images use one
-// scale, and label their dates and mark the end of the regular season the same way.
+// What every drawing of a season's ratings shares: the rating charts on the home, team and game pages, the
+// league-lines file, the league table's chart, the share images and How it works draw on one plot (seasonPlot),
+// each at its own size, and label their dates and mark the end of the regular season the same way.
 import { ranksOf, START, type Abbr, type Season } from "./elo.ts";
 import { ratingRange } from "./facts.ts";
 import { monthShort, shortDay } from "./format.ts";
@@ -82,11 +82,10 @@ export function runAndTrail(model: Season): (a: Abbr, pts: string[]) => { run: s
 /**
  * A rating axis over a season's range (lib/facts.ts ratingRange): it hugs the ratings with a margin of a twentieth of their
  * range, so the lines fill the plot rather than leaving bands empty above and below them, and is labelled by
- * the round ticks (ratingTicks) that fall inside it. Every drawing of a season's ratings uses it: the rating
- * charts, the share images and the league-lines file.
+ * the round ticks (ratingTicks) that fall inside it. Every drawing of a season's ratings uses it (seasonPlot);
+ * the league table's leaves no margin, so its top and bottom ratings sit level with its first and last rows.
  */
-export function ratingScale(min: number, max: number): { lo: number; hi: number; ticks: number[] } {
-  const margin = Math.max(1, max - min) / 20;
+export function ratingScale(min: number, max: number, margin = Math.max(1, max - min) / 20): { lo: number; hi: number; ticks: number[] } {
   const lo = min - margin;
   const hi = max + margin;
   return { lo, hi, ticks: ratingTicks(min, max).ticks.filter((t) => t >= lo && t <= hi) };
@@ -96,11 +95,12 @@ export function ratingScale(min: number, max: number): { lo: number; hi: number;
 export const PLOT = { w: 1000, h: 300, pad: 8 };
 
 /**
- * A season drawn on a rating chart's plot `h` px tall: the scale, where each day and rating falls, each team's
- * line, each team's league rank by day for the readout, and the league-lines file, every team's line once for
- * the season's pages that draw only some teams in front of the rest (src/pages/lines/[season].svg.ts), with a
- * version that changes with its content so a page never draws over a stale copy. Worked out once per season
- * and height, as some fifteen thousand pages draw them.
+ * A season drawn on a plot `w` by `h`: the scale, where each day and rating falls, each team's line, each team's
+ * league rank by day for the readout, and the league-lines file, every team's line once for the season's pages
+ * that draw only some teams in front of the rest (src/pages/lines/[season].svg.ts), with a version that changes
+ * with its content so a page never draws over a stale copy. A rating chart's plot is PLOT; the league table,
+ * the share images and How it works give their own size. `flush` leaves the scale no margin (ratingScale).
+ * Worked out once per season and size, as some fifteen thousand pages draw them.
  */
 export type SeasonPlot = {
   n: number;
@@ -117,20 +117,24 @@ export type SeasonPlot = {
   version: () => string;
 };
 
-const plots = new WeakMap<Season, Map<number, SeasonPlot>>();
+type Size = { w?: number; h?: number; pad?: number; flush?: boolean };
 
-export function seasonPlot(model: Season, h: number = PLOT.h): SeasonPlot {
-  const byHeight = plots.get(model) ?? new Map<number, SeasonPlot>();
-  plots.set(model, byHeight);
-  const hit = byHeight.get(h);
+const plots = new WeakMap<Season, Map<string, SeasonPlot>>();
+
+export function seasonPlot(model: Season, { w = PLOT.w, h = PLOT.h, pad = PLOT.pad, flush = false }: Size = {}): SeasonPlot {
+  const bySize = plots.get(model) ?? new Map<string, SeasonPlot>();
+  plots.set(model, bySize);
+  const key = `${w} ${h} ${pad} ${flush}`;
+  const hit = bySize.get(key);
   if (hit) return hit;
 
   const ser = model.series;
   const n = ser.length;
   const range = ratingRange(model);
-  const { lo, hi, ticks } = ratingScale(range.lo, range.hi);
-  const y = (v: number) => PLOT.pad + ((h - 2 * PLOT.pad) * (hi - v)) / (hi - lo);
-  const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * PLOT.w);
+  const { lo, hi, ticks } = ratingScale(range.lo, range.hi, flush ? 0 : undefined);
+  // A flush scale before the first game is one rating, drawn halfway down.
+  const y = (v: number) => (hi === lo ? h / 2 : pad + ((h - 2 * pad) * (hi - v)) / (hi - lo));
+  const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * w);
   const pts = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(1)}`);
   const once = <T>(make: () => T) => {
     let v: T | undefined;
@@ -147,7 +151,7 @@ export function seasonPlot(model: Season, h: number = PLOT.h): SeasonPlot {
   // Each line keeps its width however far the page stretches the plot, as the page's own lines do.
   const leagueLines = once(() => {
     const lines = model.abbrs.map((a) => `<polyline vector-effect="non-scaling-stroke" points="${pts(a).join(" ")}"/>`).join("");
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PLOT.w} ${h}"><g id="lines" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">${lines}</g></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}"><g id="lines" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">${lines}</g></svg>`;
   });
   // FNV-1a, 32 bits: enough to tell one day's file from the next.
   const version = once(() => {
@@ -156,6 +160,6 @@ export function seasonPlot(model: Season, h: number = PLOT.h): SeasonPlot {
     return (v >>> 0).toString(36);
   });
   const plot: SeasonPlot = { n, lo, hi, ticks, x, y, pts, ranks: (a) => ranksAttr(dayRanks().map((r) => r[a])), leagueLines, version };
-  byHeight.set(h, plot);
+  bySize.set(key, plot);
   return plot;
 }

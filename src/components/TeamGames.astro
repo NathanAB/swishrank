@@ -1,11 +1,12 @@
 ---
 // A team's played games as a list of rows, each opening the game's page: the date, the opponent and any stage
 // (a playoff round, the play-in, the NBA Cup), W or L, the score and the rating change, and with `rating` the
-// rating it left the team at. A win's row is in ink and a loss's in grey; an upset win carries the upset badge,
-// with its rating gain in the accent. Under the pointer or keyboard focus a row's highlight reaches 8px past its
-// columns, clear of the rule below it, and the row turns to ink with the opponent's name underlined. With
-// `mirror` the rows read from the right on a wide screen, as the home side of a game's page does. Each row lays
-// itself out by its own width, so the list fits a side column, half a card or a full one.
+// rating it left the team at. A win's row is in ink and a loss's in grey. An upset carries the upset badge on
+// either team's row, and the winner's rating gain is in the accent. Under the pointer or keyboard focus a row's
+// highlight reaches 8px past its columns, clear of the rule below it, and the row turns to ink with the
+// opponent's name underlined. With `mirror` the rows read from the right on a wide screen, as the home side of a
+// game's page does. Each row lays itself out by its own width, so the list fits a side column, half a card or a
+// full one.
 import UpsetBadge from "./UpsetBadge.astro";
 import { pct, rating as shown, record, shortDay, signed, weekdayDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
@@ -32,12 +33,12 @@ const { season, games, rating = false, mirror = false, "aria-label": label } = A
           <span class="day" title={weekdayDay(g.result.day)}>{shortDay(g.result.day)}</span>
           <span class="opp">
             <span class="nm">{venueWord(g.venue)} {team(season, g.them.abbr).short}</span>
-            {g.upset && <UpsetBadge class="up" title={`Won with a ${pct(g.us.chance)} chance`} compact />}
+            {g.upset && <UpsetBadge class="up" title={`${g.us.won ? "Won" : "Lost"} with a ${pct(g.us.chance)} chance`} compact />}
             {g.stage.label && <span class="tag">{g.stage.label}</span>}
           </span>
           <span class="wl">{g.us.won ? "W" : "L"}</span>
           <span class="num sc">{record(g.us.score, g.them.score)}</span>
-          <span class:list={["num chg", { paid: g.upset }]}>{signed(g.us.change)}</span>
+          <span class:list={["num chg", { paid: g.upset && g.us.won }]}>{signed(g.us.change)}</span>
           {rating && <span class="num rt">{shown(g.us.rating)}</span>}
         </span>
       </a>

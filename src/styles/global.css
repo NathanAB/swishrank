@@ -23,6 +23,11 @@
      team draws in its full colour. */
   --tint-mix: 50%;
   --tint-base: var(--line-other);
+  /* A line past the end of its team's run is dotted; a line behind the teams a drawing is about is faded; while
+     one team is previewed, the rest dim. */
+  --line-dash: 1 3.5;
+  --line-faded: 0.55;
+  --line-dim: 0.4;
   /* A switch's track, and the pill that raises its current option (components/Segmented.astro); the
      season menu sits on the same track. */
   --seg-track: #262626;
@@ -79,6 +84,16 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 svg { display: block; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 
+/* A rating chart's drawing (svg[data-chart]): RatingChart's and the league table's. Each team's line is drawn in
+   its resting tint, in full colour while previewed, and dotted past the end of its run (.trail). */
+[data-chart] :is(path, polyline) { fill: none; vector-effect: non-scaling-stroke; }
+[data-chart] .grid { stroke: var(--grid); stroke-width: 1; }
+[data-chart] .marker { stroke: var(--muted); stroke-width: 1; }
+/* 1.5px, not 1: a 1px line on a stretched plot falls between pixels and shimmers on a standard-density screen. */
+[data-chart] :is(.line, .trail) { stroke: var(--tint-rest); stroke-width: 1.5; stroke-linejoin: round; }
+[data-chart] :is(.line, .trail).hov { stroke: var(--tint); stroke-width: 2.25; }
+[data-chart] .trail { stroke-dasharray: var(--line-dash); stroke-linecap: round; }
+[data-plot]:has(.line.hov) { cursor: pointer; }
 [data-cross] { visibility: hidden; fill: none; stroke: var(--text); stroke-opacity: 0.35; stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 [data-cross].on { visibility: visible; }
 .tip {
@@ -101,6 +116,9 @@ svg { display: block; }
 /* A game's tile, on the games page and How it works, lighter under the pointer. */
 .tile { position: relative; min-width: 0; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; transition: background-color 120ms ease; }
 .tile:has(> .cover:hover) { background: color-mix(in oklab, var(--text) 10%, var(--raised)); }
+
+/* A line of small print under a table or a game. */
+.note { margin-top: 10px; font-size: var(--fs-small); line-height: 18px; color: var(--muted); }
 
 /* An upset winner's rating gain, in the accent wherever a game shows it, beside its UpsetBadge. */
 .paid { color: var(--accent); font-weight: 600; }

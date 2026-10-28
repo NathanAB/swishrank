@@ -1,11 +1,13 @@
 ---
-// One day's final games, one ResultTile each; the section's header says what each tile's smaller figure is.
+// One day's final games, one ResultTile each. When every game has a stage (lib/teams.ts stage), the heading
+// names them: the game itself on a day of one, each kind once on a day of several.
 import GameDay from "./GameDay.astro";
 import ResultTile from "./ResultTile.astro";
 import { outcome } from "../lib/facts.ts";
 import { longDay, weekdayDay } from "../lib/format.ts";
 import type { Day } from "../lib/results.ts";
 import type { SeasonView } from "../lib/season.ts";
+import { stage } from "../lib/teams.ts";
 
 interface Props {
   season: SeasonView;
@@ -15,10 +17,8 @@ interface Props {
 const { season, day } = Astro.props;
 const games = day.results.map(outcome);
 
-const notes = day.results.map((r) => r.game.note);
-const meta = notes.every((n) => n !== null) && notes.length
-  ? (notes.length === 1 ? notes[0].split(" - ") : [...new Set(notes.map((n) => n.split(" - ")[0]))]).join(" · ")
-  : undefined;
+const labels = day.results.map((r) => stage(r.game.note).label);
+const meta = labels.length && labels.every((l) => l !== null) ? [...new Set(labels)].join(" · ") : undefined;
 ---
 
 <GameDay heading={weekdayDay(day.day)} meta={meta} label={`Games on ${longDay(day.day)}`}>

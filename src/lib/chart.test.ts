@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { clearOfMark, dateTicks, ratingScale, ratingTicks, runAndTrail } from "./chart.ts";
+import { clearOfMark, dateTicks, ratingScale, ratingTicks, runAndTrail, seasonPlot } from "./chart.ts";
 import { compute } from "./elo.ts";
+import { ratingRange } from "./facts.ts";
 import { runEnds } from "./teams.ts";
 
 test("a date label under the season-end label is dropped, and those clear of it on either side stay", () => {
@@ -30,6 +31,19 @@ test("a rating axis takes the finest round step with at most six ticks, so the l
 test("a season's rating axis hugs its ratings with a twentieth of their range to spare, labelled by the round ticks inside", () => {
   // 900 to 1100: 10 points to spare each side, where whole ticks would run 900 to 1150 and leave a band empty.
   assert.deepEqual(ratingScale(900, 1100), { lo: 890, hi: 1110, ticks: [900, 950, 1000, 1050, 1100] });
+});
+
+test("a season's plot spans the size it is given; a flush one puts the season's top and bottom ratings on its padded edges", () => {
+  const model = compute(JSON.parse(readFileSync(new URL("../data/games/2025-26.json", import.meta.url), "utf8")));
+  const { lo, hi } = ratingRange(model);
+  // The league table's: 30 rows of 26px, the scale running from the first row's centre to the last's.
+  const table = seasonPlot(model, { h: 780, pad: 13, flush: true });
+  assert.equal(table.x(model.series.length - 1), 1000);
+  assert.deepEqual([table.y(hi), table.y(lo)], [13, 767]);
+  // A rating chart of the same height leaves a margin above and below the ratings.
+  const chart = seasonPlot(model, { w: 600, h: 780 });
+  assert.equal(chart.x(model.series.length - 1), 600);
+  assert.ok(chart.y(hi) > 13 && chart.y(lo) < 767);
 });
 
 test("a team's line is solid through its last game and dotted after, the two meeting on that day; the champion's has no trail", () => {
