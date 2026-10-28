@@ -248,7 +248,7 @@ const lastUpset = (() => {
 
     <li><Panel title="A bigger gap, a bigger favorite">
       <div class="step">
-        <p class="say">The gap between two ratings sets each team's chance to win. The team more likely to win is the favorite, and the other is the underdog. The chances follow how often past favorites won at each gap, within about one percentage point of the chess Elo formula, 1 / (1 + 10^(−gap / 400)). Home court is worth {int(edge)} points, so a home team is a {home.chance} favorite over an equal rival.</p>
+        <p class="say">The gap between two ratings sets each team's chance to win. The chances follow how often past favorites won at each gap, within about one percentage point of the chess Elo formula, 1 / (1 + 10^(−gap / 400)). Home court is worth {int(edge)} points, so a home team is a {home.chance} favorite over an equal rival.</p>
         <figure
           class="curve"
           role="img"
@@ -281,7 +281,7 @@ const lastUpset = (() => {
         <div class="say">
           <p>For each game still to play, take the home team's rating, add home court, and subtract the visitor's. The curve above turns that gap into each team's chance.</p>
           <p>A few games say little about a team, so until both teams have played {EARLY.games}, the chances stay closer to 50%.</p>
-          <p>A 70% favorite still loses about 3 games in 10. A win by a team given under {UPSET}% is marked as an upset, like the latest one shown here.</p>
+          <p>A win by a team given under {UPSET}% is marked as an upset, like the latest one shown here.</p>
         </div>
         {example && (
           <div class="game">

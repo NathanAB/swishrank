@@ -23,6 +23,19 @@ test("two teams whose colours read as one on a bar split them: the away side tak
   assert.equal(warriors, "--tint-light: #fdb927; --tint-dark: #fdb927");
 });
 
+test("a bar never switches a team to a colour that vanishes: the Spurs stay silver beside the Jazz on dark, not black", () => {
+  const [spurs] = pairStyles({ color: "000000", alternateColor: "c4ced4" }, { color: "4e008e", alternateColor: "79a3dc" });
+  assert.equal(spurs, "--tint-light: #000000; --tint-dark: #c4ced4");
+  const [celtics] = pairStyles({ color: "008348", alternateColor: "ffffff" }, { color: "008ca8", alternateColor: "1d1060" });
+  assert.equal(celtics, "--tint-light: #008348; --tint-dark: #ffffff");
+});
+
+test("where the away side has no other colour that shows, the home side switches: the Nuggets turn gold beside the Nets' black on light", () => {
+  const [nets, nuggets] = pairStyles({ color: "000000", alternateColor: "ffffff" }, { color: "0e2240", alternateColor: "fec524" });
+  assert.equal(nets, "--tint-light: #000000; --tint-dark: #ffffff");
+  assert.equal(nuggets, "--tint-light: #fec524; --tint-dark: #fec524");
+});
+
 test("a primary that vanishes into the surface gives way to the exact alternate: black on dark, white on light", () => {
   const team = { color: "000000", alternateColor: "C4CED4" };
   assert.equal(lineColor(team, "dark"), "#c4ced4");
