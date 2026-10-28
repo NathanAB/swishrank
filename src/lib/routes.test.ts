@@ -71,3 +71,19 @@ test("a path with no better guess, or one that is already its own guess, gets no
   assert.equal(guess("/2025-26/games/2025-11/"), null);
   assert.equal(guess("/games/2026-13/"), null);
 });
+
+test("a game lives under its season's games at its US Eastern day and its two teams, vs at a neutral site", () => {
+  const game = { t: "2026-01-24T01:00Z", home: "OKC", away: "IND", neutral: false };
+  assert.equal(routePath({ kind: "game", season: past, game }), "/2025-26/games/2026-01-23/ind-at-okc/");
+  assert.equal(routePath({ kind: "game", season: now, game: { ...game, neutral: true } }), "/games/2026-01-23/ind-vs-okc/");
+});
+
+test("a game's page shares its season's picture", () => {
+  const game = { t: "2026-01-24T01:00Z", home: "OKC", away: "IND", neutral: false };
+  assert.equal(sharePath(shareImage({ kind: "game", season: past, game }, now)), "/share/2025-26.png");
+});
+
+test("a game's link from its season at the root finds it under that season once the next one starts", () => {
+  const guess = (path: string) => guessPath(path, { current: now.id, aliases: {}, months: { "2026-01": "2025-26" } });
+  assert.equal(guess("/games/2026-01-23/ind-at-okc/"), "/2025-26/games/2026-01-23/ind-at-okc/");
+});

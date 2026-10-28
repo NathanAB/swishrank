@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clearOfMark, dateTicks, ratingTicks } from "./chart.ts";
+import { clearOfMark, dateTicks, ratingScale, ratingTicks } from "./chart.ts";
 
 test("a date label under the season-end label is dropped, and those clear of it on either side stay", () => {
   // 101 days, so day i sits at i% across. The label covers 60% to 80%, ending at the marker on day 80.
@@ -22,4 +22,9 @@ test("a rating axis takes the finest round step with at most six ticks, so the l
   // The 2026-27 opening week ran from 917 to 1106: steps of 50 fit, where 100 would leave 1100 to 1200 empty.
   assert.deepEqual(ratingTicks(917, 1106), { lo: 900, hi: 1150, ticks: [900, 950, 1000, 1050, 1100, 1150] });
   assert.deepEqual(ratingTicks(757, 1268), { lo: 700, hi: 1300, ticks: [700, 850, 1000, 1150, 1300] });
+});
+
+test("a season's rating axis hugs its ratings with a twentieth of their range to spare, labelled by the round ticks inside", () => {
+  // 900 to 1100: 10 points to spare each side, where whole ticks would run 900 to 1150 and leave a band empty.
+  assert.deepEqual(ratingScale(900, 1100), { lo: 890, hi: 1110, ticks: [900, 950, 1000, 1050, 1100] });
 });

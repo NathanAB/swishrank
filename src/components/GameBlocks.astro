@@ -1,0 +1,51 @@
+---
+// A game's two teams' blocks (TeamBlock), away on the left. Each is as wide as its team's share of the points
+// once played, or of the win chances before (lib/game.ts blockShare), and holds the team's score or chance
+// large, then its rating, rank and record. Before and after the game the blocks keep the same layout; a played
+// game adds each team's chance at tip-off, and an upset winner carries the upset badge with its rating gain in
+// the accent.
+import TeamBlock, { type BlockStat } from "./TeamBlock.astro";
+import { blockShare, type GameView } from "../lib/game.ts";
+import { ordinal, pct, rating, record, signed } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  view: GameView;
+  /** Each team's --fill and --tint (lib/tint.ts gamePaint). */
+  paint: Record<string, string>;
+}
+
+const { season, view, paint } = Astro.props;
+const played = view.away.line !== null;
+---
+
+<div class="blocks">
+  {[view.away, view.home].map((s) => {
+    const paid = view.upset && s.line?.won === true;
+    const stats: BlockStat[] = [
+      ...(played ? [{ label: "Win chance", value: pct(s.chance), upset: paid }] : []),
+      { label: "Rating", value: rating(s.rating), change: s.line ? signed(s.line.change) : undefined, paid },
+      { label: "Rank", value: `${s.tied ? "tied " : ""}${ordinal(s.rank)}` },
+      { label: "Record", value: record(...s.record) },
+    ];
+    return (
+      <TeamBlock
+        abbr={s.abbr}
+        name={team(season, s.abbr).name}
+        href={href({ kind: "team", season, abbr: s.abbr })}
+        paint={paint[s.abbr]}
+        side={s === view.home ? "home" : "away"}
+        share={blockShare(view, s)}
+        dim={s.line?.won === false}
+        big={s.line ? String(s.line.score) : pct(s.chance)}
+        stats={stats}
+      />
+    );
+  })}
+</div>
+
+<style>
+  .blocks { display: flex; gap: 2px; }
+</style>

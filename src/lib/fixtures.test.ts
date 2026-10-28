@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compute, type Game } from "./elo.ts";
-import { fixture, nextDays } from "./fixtures.ts";
+import { fixture, fixtureDays, nextDays } from "./fixtures.ts";
 
 const game = (id: string, t: string, away: string, home: string, more: Partial<Game> = {}): Game => ({
   id, t, home, away, hs: null, as: null, final: false, neutral: false, note: null, ...more,
@@ -56,4 +56,16 @@ test("a game between teams with few games behind them gets a chance nearer even,
   };
   assert.ok(chance(4) < chance(5) - 0.04, `${chance(4)} vs ${chance(5)}`);
   assert.equal(chance(5), chance(40));
+});
+
+test("a list of games becomes days of priced fixtures, by US Eastern day and in tip-off order", () => {
+  const teams = { A: { name: "A A", short: "A", color: "000000", alternateColor: "ffffff" }, B: { name: "B B", short: "B", color: "000000", alternateColor: "ffffff" } };
+  const model = compute({ season: "2026-27", teams, games: [] });
+  // The 11:30 PM Eastern game falls on the 25th in UTC but belongs to the 24th.
+  const late = game("late", "2026-10-25T03:30Z", "B", "A");
+  const early = game("early", "2026-10-24T23:00Z", "A", "B");
+  const next = game("next", "2026-10-26T23:00Z", "B", "A");
+  const days = fixtureDays(model, [next, late, early]);
+  assert.deepEqual(days.map((d) => [d.day, d.fixtures.map((f) => f.game.id)]), [["2026-10-24", ["early", "late"]], ["2026-10-26", ["next"]]]);
+  assert.deepEqual(days[0].fixtures[0], fixture(early, model));
 });

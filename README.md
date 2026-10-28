@@ -2,7 +2,7 @@
 
 Season-only Elo ratings for the 30 NBA teams: https://swishrank.com/
 
-Every team starts each season at 1000, the league average, and nothing carries over from last year. Each morning the ratings are fitted again to every game so far by least squares, like SRS or Massey ratings: margins count with diminishing returns, home court is worth a fixed edge measured over past seasons, and each team is pulled toward average until its games say otherwise. [docs/model.md](docs/model.md) holds the pre-registered backtest that chose every setting. The site has the league table with every team's rating by day drawn into it, for the whole league or one conference (`/east/`, `/west/`), a games page with every result and the week ahead's win chances, a page per team, and the same views for last season.
+Every team starts each season at 1000, the league average, and nothing carries over from last year. Each morning the ratings are fitted again to every game so far by least squares, like SRS or Massey ratings: margins count with diminishing returns, home court is worth a fixed edge measured over past seasons, and each team is pulled toward average until its games say otherwise. [docs/model.md](docs/model.md) holds the pre-registered backtest that chose every setting. The site has the league table with every team's rating by day drawn into it, for the whole league or one conference (`/east/`, `/west/`), a games page with every result and the week ahead's win chances, a page per game with both teams' ratings and last five games, a page per team, and the same views for last season.
 
 ## How it updates
 

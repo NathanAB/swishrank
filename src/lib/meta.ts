@@ -2,7 +2,8 @@
 // and description, built from the season model the page shows. Ranks, records and ratings come from the
 // helpers the tables use, so a description never disagrees with the page under it.
 import { START, type Abbr } from "./elo.ts";
-import { rating, record } from "./format.ts";
+import { longDay, pct, rating, record } from "./format.ts";
+import type { GameView } from "./game.ts";
 import type { SeasonView } from "./season.ts";
 import { place, standings, type Conference } from "./teams.ts";
 
@@ -51,4 +52,18 @@ export function teamDescription(season: Pick<SeasonView, "model" | "current">, a
   if (W + L === 0) return `${name} have not played yet; every team starts at ${START}. ${holds}`;
   const games = `${W + L} ${W + L === 1 ? "game" : "games"}`;
   return `${name} ${season.current ? "are" : "finished"} ${place(m, abbr)} of ${m.abbrs.length} at ${rating(m.r[abbr])} after ${games} (${record(W, L)}). ${holds}`;
+}
+
+/** "The Pacers beat the Thunder 117–114 on Friday, January 23, with a 5% chance." or the chances of a game to come. */
+export function gameDescription(season: Pick<SeasonView, "model">, view: GameView): string {
+  const short = (a: Abbr) => season.model.data.teams[a].short;
+  const { away, home } = view;
+  const when = longDay(view.day);
+  const holds = "Win chances, rating changes and both teams' last five games.";
+  if (away.line && home.line) {
+    const [w, l] = away.line.won ? [away, home] : [home, away];
+    const [a, h] = [away.line.score, home.line.score];
+    return `The ${short(w.abbr)} beat the ${short(l.abbr)} ${record(Math.max(a, h), Math.min(a, h))} on ${when}, with a ${pct(w.chance)} chance. ${holds}`;
+  }
+  return `The ${short(away.abbr)} ${view.game.neutral ? "play" : "visit"} the ${short(home.abbr)} on ${when}: ${pct(away.chance)} to ${pct(home.chance)} on today's ratings. ${holds}`;
 }

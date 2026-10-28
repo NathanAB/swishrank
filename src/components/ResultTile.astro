@@ -1,7 +1,9 @@
 ---
 // One final game as a tile: away over home, each with its score and, smaller, its rating change as displayed.
+// The whole tile opens the game's page; each team's name opens its own.
 // The winner is in ink. An upset's tile lights up in the accent, with a badge naming the winner and the chance
 // the ratings gave them. The games page lists these tiles; How it works shows one on its own.
+import UpsetBadge from "./UpsetBadge.astro";
 import { upset, type Outcome } from "../lib/facts.ts";
 import { pct, signed } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
@@ -19,10 +21,11 @@ const isUpset = upset(o);
 ---
 
 <Tag class:list={["tile", { upset: isUpset }]}>
+  <a class="cover" href={href({ kind: "game", season, game: o.result.game })} aria-label={`${team(season, o.away.abbr).short} ${o.result.game.neutral ? "vs" : "at"} ${team(season, o.home.abbr).short}, ${o.away.score}–${o.home.score}`}></a>
   {isUpset && (
     <p class="top">
       <span class="up">
-        <span class="tag"><svg viewBox="0 0 10 12" aria-hidden="true"><path d="M6 0 0 7h4l-1 5 6-7H5z" /></svg>Upset</span>
+        <UpsetBadge class="tag" />
         <span class="had">{team(season, o.winner.abbr).short} had a {pct(o.winner.chance)} chance</span>
       </span>
     </p>
@@ -31,7 +34,7 @@ const isUpset = upset(o);
     <div class:list={["ln", { win: l.won }]}>
       <span class="who">{l.side === "h" && (o.result.game.neutral ? "vs " : "at ")}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a></span>
       <span class="sc num">{l.score}</span>
-      <span class="ch num">{signed(l.change)}</span>
+      <span class:list={["ch num", { paid: isUpset && l.won }]}>{signed(l.change)}</span>
     </div>
   ))}
 </Tag>
@@ -46,18 +49,14 @@ const isUpset = upset(o);
   /* An upset stands out from every other tile: an accent ring and wash, a filled badge, and the winner's gain
      in the accent, since the ratings paid out most for it. */
   .tile.upset { background: color-mix(in oklab, var(--accent) 12%, var(--raised)); box-shadow: inset 0 0 0 1.5px var(--accent); }
-  .tag {
-    display: inline-flex; align-items: center; gap: 3px; margin-right: 6px; padding: 1px 6px; border-radius: 3px;
-    background: var(--accent); color: var(--surface); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  }
-  .tag svg { width: 8px; height: 10px; fill: currentColor; }
+  .tile.upset:has(> .cover:hover) { background: color-mix(in oklab, var(--accent) 24%, var(--raised)); }
+  .tag { margin-right: 6px; }
   .had { color: var(--text); font-weight: 500; }
   .ln { color: var(--muted); line-height: 22px; }
   .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sc, .ch { text-align: right; }
   .ch { font-size: var(--fs-small); }
   .win { color: var(--text); font-weight: 500; }
-  .win .ch { color: var(--muted); font-weight: 400; }
-  .upset .win .ch { color: var(--accent); font-weight: 600; }
+  .win .ch:not(.paid) { color: var(--muted); font-weight: 400; }
   .nm:hover { text-decoration: underline; text-underline-offset: 3px; }
 </style>

@@ -11,7 +11,8 @@ import { fetchEvents, lostFinals, parse } from "../src/lib/espn.ts";
 const SEASONS = JSON.parse(await readFile(new URL("../src/data/seasons.json", import.meta.url), "utf8"));
 const OUT_DIR = new URL("../src/data/games/", import.meta.url);
 const URL_FOR = (ymd) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${ymd}`;
-const FIXTURE_DAYS = 7;
+// Two weeks of games ahead, so a team's page can always show its next five.
+const FIXTURE_DAYS = 14;
 
 const DAY = 86_400_000;
 const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);

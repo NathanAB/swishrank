@@ -1,0 +1,38 @@
+---
+// The top of a game's page, on the page itself rather than in a card: the matchup and when it is, centred, then
+// the game's two team blocks (GameBlocks).
+import LocalTime from "./LocalTime.astro";
+import GameBlocks from "./GameBlocks.astro";
+import type { GameView } from "../lib/game.ts";
+import { longDay } from "../lib/format.ts";
+import type { SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  view: GameView;
+  /** Each team's --fill and --tint (lib/tint.ts gamePaint). */
+  paint: Record<string, string>;
+  title: string;
+}
+
+const { season, view, paint, title } = Astro.props;
+const meta = [view.stage.label, view.series].filter(Boolean).join(" · ");
+---
+
+<section class="top" aria-labelledby="h-game">
+  <header class="title">
+    <h1 id="h-game">{title}</h1>
+    <p class="when">{longDay(view.day)} · <LocalTime at={view.game.t} />{meta && ` · ${meta}`}</p>
+  </header>
+  <GameBlocks season={season} view={view} paint={paint} />
+</section>
+
+<style>
+  .title { margin-bottom: 16px; text-align: center; }
+  h1 { font-size: var(--fs-title); line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
+  .when { margin-top: 2px; font-size: var(--fs-card); line-height: 24px; color: var(--muted); }
+
+  @media (max-width: 640px) {
+    .when { font-size: var(--fs-body); line-height: 20px; }
+  }
+</style>

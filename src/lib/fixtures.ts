@@ -47,3 +47,10 @@ export function nextDays(model: Season, today: string, count: number): FixtureDa
     return { day, fixtures: games.filter((g) => dayKey(g.t) === day).map((g) => fixture(g, model)) };
   });
 }
+
+/** `games` priced on `model`'s current ratings and grouped by US Eastern day, in tip-off order. */
+export function fixtureDays(model: Season, games: readonly Game[]): FixtureDay[] {
+  const days = new Map<string, Fixture[]>();
+  for (const g of [...games].sort((x, y) => x.t.localeCompare(y.t))) days.set(dayKey(g.t), [...(days.get(dayKey(g.t)) ?? []), fixture(g, model)]);
+  return [...days].map(([day, fixtures]) => ({ day, fixtures }));
+}

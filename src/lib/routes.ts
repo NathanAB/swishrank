@@ -2,6 +2,7 @@
 // lives at the root and every other season under its own id, so adding a season to seasons.json moves the
 // old one under /<id>/ without code changes.
 
+import { dayKey, type Game } from "./elo.ts";
 import type { Conference } from "./teams.ts";
 
 export type SeasonRef = { readonly id: string; readonly current: boolean };
@@ -12,12 +13,20 @@ export type Route =
   /** `month` ("YYYY-MM") is that month's results alone; without it, the week ahead and the newest month. */
   | { kind: "games"; season: SeasonRef; month?: string }
   | { kind: "team"; season: SeasonRef; abbr: string }
+  /** One game, played or to come: its day and its two teams name it, as no two teams meet twice in a day. */
+  | { kind: "game"; season: SeasonRef; game: GameRef }
   /** Every season as a plain link to its home: the season menu's fallback without script. */
   | { kind: "seasons" }
   | { kind: "about" };
 
+/** What a game's URL is made of. */
+export type GameRef = Pick<Game, "t" | "home" | "away" | "neutral">;
+
 /** A team's URL segment: its abbreviation in lower case (OKC becomes okc). */
 export const teamSlug = (abbr: string) => abbr.toLowerCase();
+
+/** A game's place under its season's games: its US Eastern day, then the two teams, 2026-01-23/ind-at-okc. */
+export const gameSlug = (g: GameRef) => `${dayKey(g.t)}/${teamSlug(g.away)}-${g.neutral ? "vs" : "at"}-${teamSlug(g.home)}`;
 
 /** A conference's URL segment: east or west. */
 export const conferenceSlug = (conference: Conference) => conference.toLowerCase();
@@ -33,6 +42,8 @@ export function routePath(route: Route): string {
       return `${prefix(route.season)}/games/${route.month ? `${route.month}/` : ""}`;
     case "team":
       return `${prefix(route.season)}/teams/${teamSlug(route.abbr)}/`;
+    case "game":
+      return `${prefix(route.season)}/games/${gameSlug(route.game)}/`;
     case "seasons":
       return "/seasons/";
     case "about":
@@ -58,6 +69,7 @@ export function shareImage(route: Route | undefined, current: SeasonRef): ShareI
       return { kind: "team", season: route.season, abbr: route.abbr };
     case "home":
     case "games":
+    case "game":
       return { kind: "season", season: route.season };
     case "seasons":
     case "about":
@@ -94,8 +106,8 @@ export const href = (route: Route) => withBase(routePath(route));
 
 /**
  * The page a reader lands on when they pick season `to` from `route`: the same page in that season. A
- * conference carries over, a month of games does not, and a team that `to` lacks falls back to that season's
- * home.
+ * conference carries over, a month of games or a game does not, and a team that `to` lacks falls back to that
+ * season's home.
  */
 export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string) => boolean): Route {
   switch (route.kind) {
@@ -105,6 +117,7 @@ export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string
     case "about":
       return { kind: "home", season: to };
     case "games":
+    case "game":
       return { kind: "games", season: to };
     case "team":
       return hasTeam(route.abbr) ? { kind: "team", season: to, abbr: route.abbr } : { kind: "home", season: to };
@@ -131,8 +144,9 @@ export type Guesses = {
  * The page a path with no page most likely meant, or null when there is no better guess: the not-found page
  * sends the reader there. Case is ignored, a season may be written with the en dash the site shows, the
  * current season's id is dropped since that season lives at the root, a team may be named by any of its
- * aliases, and a month of games goes under the season it belongs to. A guess is its own guess, so a guess
- * that has no page either stops there.
+ * aliases, and a month of games, or a game by its day, goes under the season that month belongs to, so a game's
+ * link shared during its season still finds it once the next season takes the root. A guess is its own guess,
+ * so a guess that has no page either stops there.
  */
 export function guessPath(path: string, { current, aliases, months }: Guesses): string | null {
   let parts: string[];
@@ -145,7 +159,7 @@ export function guessPath(path: string, { current, aliases, months }: Guesses): 
   const t = parts.indexOf("teams");
   if (t >= 0 && parts[t + 1]) parts[t + 1] = aliases[slugify(parts[t + 1])] ?? parts[t + 1];
   const g = parts.indexOf("games");
-  const owner = g >= 0 && parts[g + 1] ? months[parts[g + 1]] : undefined;
+  const owner = g >= 0 && parts[g + 1] ? months[parts[g + 1].slice(0, 7)] : undefined;
   if (owner) parts = [...(owner === current ? [] : [owner]), ...parts.slice(g)];
   const guess = `/${parts.map(encodeURIComponent).join("/")}${parts.length ? "/" : ""}`;
   return guess === path ? null : guess;

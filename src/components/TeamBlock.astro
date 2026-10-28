@@ -1,0 +1,93 @@
+---
+// A team's block: its abbreviation and name, one figure large and vertically centred, and a row of labelled
+// figures, on a fill in the team's colour with that colour down its outer edge (lib/tint.ts gamePaint). A
+// game's page sets two side by side, away then home, meeting at a 2px gap as a chance bar's two parts do, each
+// as wide as its `share`; the home block mirrors the away one, its figures read from its outer edge in. The
+// team's colour is a real border, so the outer corners round and the stripe's inner edge stays straight. A
+// block lays itself out by its own width, which its share decides as much as the screen does: the name and
+// figures beside the big number where there is room, stacked under it where there is not.
+import UpsetBadge from "./UpsetBadge.astro";
+
+export type BlockStat = {
+  label: string;
+  value: string;
+  /** A rating change beside the value, in the accent with `paid`. */
+  change?: string;
+  paid?: boolean;
+  /** The upset badge after the value. */
+  upset?: boolean;
+};
+
+interface Props {
+  abbr: string;
+  name: string;
+  href: string;
+  /** The team's --fill and --tint. */
+  paint: string;
+  /** "home" mirrors the block for the right of a pair. */
+  side?: "away" | "home";
+  /** The block's share of its row's width; it opens at an even split and settles there. */
+  share: number;
+  /** Greys the abbreviation and the big figure, for the side that lost. */
+  dim?: boolean;
+  big: string;
+  stats: BlockStat[];
+}
+
+const { abbr, name, href, paint, side = "away", share, dim = false, big, stats } = Astro.props;
+---
+
+<a class:list={["block", side, { dim }]} href={href} style={`${paint}; --w: ${share.toFixed(3)}`}>
+  <span class="in">
+    <span class="id"><span class="ab">{abbr}</span><span class="nm">{name}</span></span>
+    <span class="big num">{big}</span>
+    <dl class="stats">
+      {stats.map((s) => (
+        <div>
+          <dt>{s.label}</dt>
+          <dd class="num">
+            {s.value}
+            {s.change && <span class:list={["chg", { paid: s.paid }]}>{s.change}</span>}
+            {s.upset && <UpsetBadge />}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  </span>
+</a>
+
+<style>
+  .block {
+    flex: var(--w) 1 0; min-width: 0; container-type: inline-size;
+    background: var(--fill); border-left: 4px solid var(--tint); border-radius: 4px 0 0 4px;
+    animation: grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .block.home { text-align: right; border-left: 0; border-right: 4px solid var(--tint); border-radius: 0 4px 4px 0; }
+  @keyframes grow { from { flex-grow: 0.5; } }
+  @media (prefers-reduced-motion: reduce) { .block { animation: none; } }
+  .in { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id big" "st big"; align-items: center; column-gap: 16px; row-gap: 14px; padding: 16px 20px; }
+  .home .in { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "big id" "big st"; }
+  .id { grid-area: id; min-width: 0; display: flex; flex-direction: column; }
+  .ab { font-size: 40px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; }
+  .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .big { grid-area: big; font-size: 64px; line-height: 64px; font-weight: 700; letter-spacing: -0.03em; }
+  .dim :is(.ab, .big) { color: var(--muted); }
+  .stats { grid-area: st; display: flex; flex-wrap: wrap; gap: 6px 24px; }
+  .home .stats { flex-direction: row-reverse; justify-content: flex-start; }
+  dt { font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
+  dd { display: flex; align-items: baseline; gap: 6px; height: 24px; font-size: 18px; line-height: 24px; font-weight: 600; white-space: nowrap; }
+  .home dd { justify-content: flex-end; }
+  .chg { font-size: var(--fs-body); font-weight: 400; }
+
+  /* Too narrow for the big figure beside the rest: about 100px of abbreviation, 150px of figure, the gap and
+     the padding. */
+  @container (max-width: 359px) {
+    .in, .home .in { grid-template-columns: 1fr; grid-template-areas: "id" "big" "st"; row-gap: 8px; padding: 12px; }
+    .nm { display: none; }
+    .ab { font-size: 24px; line-height: 28px; }
+    .big { font-size: 40px; line-height: 44px; }
+    .stats, .home .stats { flex-direction: column; gap: 4px; }
+    .stats > div { display: flex; flex-direction: column; }
+    dd { height: auto; font-size: 15px; line-height: 20px; }
+  }
+</style>

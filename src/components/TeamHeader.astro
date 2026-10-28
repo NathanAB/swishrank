@@ -1,0 +1,61 @@
+---
+// The top of a team's page, on the page itself rather than in a card: the season menu in the top right, as on
+// every page, the team's name large on the left, and its headline figures on the right, each label over its
+// number, both standing on one rule in the team's colour (lib/tint.ts teamPaint). The figures are the rating,
+// the rank, the record, the last five games and, in a season under way and a week old, how far the rating moved
+// in the last week (lib/teams.ts weekAgo).
+import SeasonMenu from "./SeasonMenu.astro";
+import type { Abbr } from "../lib/elo.ts";
+import { rating, record, signed } from "../lib/format.ts";
+import type { Route } from "../lib/routes.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+import { place, teamGames, weekAgo } from "../lib/teams.ts";
+import { teamPaint } from "../lib/tint.ts";
+
+interface Props {
+  season: SeasonView;
+  abbr: Abbr;
+  route: Route;
+}
+
+const { season, abbr, route } = Astro.props;
+const m = season.model;
+const me = team(season, abbr);
+const { W, L } = m.stats[abbr];
+const last5 = teamGames(m, abbr).slice(-5);
+const won5 = last5.filter((g) => g.us.won).length;
+const then = season.current ? weekAgo(m) : null;
+const figures = [
+  { label: "Rating", value: rating(m.r[abbr]) },
+  { label: "Rank", value: place(m, abbr) },
+  { label: "Record", value: record(W, L) },
+  ...(last5.length ? [{ label: "Last 5", value: record(won5, last5.length - won5) }] : []),
+  ...(then ? [{ label: "This week", value: signed(Math.round(m.r[abbr]) - Math.round(then.r[abbr])) }] : []),
+];
+---
+
+<header class="top" style={teamPaint(me)}>
+  <h1>{me.name}</h1>
+  <div class="menu"><SeasonMenu route={route} /></div>
+  <dl class="figs" aria-label={`The ${me.short} in numbers`}>
+    {figures.map((f) => <div><dt>{f.label}</dt><dd class="num">{f.value}</dd></div>)}
+  </dl>
+</header>
+
+<style>
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name menu" "name figs"; align-items: end; gap: 16px 48px; padding-bottom: 16px; border-bottom: 2px solid var(--tint); }
+  h1 { grid-area: name; font-size: 48px; line-height: 52px; font-weight: 800; letter-spacing: -0.02em; }
+  .menu { grid-area: menu; justify-self: end; align-self: start; }
+  .figs { grid-area: figs; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 40px; }
+  dt { margin-bottom: 2px; color: var(--muted); font-size: var(--fs-small); }
+  dd { font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em; }
+
+  /* On a phone the name keeps the menu beside it and the figures run under both. */
+  @media (max-width: 640px) {
+    .top { grid-template-areas: "name menu" "figs figs"; }
+    h1 { font-size: 28px; line-height: 32px; }
+    .menu { align-self: center; }
+    .figs { justify-content: flex-start; gap: 8px 24px; }
+    dd { font-size: 22px; line-height: 26px; }
+  }
+</style>

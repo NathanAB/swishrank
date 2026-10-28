@@ -15,7 +15,7 @@ import RatingChart from "./RatingChart.astro";
 import { clearOfMark, dateTicks, seasonEndMark } from "../lib/chart.ts";
 import { START } from "../lib/elo.ts";
 import { ratingRange } from "../lib/facts.ts";
-import { rating, record, weekdayDay } from "../lib/format.ts";
+import { rating, record } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
@@ -74,7 +74,6 @@ const lines = order.map((a) => {
   const end = runEnd(a);
   return { a, points: all.join(" "), run: end > 0 && end < ser.length - 1 ? `M${all.slice(0, end + 1).join(" L")}` : null };
 }).reverse();
-const days = JSON.stringify(ser.map((d) => weekdayDay(d.day)));
 const seasonEnd = seasonEndMark(m);
 const PLOT_MIN = 530, MARK_LABEL = 150, MONTH_LABEL = 30, DAY_LABEL = 40;
 const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN), ser.length, seasonEnd, { mark: MARK_LABEL / PLOT_MIN, tick: MONTH_LABEL / PLOT_MIN });
@@ -119,7 +118,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
                       data-plot
                       data-chart
                       data-scale={scaleAttr({ hi, yHi: valY(hi), lo, yLo: valY(lo) })}
-                      data-days={days}
+                      data-from={ser[0]?.day}
                       viewBox={`0 0 ${X} ${Y}`}
                       preserveAspectRatio="none"
                     >

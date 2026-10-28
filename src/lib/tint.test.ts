@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { SURFACE, coloursOf, lineColor, pairStyles, tintStyles } from "./tint.ts";
+import { SURFACE, coloursOf, gameColours, lineColor, pairStyles, tintStyles } from "./tint.ts";
 
 test("a team draws in its exact primary colour where it shows clearly: the Celtics' green", () => {
   const celtics = { name: "Boston Celtics", short: "Celtics", color: "008348", alternateColor: "ffffff" };
@@ -44,4 +44,14 @@ test("a past season draws each franchise in this season's colours, and keeps its
   const past = { GS: team("Warriors 2022", "1d428a"), SEA: team("SuperSonics", "00653a") };
   const out = coloursOf(past, { GS: team("Warriors", "fdb927") });
   assert.deepEqual([out.GS.name, out.GS.color, out.SEA.color], ["Warriors 2022", "fdb927", "00653a"]);
+});
+
+test("a game page gives each team one colour, from a pair that reads apart as blocks and darkens least", () => {
+  const knicks = { color: "1d428a", alternateColor: "f58426" };
+  // The Pistons share the Knicks' blue, so they take their red; the Knicks keep their blue.
+  assert.deepEqual(gameColours({ color: "1d428a", alternateColor: "c8102e" }, knicks), ["c8102e", "1d428a"]);
+  // Darkened to a block, the Cavaliers' gold turns brown and their wine stays wine.
+  assert.deepEqual(gameColours({ color: "e31837", alternateColor: "002b5c" }, { color: "860038", alternateColor: "bc945c" }), ["002b5c", "860038"]);
+  // The Spurs' black and silver are both greys, so the block is grey.
+  assert.deepEqual(gameColours(knicks, { color: "000000", alternateColor: "c4ced4" }), ["1d428a", "000000"]);
 });

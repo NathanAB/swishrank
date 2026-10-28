@@ -43,7 +43,7 @@
   --gap: 24px;
   --card-pad: clamp(20px, 1vw + 6px, 32px);
   --radius-card: 6px;
-  --bar-height: 44px;
+  --bar-height: 52px;
   /* A switch's or the season menu's height in a card's header; 44px touch targets on a phone. */
   --control-h: 28px;
 }
@@ -91,8 +91,28 @@ svg { display: block; }
 .tip i { margin-left: 6px; font-style: normal; }
 .tip > span { display: block; }
 
-/* A game's tile, on the games page and How it works. */
-.tile { min-width: 0; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; }
+/* A link over the whole of a game's tile or row (.cover), which opens the game's page; the team names' own links in
+   it sit above it. */
+.cover { position: absolute; inset: 0; border-radius: inherit; }
+.cover:focus-visible { outline-offset: -2px; }
+:is(.tile, .row-link) a:not(.cover) { position: relative; z-index: 1; }
+
+/* A game's tile, on the games page and How it works, lighter under the pointer. */
+.tile { position: relative; min-width: 0; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; transition: background-color 120ms ease; }
+.tile:has(> .cover:hover) { background: color-mix(in oklab, var(--text) 10%, var(--raised)); }
+
+/* A row that opens a game, in a list or a table: grey, or ink where its component sets --row-ink (a win's row);
+   under the pointer or keyboard focus a highlight reaches 8px past its columns, clear of the rule below it, and
+   the row turns to ink with the opponent's name (.nm) underlined. A component sets the row's colour only
+   through --row-ink, since its own scoped rules would outrank these. */
+.row-link { position: relative; isolation: isolate; color: var(--row-ink, var(--muted)); }
+.row-link::before { content: ""; position: absolute; inset: 0 -8px 1px; z-index: -1; border-radius: 4px; transition: background-color 120ms ease; }
+.row-link:is(:hover, :focus-within) { --row-ink: var(--text); }
+.row-link:is(:hover, :focus-within)::before { background: color-mix(in oklab, var(--text) 10%, var(--surface)); }
+.row-link:is(:hover, :focus-within) .nm { text-decoration: underline; text-underline-offset: 3px; }
+
+/* An upset winner's rating gain, in the accent wherever a game shows it, beside its UpsetBadge. */
+.paid { color: var(--accent); font-weight: 600; }
 
 /* Every figure in a column or a strip lines up digit for digit. */
 .num, table { font-variant-numeric: tabular-nums; }

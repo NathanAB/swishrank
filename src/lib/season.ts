@@ -4,7 +4,7 @@ import list from "../data/seasons.json" with { type: "json" };
 import { compute, dayKey, type Abbr, type Game, type Season, type SeasonData, type Team } from "./elo.ts";
 import { seasonLabel } from "./format.ts";
 import { months } from "./results.ts";
-import { conferenceSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
+import { conferenceSlug, gameSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
 import { CONFERENCE_ORDER } from "./teams.ts";
 import { coloursOf } from "./tint.ts";
 
@@ -133,6 +133,15 @@ export const movedMonthPaths = () => monthPaths().filter((p) => hadOldPages(p.pr
 export const teamPaths = () =>
   allSeasons().flatMap((season) =>
     season.model.abbrs.map((abbr) => ({ params: { season: seasonParam(season), team: teamSlug(abbr) }, props: { season, abbr } })),
+  );
+
+/** getStaticPaths for src/pages/[...season]/games/[day]/[matchup].astro: one page per game, played or to come. */
+export const gamePaths = () =>
+  allSeasons().flatMap((season) =>
+    season.model.data.games.map((game) => {
+      const [day, matchup] = gameSlug(game).split("/");
+      return { params: { season: seasonParam(season), day, matchup }, props: { season, game } };
+    }),
   );
 
 /** The season a page shows; the about and seasons pages have none. */

@@ -4,11 +4,13 @@
 // an element that names a team (data-preview: a league table row, its link, a dot on its scale) previews it
 // while pointed at or focused; the nearest data-preview decides, so one without a team (the table's scale
 // cell) previews none. A click on a link just follows it; a click on a plot, a row or a dot opens the
-// previewed team's page. Every rating chart (data-chart) also reads out the day under the pointer: a thin
-// line at that day and a box with the team's rating and rank, the nearest team's or, on a team's page, that
-// team's (data-own). On a touch screen a tap shows the readout and a second tap on the same team opens its
-// page.
-import { ordinal } from "../lib/format.ts";
+// previewed team's page. Every rating chart (data-chart) also reads out the day under the pointer: a thin line
+// at that day and a box with the team's rating and rank, the nearest team's or, on a team's page, that team's
+// (data-own). A line may carry its team's league rank for each day (data-ranks), for a chart that draws
+// only some teams, such as a game's page; otherwise the rank is among the lines drawn. On a touch screen a tap
+// shows the readout and a second tap on the same team opens its page.
+import { addDays } from "../lib/elo.ts";
+import { ordinal, weekdayDay } from "../lib/format.ts";
 import { dayAt, nearestLine, type PlotLine } from "../lib/pick.ts";
 import { parseScale, readout, type Scale } from "../lib/readout.ts";
 
@@ -19,6 +21,8 @@ type Chart = {
   lines: PlotLine[];
   names: Record<string, string>;
   hrefs: Record<string, string>;
+  /** Each line's league rank by day as data-ranks gives it, "3" or "3t" for tied 3rd, where a line has one. */
+  ranks: Record<string, string[]>;
   scale: Scale | null;
   days: string[];
   own: string | null;
@@ -27,10 +31,9 @@ type Chart = {
   tip: HTMLElement | null;
 };
 
-const parseDays = (attr: string | undefined): string[] => {
-  const v: unknown = JSON.parse(attr ?? "[]");
-  return Array.isArray(v) ? v.map(String) : [];
-};
+/** A chart's days as its readout names them: one a calendar day from its first (data-from), one per point. */
+const daysOf = (svg: SVGSVGElement, count: number): string[] =>
+  svg.dataset.from ? Array.from({ length: count }, (_, i) => weekdayDay(addDays(svg.dataset.from!, i))) : [];
 
 const charts = new Map<SVGSVGElement, Chart>(
   [...document.querySelectorAll<SVGSVGElement>("svg[data-chart]")].map((svg) => {
@@ -42,8 +45,9 @@ const charts = new Map<SVGSVGElement, Chart>(
         lines: polys.map((l) => ({ team: l.dataset.team ?? "", ys: Array.from(l.points, (p) => p.y) })),
         names: by("name"),
         hrefs: by("href"),
+        ranks: Object.fromEntries(polys.flatMap((l) => (l.dataset.ranks ? [[l.dataset.team ?? "", l.dataset.ranks.split(",")]] : []))),
         scale: parseScale(svg.dataset.scale ?? ""),
-        days: parseDays(svg.dataset.days),
+        days: daysOf(svg, polys[0]?.points.length ?? 0),
         own: svg.dataset.own ?? null,
         previewsNearest: svg.hasAttribute("data-plot"),
         cross: svg.querySelector<SVGPathElement>("[data-cross]"),
@@ -86,7 +90,8 @@ function showReadout(e: MouseEvent, svg: SVGSVGElement, c: Chart, team: string |
   const value = document.createElement("strong");
   value.textContent = String(r.rating);
   const rank = document.createElement("i");
-  rank.textContent = `${r.tied ? "tied " : ""}${ordinal(r.rank)}`;
+  const given = c.ranks[team ?? ""]?.[day];
+  rank.textContent = given ? `${given.endsWith("t") ? "tied " : ""}${ordinal(parseInt(given, 10))}` : `${r.tied ? "tied " : ""}${ordinal(r.rank)}`;
   const line = document.createElement("span");
   line.append(name, value, rank);
   const when = document.createElement("span");

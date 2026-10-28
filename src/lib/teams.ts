@@ -1,8 +1,8 @@
 // One team's season as the team pages show it, and the conference each team plays in. Every change is the
 // displayed one (facts.ts outcome), so a team's log agrees with the league's lists.
-import { addDays, dayKey, ranksOf, START, type Abbr, type Game, type Result, type Season, type TeamStats } from "./elo.ts";
-import { outcome, type Line } from "./facts.ts";
-import { DASH, ordinal, rating } from "./format.ts";
+import { dayKey, ranksOf, type Abbr, type Game, type Result, type Season, type Snapshot } from "./elo.ts";
+import { outcome, upset, type Line } from "./facts.ts";
+import { ordinal } from "./format.ts";
 import { WEEK } from "./fixtures.ts";
 
 export type Conference = "East" | "West";
@@ -94,21 +94,13 @@ export function runEnds(model: Season): Record<Abbr, string | null> {
   return Object.fromEntries(model.abbrs.map((a) => [a, out.has(a) ? (last[a] ?? null) : null]));
 }
 
-/**
- * The high and low a team page shows. Every team starts at 1000, so a team that never fell below it has the
- * start for its low, and one that never rose above it the start for its high; the unit says so.
- */
-export function highLow(s: TeamStats): { value: string; unit?: string } {
-  if (s.W + s.L === 0) return { value: DASH };
-  const value = `${rating(s.hi)} / ${rating(s.lo)}`;
-  if (s.lo === START || s.hi === START) return { value, unit: `${START} is the starting rating` };
-  return { value };
-}
-
 export type Venue = "home" | "away" | "neutral";
 
-/** One of the team's final games from its side: `us` is the team, `them` the opponent. */
-export type TeamGame = { result: Result; us: Line; them: Line; venue: Venue; stage: Stage };
+/** How a game's line names the opponent's venue: "at" away, "vs" at home or on neutral ground. */
+export const venueWord = (venue: Venue) => (venue === "away" ? "at" : "vs");
+
+/** One of the team's final games from its side: `us` is the team, `them` the opponent; `upset`, won as one. */
+export type TeamGame = { result: Result; us: Line; them: Line; venue: Venue; stage: Stage; upset: boolean };
 
 export function teamGames(model: Season, abbr: Abbr): TeamGame[] {
   return model.log[abbr].map(({ result, side }) => {
@@ -119,14 +111,26 @@ export function teamGames(model: Season, abbr: Abbr): TeamGame[] {
       them: side === "h" ? o.away : o.home,
       venue: result.game.neutral ? "neutral" : side === "h" ? "home" : "away",
       stage: stage(result.game.note),
+      upset: (side === "h" ? o.home : o.away).won && upset(o),
     };
   });
 }
 
-/** The team's games in the week ahead (the games page's WEEK from `today`), in tip-off order. */
-export const nextGames = (model: Season, abbr: Abbr, today: string): Game[] => {
-  const end = addDays(today, WEEK);
-  return model.upcoming
-    .filter((g) => (g.home === abbr || g.away === abbr) && dayKey(g.t) >= today && dayKey(g.t) < end)
-    .sort((x, y) => x.t.localeCompare(y.t));
-};
+/** How many games a team's page lists ahead. */
+const NEXT_GAMES = 5;
+
+/** The team's next NEXT_GAMES games from `today` on, however far ahead, in tip-off order. */
+export const nextGames = (model: Season, abbr: Abbr, today: string): Game[] =>
+  model.upcoming
+    .filter((g) => (g.home === abbr || g.away === abbr) && dayKey(g.t) >= today)
+    .sort((x, y) => x.t.localeCompare(y.t))
+    .slice(0, NEXT_GAMES);
+
+/**
+ * The ratings a week (WEEK days) before the season's latest day, for how far a team moved since; null until the
+ * season has played a week, since before opening night every team sits level at 1000.
+ */
+export function weekAgo(model: Season): Snapshot | null {
+  const i = model.series.length - 1 - WEEK;
+  return i >= 1 ? model.series[i] : null;
+}

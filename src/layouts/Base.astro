@@ -33,7 +33,7 @@ const { title, docTitle = title, description = "Season-only Elo ratings for all 
 const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
-  { label: "Games", kinds: ["games"], to: (s) => ({ kind: "games", season: s }) },
+  { label: "Games", kinds: ["games", "game"], to: (s) => ({ kind: "games", season: s }) },
   { label: "How it works", kinds: ["about"], to: () => ({ kind: "about" }) },
 ];
 const home = href({ kind: "home", season: currentSeason() });
@@ -97,7 +97,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
     <footer class="foot">
       <div class="foot-in">
         <p>
-          Updated <LocalTime at={BUILT_AT.toISOString()} kind="stamp" />. Scores and schedules from <a href="https://www.espn.com/nba/scoreboard">ESPN</a>. Counts visits without cookies. Not affiliated with the NBA or its teams.
+          Updated <LocalTime at={BUILT_AT.toISOString()} kind="stamp" />. Not affiliated with the NBA or its teams.
         </p>
       </div>
     </footer>
@@ -116,11 +116,11 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
     max-width: calc(var(--col) + 2 * var(--pad)); height: var(--bar-height); margin: 0 auto; padding: 0 var(--pad);
     display: flex; align-items: center; gap: 32px;
   }
-  .brand { align-self: stretch; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; }
-  .brand svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
+  .brand { align-self: stretch; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; white-space: nowrap; }
+  .brand svg { width: 24px; height: 24px; color: var(--accent); flex: none; }
   /* On a screen too narrow for every item the row scrolls inside itself, never the page. It reaches 1px
      past the bar onto its rule, so the scroller does not clip the accent line that marks the page. */
-  .nav { flex: 1 1 auto; display: flex; gap: 24px; height: calc(100% + 1px); margin-bottom: -1px; min-width: 0; overflow: auto hidden; scrollbar-width: none; }
+  .nav { flex: 1 1 auto; display: flex; gap: 28px; font-size: 15px; height: calc(100% + 1px); margin-bottom: -1px; min-width: 0; overflow: auto hidden; scrollbar-width: none; }
   .nav a { position: relative; flex: none; display: flex; align-items: center; color: var(--muted); transition: color 150ms ease; }
   .nav a:hover { color: var(--text); }
   .nav a[aria-current="page"] { color: var(--text); }
@@ -134,20 +134,20 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
 
 
   .foot { border-top: 1px solid var(--border); color: var(--muted); }
-  .foot a { text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
   .foot-in {
     max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 20px var(--pad) 32px;
-    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 24px; text-align: center;
   }
 
   @media (max-width: 640px) {
     .bar-in { gap: 8px; }
-    .nav { gap: 12px; }
-    .brand { font-size: 14px; }
+    .nav { gap: 14px; }
+    .brand { font-size: 16px; }
+    .brand svg { width: 22px; height: 22px; }
   }
   @media (max-width: 399px) {
     .bar-in { gap: 6px; }
-    .nav { gap: 8px; }
-    .brand { font-size: 13px; }
+    .nav { gap: 10px; font-size: 14px; }
+    .brand { font-size: 15px; }
   }
 </style>
