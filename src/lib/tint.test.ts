@@ -3,50 +3,40 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { SURFACE, coloursOf, lineColor, pairStyles, tintStyles } from "./tint.ts";
 
-test("a team draws in its exact primary colour where it shows clearly, and its alternate where it doesn't: the Knicks are blue on light and orange on dark", () => {
-  const knicks = { name: "New York Knicks", short: "Knicks", color: "1d428a", alternateColor: "f58426" };
-  assert.deepEqual(tintStyles({ NY: knicks }), { NY: "--tint-light: #1d428a; --tint-dark: #f58426" });
+test("a team draws in its exact primary colour where it shows clearly: the Celtics' green", () => {
+  const celtics = { name: "Boston Celtics", short: "Celtics", color: "008348", alternateColor: "ffffff" };
+  assert.deepEqual(tintStyles({ BOS: celtics }), { BOS: "--tint: #008348" });
 });
 
-test("a faint primary keeps itself when its alternate is fainter still: the Heat stay red on dark rather than black", () => {
-  assert.equal(lineColor({ color: "98002e", alternateColor: "000000" }, "dark"), "#98002e");
+test("a primary too dark to show draws as a lighter shade of itself, not the alternate: the Jazz stay purple and the Knicks blue", () => {
+  assert.equal(lineColor({ color: "4e008e", alternateColor: "79a3dc" }), "#8d02ff");
+  assert.equal(lineColor({ color: "1d428a", alternateColor: "f58426" }), "#2a60c9");
+  assert.equal(lineColor({ color: "98002e", alternateColor: "000000" }), "#cb003d");
+});
+
+test("a black primary, which has no shade but grey, gives way to the exact alternate: the Spurs draw silver", () => {
+  assert.equal(lineColor({ color: "000000", alternateColor: "C4CED4" }), "#c4ced4");
 });
 
 test("two teams whose colours read as one on a bar split them: the away side takes its other colour", () => {
-  const pistons = { color: "1d42ba", alternateColor: "c8102e" };
   const knicks = { color: "1d428a", alternateColor: "f58426" };
-  const [away, home] = pairStyles(pistons, knicks);
-  assert.equal(away, "--tint-light: #c8102e; --tint-dark: #c8102e");
-  assert.equal(home, "--tint-light: #1d428a; --tint-dark: #f58426");
-  assert.deepEqual(pairStyles({ color: "007a33", alternateColor: "ba9653" }, knicks), ["--tint-light: #007a33; --tint-dark: #007a33", home]);
-  const [warriors] = pairStyles({ color: "fdb927", alternateColor: "1d428a" }, { color: "266092", alternateColor: "79bc43" });
-  assert.equal(warriors, "--tint-light: #fdb927; --tint-dark: #fdb927");
+  assert.deepEqual(pairStyles({ color: "1d428a", alternateColor: "c8102e" }, knicks), ["--tint: #c8102e", "--tint: #2a60c9"]);
+  assert.deepEqual(pairStyles(knicks, { color: "1d428a", alternateColor: "e01234" }), ["--tint: #f58426", "--tint: #2a60c9"]);
 });
 
-test("a bar never switches a team to a colour that vanishes: the Spurs stay silver beside the Jazz on dark, not black", () => {
-  const [spurs] = pairStyles({ color: "000000", alternateColor: "c4ced4" }, { color: "4e008e", alternateColor: "79a3dc" });
-  assert.equal(spurs, "--tint-light: #000000; --tint-dark: #c4ced4");
-  const [celtics] = pairStyles({ color: "008348", alternateColor: "ffffff" }, { color: "008ca8", alternateColor: "1d1060" });
-  assert.equal(celtics, "--tint-light: #008348; --tint-dark: #ffffff");
+test("a bar never switches a team to a colour that vanishes: the Nets stay white beside the Spurs' silver, not black", () => {
+  assert.deepEqual(pairStyles({ color: "000000", alternateColor: "ffffff" }, { color: "000000", alternateColor: "c4ced4" }), ["--tint: #ffffff", "--tint: #c4ced4"]);
 });
 
-test("where the away side has no other colour that shows, the home side switches: the Nuggets turn gold beside the Nets' black on light", () => {
-  const [nets, nuggets] = pairStyles({ color: "000000", alternateColor: "ffffff" }, { color: "0e2240", alternateColor: "fec524" });
-  assert.equal(nets, "--tint-light: #000000; --tint-dark: #ffffff");
-  assert.equal(nuggets, "--tint-light: #fec524; --tint-dark: #fec524");
+test("where the away side has no other colour that shows, the home side switches", () => {
+  const spurs = { color: "000000", alternateColor: "c4ced4" };
+  assert.deepEqual(pairStyles(spurs, { color: "c4ced4", alternateColor: "c8102e" }), ["--tint: #c4ced4", "--tint: #c8102e"]);
 });
 
-test("a primary that vanishes into the surface gives way to the exact alternate: black on dark, white on light", () => {
-  const team = { color: "000000", alternateColor: "C4CED4" };
-  assert.equal(lineColor(team, "dark"), "#c4ced4");
-  assert.equal(lineColor({ color: "FFFFFF", alternateColor: "002B5C" }, "light"), "#002b5c");
-  assert.equal(lineColor(team, "light"), "#000000");
-});
-
-test("the surfaces tint.ts reads against are the chart's --surface in styles/global.css, light then dark", () => {
+test("the surface tint.ts reads against is the chart's --surface in styles/global.css", () => {
   const css = readFileSync(new URL("../styles/global.css", import.meta.url), "utf8");
   const surfaces = [...css.matchAll(/--surface:\s*#([0-9a-f]{6})/gi)].map((m) => m[1].toLowerCase());
-  assert.deepEqual(surfaces, [SURFACE.light, SURFACE.dark]);
+  assert.deepEqual(surfaces, [SURFACE]);
 });
 
 test("a past season draws each franchise in this season's colours, and keeps its own for a team gone since", () => {

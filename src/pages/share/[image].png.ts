@@ -2,7 +2,7 @@
 // (https://docs.astro.build/en/guides/fonts/#accessing-font-data-programmatically): Satori lays out the copy in
 // Public Sans around the rating chart, and sharp turns its SVG into a PNG. A season's picture draws every
 // team's line in its resting tint, as the league table's chart does; a team's draws its own line in its colour
-// and the rest in grey, as its page does. Both take the light theme's tokens from styles/global.css.
+// and the rest in grey, as its page does. Both take the site's tokens from styles/global.css.
 import type { APIRoute } from "astro";
 import { experimental_getFontFileURL, fontData } from "astro:assets";
 import satori, { type Font, type FontWeight } from "satori";
@@ -31,14 +31,15 @@ export function getStaticPaths() {
 
 type Props = { season: SeasonView; image: ShareImage };
 
-const [light, dark] = css.replace(/\/\*[\s\S]*?\*\//g, "").split(':root[data-theme="dark"]');
-if (dark === undefined) throw new Error("styles/global.css has no dark-theme block to end the light theme's tokens");
-const LIGHT = new Map([...light.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+// The tokens before the first media query, so a phone's overrides don't replace them.
+const [base, rest] = css.replace(/\/\*[\s\S]*?\*\//g, "").split("@media");
+if (rest === undefined) throw new Error("styles/global.css has no media query to end the site's tokens");
+const TOKENS = new Map([...base.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 
-/** A light-theme token with its var()s filled in; `own` adds properties, such as a team's --tint-light. */
+/** A token with its var()s filled in; `own` adds properties, such as a team's --tint. */
 function token(name: string, own: Record<string, string> = {}): string {
-  const value = own[name] ?? LIGHT.get(name);
-  if (value === undefined) throw new Error(`styles/global.css declares no ${name} for the light theme`);
+  const value = own[name] ?? TOKENS.get(name);
+  if (value === undefined) throw new Error(`styles/global.css declares no ${name}`);
   return value.replace(/var\((--[\w-]+)\)/g, (_, inner: string) => token(inner, own));
 }
 
@@ -83,7 +84,7 @@ function chart(season: SeasonView, own: Abbr | null): El {
   const ends = runEnds(m);
   const runEnd = (a: Abbr) => ser.findIndex((d) => d.day === ends[a]);
   const ended = (a: Abbr) => runEnd(a) > 0 && runEnd(a) < n - 1;
-  const tint = (a: Abbr) => ({ "--tint-light": lineColor(m.data.teams[a], "light") });
+  const tint = (a: Abbr) => ({ "--tint": lineColor(m.data.teams[a]) });
   const stroke = (a: Abbr) =>
     own === null
       ? { stroke: token("--tint-rest", tint(a)), "stroke-width": 2.5 }
