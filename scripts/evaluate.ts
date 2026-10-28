@@ -2,6 +2,8 @@
 // weekly block bootstrap and the maximum-likelihood SIGMA. docs/model.md's pre-registration defines each.
 import { readFileSync } from "node:fs";
 import { EARLY, expected, fitSeason, phi, type FitRule, type Params, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
+import { parseBox, type SeasonBox } from "../src/lib/players.ts";
+import { parsePreseason, type Preseason } from "../src/lib/preseason.ts";
 import { eloChances } from "./elo538.ts";
 
 export const TUNING = ["2015-16", "2016-17", "2017-18", "2018-19", "2019-20", "2020-21", "2021-22", "2022-23"];
@@ -15,8 +17,10 @@ export const V1 = {
   early: { games: 5, widen: 1.55 },
 };
 
-export const loadSeason = (id: string): SeasonData =>
-  JSON.parse(readFileSync(new URL(`../src/data/games/${id}.json`, import.meta.url), "utf8"));
+const read = (path: string): unknown => JSON.parse(readFileSync(new URL(`../src/data/${path}`, import.meta.url), "utf8"));
+export const loadSeason = (id: string) => read(`games/${id}.json`) as SeasonData;
+export const loadBox = (id: string): SeasonBox => parseBox(read(`box/${id}.json`), id);
+export const loadPreseason = (data: SeasonData): Preseason => parsePreseason(read(`preseason/${data.season}.json`), data.season, Object.keys(data.teams));
 
 /**
  * One final game as a model saw it. `day` counts from the season's first game day; `e` is the model's
@@ -64,9 +68,15 @@ export const brier = (s: Scored[]) => mean(s.map((x) => (x.p - x.y) ** 2));
 export const accuracy = (s: Scored[]) => mean(s.map((x) => ((x.p >= 0.5) === (x.y === 1) ? 1 : 0)));
 
 /** SIGMA by maximum likelihood: golden-section search on log SIGMA, where the log loss is unimodal. */
-export function fitSigma(rows: Row[]): number {
+export const fitSigma = (rows: Row[]): number => scaleByLikelihood(rows, 1);
+
+/** The early widening by maximum likelihood on the games where either side had played fewer than EARLY.games. */
+export const fitWiden = (rows: Row[], sigma: number): number => scaleByLikelihood(rows.filter((r) => r.k < EARLY.games), sigma);
+
+/** The s that minimises the log loss of Phi(e / (unit * s)) over `rows`. */
+function scaleByLikelihood(rows: Row[], unit: number): number {
   const f = (ls: number) => {
-    const s = Math.exp(ls);
+    const s = unit * Math.exp(ls);
     let t = 0;
     for (const r of rows) t += loss(phi(r.e / s), r.y);
     return t;

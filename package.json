@@ -12,7 +12,8 @@
     "astro": "astro",
     "fetch": "node scripts/fetch-season.mjs",
     "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
-    "backtest": "node scripts/backtest.ts"
+    "backtest": "node scripts/backtest.ts",
+    "backtest:v2": "node scripts/backtest-v2.ts"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",
