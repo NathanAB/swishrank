@@ -1,11 +1,26 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { SURFACE, coloursOf, lineColor, tintStyles } from "./tint.ts";
+import { SURFACE, coloursOf, lineColor, pairStyles, tintStyles } from "./tint.ts";
 
-test("a team draws in its exact primary colour in both themes, even one that reads faintly: the Knicks are blue on light and dark", () => {
+test("a team draws in its exact primary colour where it shows clearly, and its alternate where it doesn't: the Knicks are blue on light and orange on dark", () => {
   const knicks = { name: "New York Knicks", short: "Knicks", color: "1d428a", alternateColor: "f58426" };
-  assert.deepEqual(tintStyles({ NY: knicks }), { NY: "--tint-light: #1d428a; --tint-dark: #1d428a" });
+  assert.deepEqual(tintStyles({ NY: knicks }), { NY: "--tint-light: #1d428a; --tint-dark: #f58426" });
+});
+
+test("a faint primary keeps itself when its alternate is fainter still: the Heat stay red on dark rather than black", () => {
+  assert.equal(lineColor({ color: "98002e", alternateColor: "000000" }, "dark"), "#98002e");
+});
+
+test("two teams whose colours read as one on a bar split them: the away side takes its other colour", () => {
+  const pistons = { color: "1d42ba", alternateColor: "c8102e" };
+  const knicks = { color: "1d428a", alternateColor: "f58426" };
+  const [away, home] = pairStyles(pistons, knicks);
+  assert.equal(away, "--tint-light: #c8102e; --tint-dark: #c8102e");
+  assert.equal(home, "--tint-light: #1d428a; --tint-dark: #f58426");
+  assert.deepEqual(pairStyles({ color: "007a33", alternateColor: "ba9653" }, knicks), ["--tint-light: #007a33; --tint-dark: #007a33", home]);
+  const [warriors] = pairStyles({ color: "fdb927", alternateColor: "1d428a" }, { color: "266092", alternateColor: "79bc43" });
+  assert.equal(warriors, "--tint-light: #fdb927; --tint-dark: #fdb927");
 });
 
 test("a primary that vanishes into the surface gives way to the exact alternate: black on dark, white on light", () => {

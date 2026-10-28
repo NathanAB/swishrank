@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { monthName, nearDay, signed } from "./format.ts";
+import { localTime, monthName, nearDay, signed } from "./format.ts";
 
 test("changes carry a sign, with a real minus", () => {
   assert.deepEqual([signed(21), signed(-1322), signed(0)], ["+21", "−1,322", "0"]);
@@ -12,4 +12,12 @@ test("the week ahead calls today Tonight and the next day Tomorrow, across a mon
 
 test("a month's name carries its year, so a season's two Octobers differ", () => {
   assert.deepEqual([monthName("2019-10"), monthName("2020-10")], ["October 2019", "October 2020"]);
+});
+
+test("a tip-off shows in the reader's zone, named, and with its weekday where it falls on another day than in US Eastern", () => {
+  const tip = new Date("2026-11-02T00:30:00Z"); // Sun, Nov 1, 7:30 PM in New York
+  assert.equal(localTime(tip, "tip", "America/New_York"), "7:30 PM EST");
+  assert.equal(localTime(tip, "tip", "America/Los_Angeles"), "4:30 PM PST");
+  assert.equal(localTime(tip, "tip", "Europe/Paris"), "Mon 1:30 AM GMT+1");
+  assert.equal(localTime(tip, "stamp", "America/Chicago"), "Nov 1, 2026, 6:30 PM CST");
 });

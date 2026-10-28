@@ -7,6 +7,7 @@ import Panel from "./Panel.astro";
 import ScaleKey from "./ScaleKey.astro";
 import SeasonMenu from "./SeasonMenu.astro";
 import Segmented from "./Segmented.astro";
+import { PROVISIONAL } from "../lib/elo.ts";
 import { homeDescription, homeTitle } from "../lib/meta.ts";
 import { href, type Route } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
@@ -20,6 +21,7 @@ interface Props {
 
 const { season, conference } = Astro.props;
 const route: Route = { kind: "home", season, conference };
+const preliminary = season.current && season.model.abbrs.some((a) => season.model.log[a].length < PROVISIONAL);
 const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   label: c ?? "All",
   href: href({ kind: "home", season, conference: c }),
@@ -39,7 +41,7 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
       <Segmented label="Conference" options={views} />
       <SeasonMenu route={route} />
     </Fragment>
-    <ScaleKey class="lead" />
+    <ScaleKey class="lead">{preliminary && ` Ratings are preliminary until a team has played ${PROVISIONAL} games.`}</ScaleKey>
     <LeagueTable season={season} conference={conference} />
   </Panel>
 </Base>

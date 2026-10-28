@@ -86,6 +86,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
     <thead>
       <tr>
         <th class="lad" scope="col" aria-label="Rating chart">
+          <span class="lad-head" aria-hidden="true">Each team on the rating scale</span>
           {charted && (
             <div class="xs" aria-hidden="true">
               {dates.map((d) => (
@@ -96,9 +97,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
           )}
         </th>
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
-        <th class="team" scope="col">Team<span class="sub"> · W–L</span></th>
+        <th class="team" scope="col">Team<span class="sub"> · record</span></th>
         <th class="num" scope="col">Rating</th>
-        <th class="num opt" scope="col">W–L</th>
+        <th class="num opt" scope="col">Record</th>
       </tr>
     </thead>
     <tbody>
@@ -208,6 +209,8 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .lad { width: calc(var(--tl) + var(--cv)); padding: 0; }
   th.lad { position: relative; padding-right: 8px; }
   .xs, .history { display: none; }
+  /* Where the chart stacks above, the scale stands alone and says what it is. */
+  .lad-head { display: block; font-size: 11px; line-height: 14px; color: var(--muted); font-weight: 400; text-align: left; white-space: normal; }
   td.lad { position: relative; border-bottom: 0; }
   /* The cell starts below half of the header's collapsed 1px rule, so the drawing moves up by that half to
      sit on the rows. */
@@ -260,6 +263,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
     .charted .lad { width: 100%; }
     .charted .stacked { display: none; }
     .charted .xs, .charted .history { display: block; }
+    .charted .lad-head { display: none; }
   }
 
   /* Phone: one two-line row per team, with the other figures on the second line. */

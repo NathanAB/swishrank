@@ -59,6 +59,7 @@ const final = (o: Outcome) =>
 const restShown = rest && {
   head: `${name(rest.abbr)} ${signed(rest.change)} on ${weekdayDay(rest.day)}, without playing`,
   rows: [rest.beaten, rest.win].map((o) => ({ day: weekdayDay(o.result.day), score: final(o) })),
+  why: `The ${name(rest.beaten.loser.abbr)} won, which showed they're stronger, so the ${name(rest.abbr)} win over them now counts for more.`,
 };
 const game = opener && {
   day: weekdayDay(opener.result.day),
@@ -153,7 +154,7 @@ const lastUpset = (() => {
 
 <Base
   title="How the ratings work"
-  description={`Every NBA team starts each season at ${START}, the league average, and each morning the ratings are fitted again to every game so far.`}
+  description={`Every NBA team starts each season at ${START}, the league average, and after each day of games the ratings are fitted again to every game so far.`}
   route={{ kind: "about" }}
 >
   <Fragment slot="lede">Each rating is a number for how well a team has played this season. It uses the Elo scale from chess, where {START} is the league average and higher is better.</Fragment>
@@ -191,9 +192,9 @@ const lastUpset = (() => {
       </div>
     </Panel></li>
 
-    <li><Panel title="Every morning, every game again">
+    <li><Panel title="Every day, every game again">
       <div class="step">
-        <p class="say">Each morning every rating is worked out again from scratch, to best fit every result so far. So a win counts for more once the beaten team proves strong, and a team can rise on a day it doesn't play.</p>
+        <p class="say">After each day of games, every rating is worked out again from scratch, to best fit every result so far. So a win counts for more once the beaten team proves strong, and a team can rise on a day it doesn't play.</p>
         {restShown ? (
           <div class="game">
             <p class="score">{restShown.head}</p>
@@ -205,6 +206,7 @@ const lastUpset = (() => {
                 </tr>
               ))}
             </table>
+            <p class="note">{restShown.why}</p>
           </div>
         ) : game && (
           <div class="game">
@@ -226,13 +228,13 @@ const lastUpset = (() => {
       </div>
     </Panel></li>
 
-    <li><Panel title="Bigger wins count, less and less">
+    <li><Panel title="Each extra point counts a little less">
       <div class="step">
-        <p class="say">A {blowout}-point win counts only {blowoutTimes} times as much as a 1-point win, so a blowout padded in garbage time can't swing a rating. {upsetSay}</p>
+        <p class="say">A {blowout}-point win counts only {blowoutTimes} times as much as a 1-point win, so points scored after a game is already decided can't change a rating much. {upsetSay} Each game also counts for less as more games are played, so the same win moves a rating less in spring than in October.</p>
         {bars.length > 0 && (
           <div class="bars">
             <span></span>
-            <span class="head">Winner gains</span>
+            <span class="head">Winner gains, {season?.label} season</span>
             {bars.map((b) => (
               <Fragment>
                 <span class="label">{b.label}</span>
@@ -246,7 +248,7 @@ const lastUpset = (() => {
 
     <li><Panel title="A bigger gap, a bigger favorite">
       <div class="step">
-        <p class="say">Before tip-off, the gap between two ratings gives each team its chance to win. Home court is worth {int(edge)} points, measured over eight past seasons, so a home team is a {home.chance} favorite over an equal rival.</p>
+        <p class="say">Before a game starts, the gap between the two ratings gives each team its chance to win. The team more likely to win is the favorite, and the other team is the underdog. The chances come from how often past favorites won by each gap, and they stay within about one percentage point of the chess Elo formula, 1 / (1 + 10^(−gap / 400)). Home court is worth {int(edge)} points, measured over eight past seasons, so a home team is a {home.chance} favorite over an equal rival.</p>
         <figure
           class="curve"
           role="img"
@@ -283,7 +285,7 @@ const lastUpset = (() => {
         </div>
         {example && (
           <div class="game">
-            <p class="day">{example.ahead ? `Next on the games page · ${example.day}` : `The season's last game, before tip-off · ${example.day}`}</p>
+            <p class="day">{example.ahead ? `Next on the games page · ${example.day}` : `The season's last game, before it started · ${example.day}`}</p>
             <div class="tile">
               <div class="teams">
                 {example.fixture.lines.map((l) => (
@@ -312,6 +314,9 @@ const lastUpset = (() => {
               <Fragment>
                 <p class="from">The latest upset · {lastUpset.when}</p>
                 <ResultTile as="div" season={lastUpset.season} outcome={lastUpset.outcome} />
+                {lastUpset.season.id !== season?.id && (
+                  <p class="note">That game came late in a season, when one game moves a rating less, so it earned less than the wins above.</p>
+                )}
               </Fragment>
             )}
           </div>
@@ -320,10 +325,18 @@ const lastUpset = (() => {
     </Panel></li>
   </ol>
 
+  <p class="proof">
+    The settings were chosen on eight past seasons and then checked on three more. <a href="https://github.com/NathanAB/nba-elo/blob/main/docs/model.md">The model notes</a>
+    have every result, including how often favorites really won at each stated chance, where the check fell short of
+    its written plan, and the one rule added after it.
+  </p>
+
 </Base>
 
 <style>
   .steps { display: grid; gap: var(--gap); }
+  .proof { margin-top: var(--gap); max-width: 720px; color: var(--muted); }
+  .proof a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
   /* A step's words at a fixed measure beside its drawing, so every drawing starts at the same edge; stacked
      where the two do not fit side by side. */
   .step { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; gap: 16px 56px; padding-bottom: 8px; }

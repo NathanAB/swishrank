@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { routePath, shareImage, sharePath, switchTarget, type Route } from "./routes.ts";
+import { guessPath, routePath, shareImage, sharePath, switchTarget, type Route } from "./routes.ts";
 
 const now = { id: "2026-27", current: true };
 const past = { id: "2025-26", current: false };
@@ -41,4 +41,33 @@ test("the season switch keeps the page but not a month, and a team the other sea
   assert.deepEqual(switchTarget({ kind: "team", season: now, abbr: "OKC" }, past, anyTeam), { kind: "team", season: past, abbr: "OKC" });
   assert.deepEqual(switchTarget({ kind: "games", season: past, month: "2026-06" }, now, anyTeam), { kind: "games", season: now });
   assert.deepEqual(switchTarget({ kind: "team", season: now, abbr: "SEA" }, past, () => false), { kind: "home", season: past });
+});
+
+test("a mistyped path leads to the page it meant: any case, the current season by its id, a team by its name", () => {
+  const aliases = { ny: "ny", knicks: "ny", "new-york-knicks": "ny", "trail-blazers": "por" };
+  const guess = (path: string) => guessPath(path, { current: now.id, aliases, months: {} });
+  assert.equal(guess("/teams/NY/"), "/teams/ny/");
+  assert.equal(guess("/East/"), "/east/");
+  assert.equal(guess("/2026-27/"), "/");
+  assert.equal(guess("/2026-27/teams/knicks/"), "/teams/ny/");
+  assert.equal(guess("/2025-26/teams/New%20York%20Knicks"), "/2025-26/teams/ny/");
+  assert.equal(guess("/teams/Trail%20Blazers/"), "/teams/por/");
+  assert.equal(guess("/2025%E2%80%9326/"), "/2025-26/");
+});
+
+test("a month of games goes under the season it belongs to, from any season's address", () => {
+  const guess = (path: string) => guessPath(path, { current: now.id, aliases: {}, months: { "2025-11": "2025-26", "2026-10": "2026-27" } });
+  assert.equal(guess("/games/2025-11/"), "/2025-26/games/2025-11/");
+  assert.equal(guess("/2024-25/games/2025-11/"), "/2025-26/games/2025-11/");
+  assert.equal(guess("/2025-26/games/2026-10/"), "/games/2026-10/");
+});
+
+test("a path with no better guess, or one that is already its own guess, gets none, so the not-found page never loops", () => {
+  const guess = (path: string) => guessPath(path, { current: now.id, aliases: { knicks: "ny" }, months: { "2025-11": "2025-26" } });
+  assert.equal(guess("/teams/nyk/"), null);
+  assert.equal(guess("/north/"), null);
+  assert.equal(guess("/teams/%E0%A4%A/"), null);
+  assert.equal(guess("/teams/a%2Fb/"), null);
+  assert.equal(guess("/2025-26/games/2025-11/"), null);
+  assert.equal(guess("/games/2026-13/"), null);
 });

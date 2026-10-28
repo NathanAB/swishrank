@@ -37,7 +37,7 @@ export function homeDescription(season: Shown, conference?: Conference): string 
   const count = standings(season.model, conference).order.length;
   const teams = conference ? `all ${count} ${conference}ern Conference teams` : `all ${count} NBA teams`;
   const lede = season.current
-    ? `Elo ratings for ${teams}, fitted again every morning to every score this season.`
+    ? `Elo ratings for ${teams}, fitted again after each day of games to every score this season.`
     : `How ${teams}' Elo ratings moved through ${season.label}.`;
   return `${lede} ${leaders(season, conference)}`;
 }

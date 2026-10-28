@@ -4,13 +4,15 @@
 // the expected or actual winner, as on the games page: the favourite's win chance, the winner's name and
 // result.
 import KpiStrip, { type Kpi } from "../../../components/KpiStrip.astro";
+import LocalTime from "../../../components/LocalTime.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
 import ScaleKey from "../../../components/ScaleKey.astro";
 import SeasonMenu from "../../../components/SeasonMenu.astro";
 import Base from "../../../layouts/Base.astro";
-import { dayKey, gap, played, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
-import { pct, rating, record, signed, tipTime, weekdayDay } from "../../../lib/format.ts";
+import { dayKey, EARLY, gap, played, PROVISIONAL, winProb, type Abbr, type Game } from "../../../lib/elo.ts";
+import { outcome, upset } from "../../../lib/facts.ts";
+import { pct, rating, record, signed, weekdayDay } from "../../../lib/format.ts";
 import { teamDescription } from "../../../lib/meta.ts";
 import { href, type Route } from "../../../lib/routes.ts";
 import { TODAY, noGamesAhead, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
@@ -33,21 +35,32 @@ const s = m.stats[abbr];
 const games = teamGames(m, abbr);
 const prep = (v: Venue) => (v === "away" ? "at" : "vs");
 
-const kpis: Kpi[] = [
-  { label: "Rating", value: rating(m.r[abbr]), unit: place(m, abbr) },
-  { label: "Record", value: record(s.W, s.L) },
-  { label: "High / low", ...highLow(s) },
-];
-
 // The games in the week ahead, each with the win chance today's ratings give this team.
 const fixtures = nextGames(m, abbr, TODAY).map((g: Game) => {
   const home = g.home === abbr;
   const p = winProb(gap(g, m.r, m.home), played(m.log, g));
   const venue: Venue = g.neutral ? "neutral" : home ? "home" : "away";
-  return { g, day: dayKey(g.t), venue, opp: home ? g.away : g.home, chance: home ? p : 1 - p, tag: stage(g.note).label };
+  return { g, day: dayKey(g.t), venue, opp: home ? g.away : g.home, chance: home ? p : 1 - p, tag: stage(g.note).label, early: played(m.log, g) < EARLY.games };
 });
+const next = season.current ? fixtures[0] : undefined;
+// The record counts every game the ratings do, so a season with a postseason says how many of those it holds.
+const postseason = games.filter((g) => g.stage.phase !== "regular").length;
+
+const kpis: Kpi[] = [
+  {
+    label: season.current ? "Rating" : "Final rating",
+    value: rating(m.r[abbr]),
+    unit: `${place(m, abbr)} in the NBA${season.current && games.length < PROVISIONAL ? `, preliminary: ${games.length} of ${PROVISIONAL} games` : ""}`,
+  },
+  { label: "Record", value: record(s.W, s.L), unit: postseason ? `includes ${postseason} postseason games` : undefined },
+  { label: "High / low", ...highLow(s) },
+  ...(next ? [{ label: "Next game", value: pct(next.chance), unit: `to win ${prep(next.venue)} ${team(season, next.opp).short}, ${weekdayDay(next.day)}` }] : []),
+];
 
 const log = [...games].reverse();
+// How far the daily refits have moved the rating since the team's last game, shown as a row of its own so the
+// log reaches the rating at the top of the page.
+const drift = games.length ? Math.round(m.r[abbr]) - Math.round(games[games.length - 1].us.rating) : 0;
 const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
 ---
 
@@ -74,26 +87,33 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
         {fixtures.length === 0 ? (
           <p class="empty">{noGamesAhead(season)}</p>
         ) : (
+          <Fragment>
           <div class="sheet fx" role="table" aria-label={`Next games for the ${me.short}`}>
             <div class="hd" role="row">
               <span role="columnheader">Date</span>
               <span role="columnheader">Opponent</span>
-              <span role="columnheader" class="r opt">Tip-off, ET</span>
+              <span role="columnheader" class="r opt">Tip-off</span>
               <span role="columnheader" class="r">Win chance</span>
             </div>
             {fixtures.map((x) => (
-              <div class="row" role="row">
+              <div class="row" role="row" data-team={x.opp} data-preview data-href={teamLink(x.opp)}>
                 <span role="cell" class="when">{weekdayDay(x.day)}</span>
                 <span role="cell" class="who" data-team={x.opp}>
                   {prep(x.venue)} <a class:list={["nm", { ink: x.chance < 0.5 }]} data-team={x.opp} data-preview href={teamLink(x.opp)}>{team(season, x.opp).short}</a>
-                  {x.tag && <span class="tag">{x.tag}</span>}
-                  <span class="sub">{weekdayDay(x.day)} · {tipTime(x.g.t)}{x.tag ? ` · ${x.tag}` : ""}</span>
+                  {x.tag && <Fragment>{" "}<span class="tag">{x.tag}</span></Fragment>}
+                  <span class="sub">{weekdayDay(x.day)} · <LocalTime at={x.g.t} />{x.tag ? ` · ${x.tag}` : ""}</span>
                 </span>
-                <span role="cell" class="r num opt">{tipTime(x.g.t)}</span>
+                <span role="cell" class="r num opt"><LocalTime at={x.g.t} /></span>
                 <span role="cell" class:list={["r num", { ink: x.chance >= 0.5 }]}>{pct(x.chance)}</span>
               </div>
             ))}
           </div>
+          <p class="note">
+            “at” is an away game and “vs” a home game. If the other team is more likely to win, its name is bold. If this team is more likely to win, the win chance is bold.
+            {fixtures.some((x) => x.tag?.startsWith("NBA Cup")) && " NBA Cup games are regular-season games in the league's in-season tournament, and they count like any other game."}
+            {fixtures.some((x) => x.early) && ` Until both teams have played ${EARLY.games} games, the chances are kept closer to 50%, because a few games say little.`}
+          </p>
+          </Fragment>
         )}
       </Panel>
     )}
@@ -102,6 +122,7 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
       {games.length === 0 ? (
         <p class="empty">No games yet.</p>
       ) : (
+        <Fragment>
         <div class="sheet gl" role="table" aria-label={`Games played by the ${me.short}, newest first`}>
           <div class="hd" role="row">
             <span role="columnheader">Date</span>
@@ -112,13 +133,28 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
             <span role="columnheader" class="r opt">Change</span>
             <span role="columnheader" class="r">Rating</span>
           </div>
-          {log.map((g) => (
+          {drift !== 0 && (
             <div class="row" role="row">
+              <span role="cell" class="when">{season.current ? "Today" : "Season end"}</span>
+              <span role="cell" class="who">No game since<span class="sub">{season.current ? "Today" : "Season end"}</span></span>
+              <span role="cell" class="wl"></span>
+              <span role="cell" class="r num"></span>
+              <span role="cell" class="r num opt"></span>
+              <span role="cell" class="r num opt chg">{signed(drift)}</span>
+              <span role="cell" class="r num rt">
+                {rating(m.r[abbr])}
+                <span class="sub">{signed(drift)}</span>
+              </span>
+            </div>
+          )}
+          {log.map((g) => (
+            <div class="row" role="row" data-team={g.them.abbr} data-preview data-href={teamLink(g.them.abbr)}>
               <span role="cell" class="when">{weekdayDay(g.result.day)}</span>
               <span role="cell" class="who" data-team={g.them.abbr}>
                 {prep(g.venue)} <a class:list={["nm", { ink: g.them.won }]} data-team={g.them.abbr} data-preview href={teamLink(g.them.abbr)}>{team(season, g.them.abbr).short}</a>
-                {g.stage.label && <span class="tag">{g.stage.label}</span>}
-                <span class="sub">{weekdayDay(g.result.day)}{g.stage.label ? ` · ${g.stage.label}` : ""}</span>
+                {g.stage.label && <Fragment>{" "}<span class="tag">{g.stage.label}</span></Fragment>}
+                {g.us.won && upset(outcome(g.result)) && <Fragment>{" "}<span class="tag">Upset</span></Fragment>}
+                <span class="sub">{[weekdayDay(g.result.day), g.stage.label, g.us.won && upset(outcome(g.result)) && "Upset"].filter(Boolean).join(" · ")}</span>
               </span>
               <span role="cell" class:list={["wl", { ink: g.us.won }]}>{g.us.won ? "W" : "L"}</span>
               <span role="cell" class:list={["r num", { ink: g.us.won }]}>{record(g.us.score, g.them.score)}</span>
@@ -131,6 +167,14 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
             </div>
           ))}
         </div>
+        <p class="note">
+          After each day of games, all ratings are worked out again from every game so far, so a rating also moves on
+          days the team doesn't play, and the rows won't always add up. Rating is where the team ended that day, and the
+          number with a + or − is how far it moved that day.<span class="opt"> Win chance is this team's chance before
+          the game.</span> A bold W/L and score mean this team won, and a bold opponent name means the opponent
+          won. <a href={href({ kind: "about" })}>How it works</a>
+        </p>
+        </Fragment>
       )}
     </Panel>
   </div>
@@ -142,8 +186,10 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
   /* The next games and the game log side by side where both fit; the log has more columns, so it takes more. */
   .pair { display: grid; align-items: start; gap: var(--gap); margin-top: var(--gap); }
   .pair .card { margin-top: 0; }
-  @media (min-width: 1100px) { .pair:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); } }
+  @media (min-width: 1360px) { .pair:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); } }
   .empty { padding: 4px 0 8px; color: var(--muted); }
+  .note { margin-top: 10px; font-size: var(--fs-small); line-height: 18px; color: var(--muted); }
+  .note a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
 
   .sheet { --lead: 112px minmax(0, 240px); }
   .sheet .hd, .sheet .row { display: grid; grid-template-columns: var(--cols); column-gap: 16px; align-items: center; }
@@ -151,12 +197,12 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
   .gl { --cols: var(--lead) minmax(16px, 1fr) minmax(72px, 1fr) minmax(96px, 1fr) repeat(2, minmax(64px, 1fr)); }
   .hd { height: 32px; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
   .hd abbr { text-decoration: none; }
-  .row { height: 36px; border-bottom: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+  .row { min-height: 36px; border-bottom: 1px solid var(--rule); color: var(--muted); white-space: nowrap; cursor: pointer; }
   .sheet > .row:last-child { border-bottom: 0; }
   .r, .wl { text-align: right; }
   .row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-  .who { color: var(--muted); }
+  .who { color: var(--muted); white-space: normal; }
   .nm { position: relative; color: var(--muted); }
   .nm::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: transparent; }
   .nm:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
@@ -176,7 +222,7 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
     .sheet .row { height: 48px; align-items: start; padding-top: 6px; line-height: 18px; }
     .opt, .when, .hd > :first-child, .tag { display: none; }
     .sub { display: block; font-size: 13px; color: var(--muted); font-weight: 400; }
-    .who .sub { overflow: hidden; text-overflow: ellipsis; }
+    .who .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rt .sub { color: var(--text); }
   }
 </style>

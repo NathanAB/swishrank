@@ -153,7 +153,16 @@ for (const [svg, c] of charts) {
 document.addEventListener("click", (e) => {
   if (closestOf(e.target, "a[href]")) return;
   const to = closestOf(e.target, "[data-preview]")?.dataset.href;
-  if (to) location.assign(to);
+  if (!to) return;
+  if (e.metaKey || e.ctrlKey || e.shiftKey) window.open(to, "_blank");
+  else location.assign(to);
+});
+
+// A middle click on a row or a dot opens its team in a new tab, as it would on a link.
+document.addEventListener("auxclick", (e) => {
+  if (e.button !== 1 || closestOf(e.target, "a[href]")) return;
+  const to = closestOf(e.target, "[data-preview]")?.dataset.href;
+  if (to) window.open(to, "_blank");
 });
 
 document.addEventListener("focusin", (e) => preview(closestOf(e.target, "[data-preview]")?.dataset.team ?? null));
