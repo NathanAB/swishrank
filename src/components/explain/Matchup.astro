@@ -5,9 +5,9 @@
 // Without script it shows the first game.
 import ChanceBar from "../ChanceBar.astro";
 import type { Abbr } from "../../lib/elo.ts";
-import { ahead, before, figure, told, worked } from "../../lib/explain/matchup.ts";
+import { ahead, before, told, worked } from "../../lib/explain/matchup.ts";
 import { nextDays, priced, WEEK } from "../../lib/fixtures.ts";
-import { between, matchup, MINUS, pct } from "../../lib/format.ts";
+import { between, figure, matchup, MINUS, pct } from "../../lib/format.ts";
 import { TODAY, team, type SeasonView } from "../../lib/season.ts";
 import { pairStyles } from "../../lib/tint.ts";
 
@@ -87,8 +87,8 @@ const data = {
 
 <script>
   import type { Abbr, Team } from "../../lib/elo.ts";
-  import { figure, SIDES, told, worked, type Pairing } from "../../lib/explain/matchup.ts";
-  import { between, pct } from "../../lib/format.ts";
+  import { SIDES, told, worked, type Pairing } from "../../lib/explain/matchup.ts";
+  import { between, figure, pct } from "../../lib/format.ts";
   import { pairStyles } from "../../lib/tint.ts";
 
   type Data = { home: number; teams: Record<Abbr, Team>; pairings: Pairing[] };
@@ -186,7 +186,6 @@ const data = {
 
   /* The answer as the games page shows a game: the two teams, the favourite in ink, over their chances. The bar
      moves to each game's split. */
-  .tile { padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; }
   .tile :global(.bar) { transition: grid-template-columns 300ms var(--ease); }
   .teams { display: flex; align-items: center; justify-content: space-between; gap: 12px; line-height: 22px; color: var(--muted); }
   .teams > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

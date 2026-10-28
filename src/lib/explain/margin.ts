@@ -7,8 +7,6 @@ export const MOST = 50;
 
 const worthOf = (margin: number) => counted(margin, PARAMS.margin);
 
-export const points = (n: number) => `${n} point${n === 1 ? "" : "s"}`;
-
 /** How many times a 1-point win an n-point win counts, to one decimal. */
 export const times = (n: number) => (worthOf(n) / worthOf(1)).toFixed(1);
 

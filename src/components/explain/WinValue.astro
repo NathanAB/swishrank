@@ -3,7 +3,8 @@
 // tall as what a win by that many points counts, so each column rises less than the one before. The two same-margin
 // wins sit under the step's words (WinPair.astro).
 import { counted, PARAMS } from "../../lib/elo.ts";
-import { MOST, points, times, worth } from "../../lib/explain/margin.ts";
+import { MOST, times, worth } from "../../lib/explain/margin.ts";
+import { points } from "../../lib/format.ts";
 import { examples } from "../../lib/method.ts";
 import type { SeasonView } from "../../lib/season.ts";
 import Range from "./Range.astro";
@@ -36,7 +37,8 @@ const columns = Array.from({ length: MOST }, (_, i) => counted(i + 1, PARAMS.mar
 </div>
 
 <script>
-  import { points, worth } from "../../lib/explain/margin.ts";
+  import { worth } from "../../lib/explain/margin.ts";
+  import { points } from "../../lib/format.ts";
 
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 

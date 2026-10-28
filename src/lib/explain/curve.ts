@@ -1,7 +1,7 @@
 // How it works, step 2: the favourite's chance against the rating gap, and the motion that moves its dot.
 // GapCurve.astro draws it on the server and its script redraws it.
 import { winProb } from "../elo.ts";
-import { int, pct } from "../format.ts";
+import { int, pct, points } from "../format.ts";
 
 /** The widest gap the curve shows, in points. */
 export const GAP_MAX = 400;
@@ -22,7 +22,7 @@ export function readout(g: number) {
     p,
     chances: [pct(p), pct(1 - p)] as const,
     tag: `${int(g)}-point gap`,
-    points: `${int(g)} points`,
+    points: points(g),
   };
 }
 

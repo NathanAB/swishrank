@@ -2,7 +2,7 @@
 // A game still to play as a tile: the tip-off in the reader's time zone, then away at home, then each side's
 // win chance from today's ratings on its chance bar. The favourite's name and chance are in ink, whether home
 // or away. The whole tile opens the game's page; each team's name opens its own. The games page lists these
-// tiles; How it works shows one on its own.
+// tiles.
 import ChanceBar from "./ChanceBar.astro";
 import LocalTime from "./LocalTime.astro";
 import type { Fixture } from "../lib/fixtures.ts";
@@ -13,15 +13,13 @@ import { team, type SeasonView } from "../lib/season.ts";
 interface Props {
   season: SeasonView;
   fixture: Fixture;
-  /** "li" in a list of games, "div" on its own. */
-  as?: "li" | "div";
 }
 
-const { season, fixture: f, as: Tag = "li" } = Astro.props;
+const { season, fixture: f } = Astro.props;
 const [away, home] = f.lines;
 ---
 
-<Tag class="tile">
+<li class="tile">
   <a class="cover" href={href({ kind: "game", season, game: f.game })} aria-label={matchup(team(season, away.abbr).short, team(season, home.abbr).short, f.game.neutral)}></a>
   <p class="top num"><LocalTime at={f.game.t} /></p>
   <div class="teams">
@@ -30,7 +28,7 @@ const [away, home] = f.lines;
     ))}
   </div>
   <ChanceBar fixture={f} teams={season.model.data.teams} />
-</Tag>
+</li>
 
 <style>
   .top { min-height: 18px; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }

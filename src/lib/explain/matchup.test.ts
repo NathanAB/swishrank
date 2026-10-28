@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compute, type Game } from "../elo.ts";
 import { fixture } from "../fixtures.ts";
-import { ahead, before, figure, told, worked, type Pairing } from "./matchup.ts";
+import { ahead, before, told, worked, type Pairing } from "./matchup.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
 const game = (id: string, day: number, away: string, home: string, score: [number, number] | null, neutral = false): Game => ({
@@ -24,7 +24,7 @@ const model = compute({
     game("next neutral", 9, "D", "A", null, true),
   ],
 });
-const pairing = (over: Partial<Pairing>): Pairing => ({ away: "A", home: "B", neutral: false, r: { away: 1000, home: 1000 }, gap: 0, p: 0.5, ...over });
+const pairing = (over: Partial<Pairing>): Pairing => ({ away: "A", home: "B", neutral: false, r: { away: 1000, home: 1000 }, p: 0.5, ...over });
 
 test("a listed game is worked out from today's ratings, at the chance the games page gives it", () => {
   for (const g of model.upcoming) {
@@ -42,7 +42,7 @@ test("a neutral-site game gets no home court", () => {
 });
 
 test("the shown figures add up to the shown gap, though rounding each differs from rounding the sum", () => {
-  const w = worked(pairing({ r: { away: 900.4, home: 1040.5 }, gap: 204.6 }), 64.5);
+  const w = worked(pairing({ r: { away: 900.4, home: 1040.5 } }), 64.5);
   assert.deepEqual([w.home, w.court, w.away, w.gap], [1041, 65, 900, 206]);
 });
 
@@ -53,15 +53,9 @@ test("a played game is worked out from the ratings before it, at the chance it w
   assert.equal(shown.p, last.p);
 });
 
-test("a gap the visitor leads shows with a real minus", () => {
-  assert.equal(figure(202), "202");
-  assert.equal(figure(0), "0");
-  assert.equal(figure(-83), "−83");
-});
-
 test("says which side is ahead, by how much, with home court named only when it counts", () => {
   const names = { away: "Heat", home: "Hawks" };
   assert.equal(told({ away: 902, home: 1040, court: 64, gap: 202 }, names), "Hawks 1040 plus 64 for home court is 202 points above Heat 902.");
   assert.equal(told({ away: 1096, home: 949, court: 64, gap: -83 }, names), "Heat 1096 is 83 points above Hawks 949 plus 64 for home court.");
-  assert.equal(told({ away: 1000, home: 1001, court: 0, gap: 1 }, names), "Hawks 1001 is 1 point above Heat 1000.");
+  assert.equal(told({ away: 1000, home: 1003, court: 0, gap: 3 }, names), "Hawks 1003 is 3 points above Heat 1000.");
 });

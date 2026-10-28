@@ -9,8 +9,14 @@ const intFmt = new Intl.NumberFormat("en-US");
 /** A count with thousands separators: 1,322. */
 export const int = (n: number) => intFmt.format(n);
 
+/** A count of points, a margin or a rating gap: "1 point", "202 points". */
+export const points = (n: number) => `${int(n)} ${n === 1 ? "point" : "points"}`;
+
 /** A change with its sign and a real minus: +5, −5, 0. */
 export const signed = (n: number) => (n > 0 ? `+${int(n)}` : n < 0 ? `${MINUS}${int(-n)}` : "0");
+
+/** A figure in a sum, with a real minus and no plus: 202, −83. */
+export const figure = (n: number) => (n < 0 ? `${MINUS}${-n}` : String(n));
 
 /** A rating as the reader sees it everywhere: rounded to the point. */
 export const rating = (v: number) => String(Math.round(v));
