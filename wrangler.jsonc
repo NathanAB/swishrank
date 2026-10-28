@@ -1,0 +1,12 @@
+// Astro's static-site config for Cloudflare Workers (https://docs.astro.build/en/guides/deploy/cloudflare/).
+{
+  "name": "swishrank",
+  "account_id": "f8a103773e6ba1a5a81e5a40b3e107a7",
+  "compatibility_date": "2026-10-28",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  },
+  "routes": [{ "pattern": "swishrank.com", "custom_domain": true }],
+  "workers_dev": false
+}
