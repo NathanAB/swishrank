@@ -6,7 +6,7 @@ Every team starts each season at 1000, the league average, and nothing carries o
 
 ## How it updates
 
-A GitHub Action ([deploy.yml](.github/workflows/deploy.yml)) runs three times a day: at 05:17 UTC (just after midnight Eastern in winter) once most games have ended, at 10:17 UTC once the last West Coast game is in, and at 15:17 UTC as a retry. It pulls the season's games from ESPN's public scoreboard, commits them to `src/data/games/` when they change, rebuilds the site and deploys it to Cloudflare. It also runs on every push to `main`.
+A GitHub Action ([deploy.yml](.github/workflows/deploy.yml)) runs once a day at 08:17 UTC, once the last West Coast game is in, started by the Cloudflare Worker in [cron/](cron/), with GitHub's own schedule at 12:17 UTC as a backup. It pulls the season's games from ESPN's public scoreboard, commits them to `src/data/games/` when they change, rebuilds the site and deploys it to Cloudflare. It also runs on every push to `main`.
 
 ## Run it locally
 
