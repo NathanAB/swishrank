@@ -1,0 +1,18 @@
+{
+  "name": "nba-elo-cron",
+  "account_id": "f8a103773e6ba1a5a81e5a40b3e107a7",
+  "main": "index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  // The same times as deploy.yml's schedule, in UTC.
+  "triggers": {
+    "crons": ["17 5 * * *", "17 10 * * *", "17 15 * * *"]
+  },
+  "vars": {
+    "REPO": "NathanAB/nba-elo"
+  },
+  // GITHUB_TOKEN is a secret: a fine-grained token for this repo with Actions read and write.
+  "observability": {
+    "enabled": true
+  }
+}
