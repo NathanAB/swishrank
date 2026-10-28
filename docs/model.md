@@ -324,7 +324,7 @@ Version 1's settings, frozen as V1 in scripts/evaluate.ts, match the choice, `{"
 
 ## Settings and their evidence
 
-Written after the results. Each setting lives in `src/lib/elo.ts` (`PARAMS`, `PROVISIONAL`, `ELO_PER_SIGMA`), and `npm run backtest` fails if they drift from what the tables choose.
+Written after the results. Each setting lives in `src/lib/elo.ts` (`PARAMS`, `PROVISIONAL`, `ELO_PER_SIGMA`). `npm run backtest` fails if the copy frozen as `V1` in `scripts/evaluate.ts` drifts from what the tables choose, so this record stays checkable if the site moves to version 2 (`docs/model-v2.md`).
 
 - **Prior strength, `n0` = 12 games.** Lowest tuning log loss among the eligible candidates (table 1). The next step down, 8, ties it (table 7). Log loss falls steadily from 2 to 12 for every margin rule (table 1), so the pull toward average earns its keep. 12 is the edge of the grid. A check outside the plan, not used to choose, found 16 within 0.0001 of 12 and 20, 30 and 50 worse, so the edge hides no better setting.
 - **Margins, `(|m| + 3)^0.5`.** The only rule in the grid within the owner's limit: a 43-point win counts 3.4 times a 1-point win (table 1). The power 0.6 rule just misses the limit at 4.3x.
