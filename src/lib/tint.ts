@@ -47,18 +47,25 @@ export const tintStyles = (teams: Record<Abbr, Team>): Record<Abbr, string> =>
 const MIN_APART = 100;
 const apart = (a: string, b: string) => Math.hypot(...channels(a.slice(1)).map((c, i) => (c - channels(b.slice(1))[i]) * 255));
 
+/** Below this contrast against the surface a colour all but vanishes, as black does on the dark one. */
+const MIN_VISIBLE = 1.5;
+
 /**
- * Two teams' style attributes for one bar, away then home: the away side draws in its other colour where the
- * two would read as one, such as the Pistons' and the Knicks' blues, even if that colour is faint on its own:
- * beside the other team's, it still tells the two apart.
+ * Two teams' style attributes for one bar, away then home. Where their line colours would read as one, such as
+ * the Pistons' and the Knicks' blues, one side draws in its other colour instead: the away side first, then the
+ * home side, then both, the first pair that tells them apart, or else the furthest apart. That colour may be
+ * faint on its own, since beside the other team's it still tells the two apart, but never one that vanishes, so
+ * the Spurs never turn black on dark.
  */
 export function pairStyles(away: Pick<Team, "color" | "alternateColor">, home: Pick<Team, "color" | "alternateColor">): [string, string] {
   const side = (theme: Theme) => {
-    const h = lineColor(home, theme);
-    const a = lineColor(away, theme);
-    const other = `#${(a === `#${away.color.toLowerCase()}` ? away.alternateColor : away.color).toLowerCase()}`;
-    return { a: apart(a, h) < MIN_APART && apart(other, h) > apart(a, h) ? other : a, h };
+    const line = [lineColor(away, theme), lineColor(home, theme)];
+    const other = [away, home].map((t, i) => `#${(line[i] === `#${t.color.toLowerCase()}` ? t.alternateColor : t.color).toLowerCase()}`);
+    const visible = (c: string) => contrast(c.slice(1), SURFACE[theme]) >= MIN_VISIBLE;
+    const pairs = [line, [other[0], line[1]], [line[0], other[1]], other].filter((p) => p.every(visible));
+    const gap = (p: string[]) => apart(p[0], p[1]);
+    return pairs.find((p) => gap(p) >= MIN_APART) ?? pairs.reduce((best, p) => (gap(p) > gap(best) ? p : best), line);
   };
   const [light, dark] = [side("light"), side("dark")];
-  return [style(light.a, dark.a), style(light.h, dark.h)];
+  return [style(light[0], dark[0]), style(light[1], dark[1])];
 }

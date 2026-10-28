@@ -109,9 +109,9 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
             ))}
           </div>
           <p class="note">
-            “at” is an away game and “vs” a home game. If the other team is more likely to win, its name is bold. If this team is more likely to win, the win chance is bold.
-            {fixtures.some((x) => x.tag?.startsWith("NBA Cup")) && " NBA Cup games are regular-season games in the league's in-season tournament, and they count like any other game."}
-            {fixtures.some((x) => x.early) && ` Until both teams have played ${EARLY.games} games, the chances are kept closer to 50%, because a few games say little.`}
+            Bold marks the favorite.
+            {fixtures.some((x) => x.tag?.startsWith("NBA Cup")) && " NBA Cup games count like any other."}
+            {fixtures.some((x) => x.early) && ` Until both teams have played ${EARLY.games} games, chances stay closer to 50%.`}
           </p>
           </Fragment>
         )}
@@ -168,7 +168,7 @@ const teamLink = (a: Abbr) => href({ kind: "team", season, abbr: a });
           ))}
         </div>
         <p class="note">
-          After each day of games, all ratings are worked out again from every game so far, so a rating also moves on days the team doesn't play, and the rows won't always add up. Rating is where the team ended that day, and the number with a + or − is how far it moved that day.<span class="opt"> Win chance is this team's chance before the game.</span> A bold W/L and score mean this team won, and a bold opponent name means the opponent won. <a href={href({ kind: "about" })}>How it works</a>
+          Every rating is worked out again after each day of games, so it also moves on days off and the rows won't always add up. <a href={href({ kind: "about" })}>How it works</a>
         </p>
         </Fragment>
       )}
