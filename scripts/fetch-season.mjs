@@ -1,4 +1,5 @@
-// Fetch a season's NBA games from ESPN's public scoreboard into src/data/games/<season>.json.
+// Fetch a season's NBA games from ESPN's public scoreboard into src/data/games/<season>.json, and the box score
+// of every final game src/data/box/<season>.json lacks from ESPN's game summary.
 //
 //   node scripts/fetch-season.mjs            seasons still in progress (no "end" in seasons.json)
 //   node scripts/fetch-season.mjs 2025-26    one season by id
@@ -6,10 +7,12 @@
 // ESPN's scoreboard takes one date per request (date ranges return 400), so this walks the season day by day.
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { fetchEvents, lostFinals, parse } from "../src/lib/espn.ts";
+import { boxLines, fetchEvents, fetchJson, lostFinals, parse } from "../src/lib/espn.ts";
 
 const SEASONS = JSON.parse(await readFile(new URL("../src/data/seasons.json", import.meta.url), "utf8"));
 const OUT_DIR = new URL("../src/data/games/", import.meta.url);
+const BOX_DIR = new URL("../src/data/box/", import.meta.url);
+const SUMMARY = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
 const URL_FOR = (ymd) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${ymd}`;
 // Two weeks of games ahead, so a team's page can always show its next five.
 const FIXTURE_DAYS = 14;
@@ -41,6 +44,29 @@ async function fetchSeason(season) {
   await writeFile(file, JSON.stringify({ season: season.id, teams: sortedTeams, games }) + "\n");
   const done = games.filter((g) => g.final).length;
   console.log(`${season.id}: ${done} final, ${games.length - done} upcoming, ${Object.keys(teams).length} teams`);
+  await fetchBox(season.id, games.filter((g) => g.final));
+}
+
+// A box score ESPN cannot give yet leaves its game out of the file, to be tried again on the next run: the model
+// predicts from each team's latest game with lines, so a gap costs a little, where a failed run would hold back scores.
+async function fetchBox(id, finals) {
+  const file = new URL(`${id}.json`, BOX_DIR);
+  const box = await readFile(file, "utf8").then((text) => JSON.parse(text), () => ({ season: id, games: {} }));
+  const missing = finals.filter((g) => !box.games[g.id]);
+  let added = 0;
+  for (let i = 0; i < missing.length; i += 8) {
+    await Promise.all(missing.slice(i, i + 8).map(async (g) => {
+      try {
+        const lines = boxLines(await fetchJson(SUMMARY(g.id)));
+        if (Object.keys(lines).length) { box.games[g.id] = lines; added++; }
+      } catch (err) {
+        console.warn(`${id}: no box score for game ${g.id} this time: ${err.message}`);
+      }
+    }));
+  }
+  await mkdir(BOX_DIR, { recursive: true });
+  await writeFile(file, JSON.stringify({ season: id, games: box.games }) + "\n");
+  console.log(`${id}: box scores for ${added} more games, ${finals.length - Object.keys(box.games).length} final games without one`);
 }
 
 const ids = process.argv.slice(2);

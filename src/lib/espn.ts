@@ -1,17 +1,22 @@
 // ESPN's scoreboard events as this site's games, for scripts/fetch-season.mjs. Fixes to ESPN's data belong
 // here, so a re-fetch keeps them.
 import { dayKey, type Abbr, type Game, type Team } from "./elo.ts";
+import type { BoxLine, SeasonBox } from "./players.ts";
 
 /** The pauses between tries of one scoreboard request: ESPN now and then sends an empty body, twice in a row. */
 export const RETRY_WAITS = [5_000, 20_000, 60_000];
 
 /** One day's scoreboard events from `url`, tried again after each of `waits` when ESPN fails or sends no JSON. */
-export async function fetchEvents(url: string, waits = RETRY_WAITS, get: typeof fetch = fetch): Promise<EspnEvent[]> {
+export const fetchEvents = async (url: string, waits = RETRY_WAITS, get: typeof fetch = fetch): Promise<EspnEvent[]> =>
+  ((await fetchJson(url, waits, get)) as { events?: EspnEvent[] }).events ?? [];
+
+/** JSON from `url`, tried again after each of `waits` when ESPN fails or sends no JSON. */
+export async function fetchJson(url: string, waits = RETRY_WAITS, get: typeof fetch = fetch): Promise<unknown> {
   for (let i = 0; ; i++) {
     try {
       const res = await get(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return ((await res.json()) as { events?: EspnEvent[] }).events ?? [];
+      return await res.json();
     } catch (err) {
       if (i === waits.length) throw new Error(`ESPN ${url}: ${(err as Error).message}`);
       console.warn(`ESPN ${url}: ${(err as Error).message}, trying again in ${waits[i] / 1000}s`);
@@ -110,3 +115,45 @@ export const lostFinals = (before: readonly Game[], after: readonly Game[]): str
   const final = new Set(after.filter((g) => g.final).map((g) => g.id));
   return before.filter((g) => g.final && !final.has(g.id)).map((g) => g.id);
 };
+
+type SummaryAthlete = { athlete?: { id?: string }; didNotPlay?: boolean; stats?: string[] };
+/** The parts of ESPN's game summary (site.api.espn.com .../summary?event=<id>) the box scores read. */
+export type EspnSummary = { boxscore?: { players?: { team: { abbreviation: string }; statistics?: { labels?: string[]; athletes?: SummaryAthlete[] }[] }[] } };
+
+// ESPN writes a blank stat as "--" or leaves it out; it counts as 0, as a whole number with a "+" does as itself.
+const whole = (s: string | undefined) => {
+  const n = parseInt(String(s ?? "").replace("+", ""), 10);
+  return Number.isFinite(n) ? n : 0;
+};
+const madeOf = (s: string | undefined) => String(s ?? "").split("-").map(whole);
+
+/**
+ * A summary's box lines, by team: [athlete, MIN, PTS, FGM, FGA, FTM, FTA, OREB, DREB, AST, STL, BLK, TO, PF] for
+ * every player with minutes. A team whose players have no stats, as in about 12% of 2015-16 to 2017-18, is left out.
+ */
+export function boxLines(summary: EspnSummary): SeasonBox["games"][string] {
+  const out: SeasonBox["games"][string] = {};
+  for (const team of summary.boxscore?.players ?? []) {
+    const stats = team.statistics?.[0];
+    const athletes = (stats?.athletes ?? []).filter((a) => !a.didNotPlay && a.stats?.length);
+    if (!athletes.length) continue;
+    const labels = stats?.labels ?? [];
+    const col = (label: string) => {
+      const i = labels.indexOf(label);
+      if (i < 0) throw new Error(`ESPN box score for ${team.team.abbreviation} has no ${label} column`);
+      return i;
+    };
+    const [min, pts, fg, ft, oreb, dreb, ast, stl, blk, to, pf] = ["MIN", "PTS", "FG", "FT", "OREB", "DREB", "AST", "STL", "BLK", "TO", "PF"].map(col);
+    const lines: BoxLine[] = [];
+    for (const { athlete, stats: s = [] } of athletes) {
+      const minutes = whole(s[min]);
+      if (minutes <= 0) continue;
+      if (!/^\d+$/.test(athlete?.id ?? "")) throw new Error(`ESPN box score for ${team.team.abbreviation} has a player without an id`);
+      const [fgm = 0, fga = 0] = madeOf(s[fg]);
+      const [ftm = 0, fta = 0] = madeOf(s[ft]);
+      lines.push([Number(athlete?.id), minutes, whole(s[pts]), fgm, fga, ftm, fta, whole(s[oreb]), whole(s[dreb]), whole(s[ast]), whole(s[stl]), whole(s[blk]), whole(s[to]), whole(s[pf])]);
+    }
+    if (lines.length) out[team.team.abbreviation] = lines;
+  }
+  return out;
+}

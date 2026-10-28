@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dayKey, type SeasonData } from "./elo.ts";
-import { canonicalNote, fetchEvents, lostFinals, parse, type EspnEvent } from "./espn.ts";
+import { boxLines, canonicalNote, fetchEvents, lostFinals, parse, type EspnEvent } from "./espn.ts";
 import { stage } from "./teams.ts";
 
 const side = (homeAway: "home" | "away", id: string, abbreviation: string) => ({
@@ -64,4 +64,20 @@ test("a scoreboard request tries again when ESPN sends an empty body, and gives 
   const events = [{ id: "1" }];
   assert.deepEqual(await fetchEvents("u", [0, 0, 0], replies(["", "", "", JSON.stringify({ events })])), events);
   await assert.rejects(fetchEvents("u", [0, 0], replies(["", "", "", JSON.stringify({ events })])), /ESPN u: Unexpected end of JSON input/);
+});
+
+test("a summary's box line keeps made and attempted shots apart and skips players who did not play", () => {
+  const labels = ["MIN", "PTS", "FG", "3PT", "FT", "REB", "AST", "TO", "STL", "BLK", "OREB", "DREB", "PF", "+/-"];
+  const lines = boxLines({
+    boxscore: {
+      players: [
+        { team: { abbreviation: "BOS" }, statistics: [{ labels, athletes: [
+          { athlete: { id: "4251" }, stats: ["31", "38", "12-21", "7-12", "7-8", "5", "3", "4", "5", "0", "0", "5", "2", "+3"] },
+          { athlete: { id: "9" }, didNotPlay: true, stats: [] },
+        ] }] },
+        { team: { abbreviation: "DET" }, statistics: [{ labels: [], athletes: [{ athlete: { id: "7" }, stats: [] }] }] },
+      ],
+    },
+  });
+  assert.deepEqual(lines, { BOS: [[4251, 31, 38, 12, 21, 7, 8, 0, 5, 3, 5, 0, 4, 2]] });
 });

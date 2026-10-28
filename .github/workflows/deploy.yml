@@ -35,7 +35,7 @@ jobs:
         run: npm test
       # A failed fetch writes nothing, so the site still builds and deploys on the scores already committed, and
       # an outage at ESPN never holds back a change to the site. The fetch-failed job below then turns the run red.
-      - name: Fetch this season's games from ESPN
+      - name: Fetch this season's games and box scores from ESPN
         id: fetch
         continue-on-error: true
         run: npm run fetch
@@ -44,7 +44,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/games
+          git add src/data/games src/data/box
           # A run that waited in the queue may be behind a push made since, which would reject its own.
           git diff --cached --quiet || { git commit -m "Update scores" && git pull --rebase && git push; }
       - name: Install, build, and upload the site
