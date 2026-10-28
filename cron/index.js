@@ -9,7 +9,7 @@ export default {
         headers: {
           Accept: "application/vnd.github+json",
           Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-          "User-Agent": "nba-elo-cron",
+          "User-Agent": "swishrank-cron",
           "X-GitHub-Api-Version": "2022-11-28",
         },
         body: JSON.stringify({ ref: "main" }),
