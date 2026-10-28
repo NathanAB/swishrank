@@ -183,7 +183,6 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   tr:has(.go:focus-visible) > td:last-child { --ring-r: -2px 0; }
   .name { position: relative; display: inline-block; min-width: var(--name); font-weight: 500; line-height: calc(var(--row) - 1px); }
   .name::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: transparent; }
-  tr:has(> td:not(.lad):hover) .name { text-decoration: underline; text-underline-offset: 3px; }
   tr:has(> td:not(.lad):hover) .name::after, tr.hov .name::after { background: var(--control); }
   td.rating { color: var(--text); font-weight: 600; }
   td.opt { color: var(--text); }
