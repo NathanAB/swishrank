@@ -13,8 +13,9 @@
 //
 // With `focus`, the teams a page is about (a team's own page, a game's two): only their lines are drawn on the
 // page, in colour and labelled by name (by abbreviation on a phone, so the lines keep the width), in front of
-// every other team's line in grey from the season's league-lines file, and the readout names their league rank. One team is read out wherever the pointer is;
-// of two, the nearer, and a click opens its page. A `mark`, such as a game's day, takes the season end's place.
+// every other team's line in grey from the season's league-lines file, and the readout names their league rank.
+// One team is read out wherever the pointer is; of two, the nearer, and a click opens its page. A `mark`, such as
+// a game's day, takes the season end's place.
 import Empty from "./Empty.astro";
 import { dateTicks, PLOT, runAndTrail, seasonEndMark, seasonPlot } from "../lib/chart.ts";
 import { START, type Abbr } from "../lib/elo.ts";
