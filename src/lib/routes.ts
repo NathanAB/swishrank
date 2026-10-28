@@ -3,6 +3,7 @@
 // old one under /<id>/ without code changes.
 
 import { dayKey, type Game } from "./elo.ts";
+import { between } from "./format.ts";
 import type { Conference } from "./teams.ts";
 
 export type SeasonRef = { readonly id: string; readonly current: boolean };
@@ -26,7 +27,7 @@ export type GameRef = Pick<Game, "t" | "home" | "away" | "neutral">;
 export const teamSlug = (abbr: string) => abbr.toLowerCase();
 
 /** A game's place under its season's games: its US Eastern day, then the two teams, 2026-01-23/ind-at-okc. */
-export const gameSlug = (g: GameRef) => `${dayKey(g.t)}/${teamSlug(g.away)}-${g.neutral ? "vs" : "at"}-${teamSlug(g.home)}`;
+export const gameSlug = (g: GameRef) => ({ day: dayKey(g.t), matchup: `${teamSlug(g.away)}-${between(g.neutral)}-${teamSlug(g.home)}` });
 
 /** A conference's URL segment: east or west. */
 export const conferenceSlug = (conference: Conference) => conference.toLowerCase();
@@ -42,8 +43,10 @@ export function routePath(route: Route): string {
       return `${prefix(route.season)}/games/${route.month ? `${route.month}/` : ""}`;
     case "team":
       return `${prefix(route.season)}/teams/${teamSlug(route.abbr)}/`;
-    case "game":
-      return `${prefix(route.season)}/games/${gameSlug(route.game)}/`;
+    case "game": {
+      const { day, matchup } = gameSlug(route.game);
+      return `${prefix(route.season)}/games/${day}/${matchup}/`;
+    }
     case "seasons":
       return "/seasons/";
     case "about":

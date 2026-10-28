@@ -9,7 +9,7 @@ import Base from "../layouts/Base.astro";
 import { counted, dayKey, EARLY, gap, PARAMS, START, winProb } from "../lib/elo.ts";
 import { outcome, upset, UPSET, type Outcome } from "../lib/facts.ts";
 import { nextDays, priced, WEEK } from "../lib/fixtures.ts";
-import { int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
+import { between, int, MINUS, pct, rating, signed, weekdayDay } from "../lib/format.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team, TODAY } from "../lib/season.ts";
 
@@ -126,7 +126,7 @@ const example = shown && (() => {
     fixture: f,
     ahead: shown.ahead,
     day: weekdayDay(dayKey(g.t)),
-    at: g.neutral ? "vs" : "at",
+    at: between(g.neutral),
     rows: [
       { label: name(g.home), value: rating(r[g.home]) },
       ...(court ? [{ label: "Home court", value: signed(court) }] : []),

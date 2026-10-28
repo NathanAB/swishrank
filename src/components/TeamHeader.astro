@@ -1,40 +1,43 @@
 ---
 // The top of a team's page, on the page itself rather than in a card: the season menu in the top right, as on
 // every page, the team's name large on the left, and its headline figures on the right, each label over its
-// number, both standing on one rule in the team's colour (lib/tint.ts teamPaint). The figures are the rating,
-// the rank, the record, the last five games and, in a season under way and a week old, how far the rating moved
-// in the last week (lib/teams.ts weekAgo).
+// number, both standing on one rule in the team's colour. The figures are the rating,
+// the rank, the regular season's record and the postseason's once it has one, the last five games and, while the
+// season has games this week, how far the rating moved in it (lib/teams.ts weekAgo).
 import SeasonMenu from "./SeasonMenu.astro";
 import type { Abbr } from "../lib/elo.ts";
 import { rating, record, signed } from "../lib/format.ts";
 import type { Route } from "../lib/routes.ts";
-import { team, type SeasonView } from "../lib/season.ts";
-import { place, teamGames, weekAgo } from "../lib/teams.ts";
-import { teamPaint } from "../lib/tint.ts";
+import { TODAY, team, type SeasonView } from "../lib/season.ts";
+import { place, RECENT, recordOf, teamGames, weekAgo } from "../lib/teams.ts";
 
 interface Props {
   season: SeasonView;
   abbr: Abbr;
   route: Route;
+  /** The team's --fill and --tint (lib/tint.ts teamPaint), as its rating chart draws it. */
+  paint: string;
 }
 
-const { season, abbr, route } = Astro.props;
+const { season, abbr, route, paint } = Astro.props;
 const m = season.model;
 const me = team(season, abbr);
-const { W, L } = m.stats[abbr];
-const last5 = teamGames(m, abbr).slice(-5);
-const won5 = last5.filter((g) => g.us.won).length;
-const then = season.current ? weekAgo(m) : null;
+const games = teamGames(m, abbr);
+const regular = games.filter((g) => g.stage.phase === "regular");
+const postseason = games.filter((g) => g.stage.phase !== "regular");
+const recent = games.slice(-RECENT);
+const then = weekAgo(m, TODAY);
 const figures = [
   { label: "Rating", value: rating(m.r[abbr]) },
   { label: "Rank", value: place(m, abbr) },
-  { label: "Record", value: record(W, L) },
-  ...(last5.length ? [{ label: "Last 5", value: record(won5, last5.length - won5) }] : []),
+  { label: "Record", value: record(...recordOf(regular)) },
+  ...(postseason.length ? [{ label: "Postseason", value: record(...recordOf(postseason)) }] : []),
+  ...(recent.length ? [{ label: `Last ${RECENT}`, value: record(...recordOf(recent)) }] : []),
   ...(then ? [{ label: "This week", value: signed(Math.round(m.r[abbr]) - Math.round(then.r[abbr])) }] : []),
 ];
 ---
 
-<header class="top" style={teamPaint(me)}>
+<header class="top" style={paint}>
   <h1>{me.name}</h1>
   <div class="menu"><SeasonMenu route={route} /></div>
   <dl class="figs" aria-label={`The ${me.short} in numbers`}>

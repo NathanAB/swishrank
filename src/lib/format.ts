@@ -3,7 +3,6 @@
 import { addDays, TZ } from "./elo.ts";
 
 export const MINUS = "−";
-export const DASH = "—";
 
 const intFmt = new Intl.NumberFormat("en-US");
 
@@ -28,6 +27,15 @@ export const ordinal = (n: number) => {
   return `${n}${suffix}`;
 };
 
+/** A place in a table: 9th, or tied 9th when another team shares the rank. */
+export const placeLabel = (rank: number, tied: boolean) => `${tied ? "tied " : ""}${ordinal(rank)}`;
+
+/** The word between a game's two teams, away first: "at" the home team, or "vs" at a neutral site. */
+export const between = (neutral: boolean) => (neutral ? "vs" : "at");
+
+/** A game as a schedule names it: Pacers at Thunder, or Spurs vs Knicks at a neutral site. */
+export const matchup = (away: string, home: string, neutral: boolean) => `${away} ${between(neutral)} ${home}`;
+
 /** A season id with an en dash: 2026-27 becomes 2026–27. */
 export const seasonLabel = (id: string) => id.replace("-", "–");
 
@@ -39,6 +47,8 @@ const dayPart = (day: string, opts: Intl.DateTimeFormatOptions) => asDate(day).t
 
 /** Oct 24 */
 export const shortDay = (day: string) => dayPart(day, { month: "short", day: "numeric" });
+/** Oct 24, 2026 */
+export const dayWithYear = (day: string) => dayPart(day, { month: "short", day: "numeric", year: "numeric" });
 /** Sat, Oct 24 */
 export const weekdayDay = (day: string) => dayPart(day, { weekday: "short", month: "short", day: "numeric" });
 /** Saturday, October 24 */

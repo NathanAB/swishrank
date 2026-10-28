@@ -12,14 +12,14 @@
 // the rows stay ink. Given a conference, only its teams are drawn and listed, ranked among themselves, on the
 // same league-wide scale, so a rating sits at the same height in every view.
 import RatingChart from "./RatingChart.astro";
-import { clearOfMark, dateTicks, seasonEndMark } from "../lib/chart.ts";
+import { clearOfMark, dateTicks, runAndTrail, seasonEndMark } from "../lib/chart.ts";
 import { START } from "../lib/elo.ts";
 import { ratingRange } from "../lib/facts.ts";
 import { rating, record } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
-import { runEnds, standings, type Conference } from "../lib/teams.ts";
+import { standings, type Conference } from "../lib/teams.ts";
 import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
@@ -65,15 +65,9 @@ const X = 1000; // the plot's viewBox width
 const at = (i: number) => i / (ser.length - 1);
 // Lines run through the displayed (rounded) ratings, as the dots do, so each one ends on its dot.
 const pts = (a: string) => ser.map((d, i) => `${(at(i) * X).toFixed(1)},${f(valY(Math.round(d.r[a])))}`);
-// Once a team's run has ended (lib/teams.ts runEnds), its line goes on as a dotted trail, the re-fit moving it
-// without games, and the run itself is drawn solid over it. The full line stays as the one hover reads.
-const ends = runEnds(m);
-const runEnd = (a: string) => ser.findIndex((d) => d.day === ends[a]);
-const lines = order.map((a) => {
-  const all = pts(a);
-  const end = runEnd(a);
-  return { a, points: all.join(" "), run: end > 0 && end < ser.length - 1 ? `M${all.slice(0, end + 1).join(" L")}` : null };
-}).reverse();
+// Once a team's run has ended, its line goes on as a dotted trail (lib/chart.ts runAndTrail).
+const split = runAndTrail(m);
+const lines = order.map((a) => ({ a, ...split(a, pts(a)) })).reverse();
 const seasonEnd = seasonEndMark(m);
 const PLOT_MIN = 530, MARK_LABEL = 150, MONTH_LABEL = 30, DAY_LABEL = 40;
 const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN), ser.length, seasonEnd, { mark: MARK_LABEL / PLOT_MIN, tick: MONTH_LABEL / PLOT_MIN });
@@ -128,16 +122,16 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
                       <g>
                         {lines.map((l) => (
                           <polyline
-                            class:list={["line", { ended: l.run }]}
+                            class="line"
                             data-team={l.a}
                             data-name={m.data.teams[l.a].short}
                             data-href={href({ kind: "team", season, abbr: l.a })}
                             data-raise
                             style={tint[l.a]}
-                            points={l.points}
+                            points={l.run}
                           />
                         ))}
-                        {lines.map((l) => l.run && <path class="run" data-team={l.a} style={tint[l.a]} d={l.run} />)}
+                        {lines.map((l) => l.trail && <polyline class="trail" data-team={l.a} data-trail style={tint[l.a]} points={l.trail} />)}
                       </g>
                     </svg>
                   )}
@@ -224,11 +218,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .grid { stroke: var(--grid); stroke-width: 1; }
   .marker { stroke: var(--muted); stroke-width: 1; }
   /* 1.5px, not 1: a 1px line on a stretched plot falls between pixels and shimmers on a standard-density screen. */
-  .line { stroke: var(--tint-rest); stroke-width: 1.5; stroke-linejoin: round; }
-  .line.hov { stroke: var(--tint); stroke-width: 2.25; }
-  .line.ended { stroke-dasharray: 1 3.5; stroke-linecap: round; }
-  .run { stroke: var(--tint-rest); stroke-width: 1.5; stroke-linejoin: round; }
-  .run.hov { stroke: var(--tint); stroke-width: 2.25; }
+  :is(.line, .trail) { stroke: var(--tint-rest); stroke-width: 1.5; stroke-linejoin: round; }
+  :is(.line, .trail).hov { stroke: var(--tint); stroke-width: 2.25; }
+  .trail { stroke-dasharray: 1 3.5; stroke-linecap: round; }
   .history:has(.line.hov) { cursor: pointer; }
   .tick {
     position: absolute; right: calc(100% - var(--tl) + 8px); transform: translateY(-50%);
@@ -241,7 +233,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .pin { stroke: var(--tint-rest); stroke-width: 6; }
   .dot.hov .pin { stroke: var(--tint); }
   /* While one team is previewed, the rest step back so its line can be followed. */
-  .lt:has(.hov) :is(.line, .run, .lead, .dot):not(.hov) { opacity: 0.4; }
+  .lt:has(.hov) :is(.line, .trail, .lead, .dot):not(.hov) { opacity: 0.4; }
   .lt:has(.hov) tbody tr:not(.hov) > td:not(.lad) { opacity: 0.4; }
   .xs { position: absolute; inset: 0 var(--cv) 0 var(--tl); }
   .xs span { position: absolute; bottom: 2px; left: calc(var(--at) * 100%); transform: translateX(-50%); line-height: 16px; }

@@ -1,57 +1,46 @@
 ---
-// A team's block: its abbreviation and name, one figure large and vertically centred, and a row of labelled
-// figures, on a fill in the team's colour with that colour down its outer edge (lib/tint.ts gamePaint). A
-// game's page sets two side by side, away then home, meeting at a 2px gap as a chance bar's two parts do, each
-// as wide as its `share`; the home block mirrors the away one, its figures read from its outer edge in. The
-// team's colour is a real border, so the outer corners round and the stripe's inner edge stays straight. A
-// block lays itself out by its own width, which its share decides as much as the screen does: the name and
-// figures beside the big number where there is room, stacked under it where there is not.
+// One team's block at the top of a game's page: its abbreviation and name, its score or win chance large and
+// vertically centred, then its rating, place and record, on a fill in the team's colour with that colour down
+// its outer edge (lib/tint.ts gamePaint). A played game adds the team's chance at tip-off, and an upset winner
+// carries the upset badge with its rating gain in the accent. The game's page sets the two side by side, away
+// then home, meeting at a 2px gap as a chance bar's two parts do, each as wide as its share of the points or
+// the chances (lib/game.ts blockShare); the home block mirrors the away one, its figures read from its outer
+// edge in. The team's colour is a real border, so the outer corners round and the stripe's inner edge stays
+// straight. A block lays itself out by its own width, which its share decides as much as the screen does: the
+// name and figures beside the big number where there is room, stacked under it where there is not. The record
+// is the regular season's in a regular-season game and the postseason's after it.
 import UpsetBadge from "./UpsetBadge.astro";
-
-export type BlockStat = {
-  label: string;
-  value: string;
-  /** A rating change beside the value, in the accent with `paid`. */
-  change?: string;
-  paid?: boolean;
-  /** The upset badge after the value. */
-  upset?: boolean;
-};
+import { blockShare, type GameSide, type GameView } from "../lib/game.ts";
+import { pct, rating, record, signed } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import { team, type SeasonView } from "../lib/season.ts";
 
 interface Props {
-  abbr: string;
-  name: string;
-  href: string;
+  season: SeasonView;
+  view: GameView;
+  side: GameSide;
   /** The team's --fill and --tint. */
   paint: string;
-  /** "home" mirrors the block for the right of a pair. */
-  side?: "away" | "home";
-  /** The block's share of its row's width; it opens at an even split and settles there. */
-  share: number;
-  /** Greys the abbreviation and the big figure, for the side that lost. */
-  dim?: boolean;
-  big: string;
-  stats: BlockStat[];
 }
 
-const { abbr, name, href, paint, side = "away", share, dim = false, big, stats } = Astro.props;
+const { season, view, side: s, paint } = Astro.props;
+const share = blockShare(view, s);
 ---
 
-<a class:list={["block", side, { dim }]} href={href} style={`${paint}; --w: ${share.toFixed(3)}`}>
+<a class:list={["block", s.side, { dim: s.line?.won === false }]} href={href({ kind: "team", season, abbr: s.abbr })} style={`${paint}; --w: ${share.toFixed(3)}`}>
   <span class="in">
-    <span class="id"><span class="ab">{abbr}</span><span class="nm">{name}</span></span>
-    <span class="big num">{big}</span>
+    <span class="id"><span class="ab">{s.abbr}</span><span class="nm">{team(season, s.abbr).name}</span></span>
+    <span class="big num">{s.line ? s.line.score : pct(s.chance)}</span>
     <dl class="stats">
-      {stats.map((s) => (
-        <div>
-          <dt>{s.label}</dt>
-          <dd class="num">
-            {s.value}
-            {s.change && <span class:list={["chg", { paid: s.paid }]}>{s.change}</span>}
-            {s.upset && <UpsetBadge />}
-          </dd>
-        </div>
-      ))}
+      {view.played && (
+        <div><dt>Win chance</dt><dd class="num">{pct(s.chance)}{s.upset && <UpsetBadge />}</dd></div>
+      )}
+      <div>
+        <dt>Rating</dt>
+        <dd class="num">{rating(s.rating)}{s.line && <span class:list={["chg", { paid: s.upset }]}>{signed(s.line.change)}</span>}</dd>
+      </div>
+      <div><dt>Rank</dt><dd class="num">{s.place}</dd></div>
+      <div><dt>{view.stage.phase === "regular" ? "Record" : "Postseason"}</dt><dd class="num">{record(...s.record)}</dd></div>
     </dl>
   </span>
 </a>
@@ -77,7 +66,17 @@ const { abbr, name, href, paint, side = "away", share, dim = false, big, stats }
   dt { font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
   dd { display: flex; align-items: baseline; gap: 6px; height: 24px; font-size: 18px; line-height: 24px; font-weight: 600; white-space: nowrap; }
   .home dd { justify-content: flex-end; }
-  .chg { font-size: var(--fs-body); font-weight: 400; }
+  /* An upset winner's gain keeps the accent's weight (global.css .paid). */
+  .chg:not(.paid) { font-weight: 400; }
+  .chg { font-size: var(--fs-body); }
+
+  /* About half a 1024px page: too narrow for four figures in a row beside the big number, so they stand two by
+     two, mirrored in the home block, rather than leave one on a line of its own. */
+  @container (max-width: 559px) {
+    .stats { display: grid; grid-template-columns: repeat(2, max-content); }
+    .home .stats { direction: rtl; }
+    .home .stats > div { direction: ltr; }
+  }
 
   /* Too narrow for the big figure beside the rest: about 100px of abbreviation, 150px of figure, the gap and
      the padding. */
@@ -86,7 +85,7 @@ const { abbr, name, href, paint, side = "away", share, dim = false, big, stats }
     .nm { display: none; }
     .ab { font-size: 24px; line-height: 28px; }
     .big { font-size: 40px; line-height: 44px; }
-    .stats, .home .stats { flex-direction: column; gap: 4px; }
+    .stats, .home .stats { display: flex; flex-direction: column; gap: 4px; direction: ltr; }
     .stats > div { display: flex; flex-direction: column; }
     dd { height: auto; font-size: 15px; line-height: 20px; }
   }

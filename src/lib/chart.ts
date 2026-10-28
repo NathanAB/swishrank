@@ -1,9 +1,11 @@
-// What every drawing of a season's ratings shares: the rating chart on the home, team and game pages, the share
-// images and the league-lines file use one scale and one plot, and label their dates and mark the end of the
-// regular season the same way.
+// What every drawing of a season's ratings shares: the rating charts on the home, team and game pages and the
+// league-lines file draw on one plot (seasonPlot); those, the league table's chart and the share images use one
+// scale, and label their dates and mark the end of the regular season the same way.
 import { ranksOf, START, type Abbr, type Season } from "./elo.ts";
+import { ratingRange } from "./facts.ts";
 import { monthShort, shortDay } from "./format.ts";
-import { regularSeasonEnd } from "./teams.ts";
+import { ranksAttr, type Place } from "./readout.ts";
+import { regularSeasonEnd, runEnds } from "./teams.ts";
 
 /**
  * Date labels on one step that lands on the last day: month starts for a long season, days for a short one.
@@ -63,14 +65,22 @@ export function clearOfMark<T extends { i: number }>(ticks: readonly T[], n: num
   });
 }
 
-/** The lowest and highest rating any team held on any day of the season, 1000 included. */
-export function seasonRange(model: Season): [number, number] {
-  const all = model.series.flatMap((d) => model.abbrs.map((a) => d.r[a]));
-  return [Math.min(START, ...all), Math.max(START, ...all)];
+/**
+ * A team's line split at the last day of its run (lib/teams.ts runEnds): solid through its games, then a
+ * dotted trail as the daily refits move it without any. Each day's point is drawn once; the trail starts on
+ * the run's last point so the two meet. No trail while the team still plays, or played on the latest day.
+ */
+export function runAndTrail(model: Season): (a: Abbr, pts: string[]) => { run: string; trail: string | null } {
+  const ends = runEnds(model);
+  const last = model.series.length - 1;
+  return (a, pts) => {
+    const end = model.series.findIndex((d) => d.day === ends[a]);
+    return end > 0 && end < last ? { run: pts.slice(0, end + 1).join(" "), trail: pts.slice(end).join(" ") } : { run: pts.join(" "), trail: null };
+  };
 }
 
 /**
- * A rating axis over a season's range (seasonRange): it hugs the ratings with a margin of a twentieth of their
+ * A rating axis over a season's range (lib/facts.ts ratingRange): it hugs the ratings with a margin of a twentieth of their
  * range, so the lines fill the plot rather than leaving bands empty above and below them, and is labelled by
  * the round ticks (ratingTicks) that fall inside it. Every drawing of a season's ratings uses it: the rating
  * charts, the share images and the league-lines file.
@@ -101,7 +111,7 @@ export type SeasonPlot = {
   y: (v: number) => number;
   /** A team's line through its displayed (rounded) ratings, one "x,y" point a day. */
   pts: (a: Abbr) => string[];
-  /** A team's league rank on each day as the readout's data-ranks takes it: "3", or "3t" for tied 3rd. */
+  /** A team's league rank on each day, as the readout's data-ranks takes it (lib/readout.ts ranksAttr). */
   ranks: (a: Abbr) => string;
   leagueLines: () => string;
   version: () => string;
@@ -117,10 +127,11 @@ export function seasonPlot(model: Season, h: number = PLOT.h): SeasonPlot {
 
   const ser = model.series;
   const n = ser.length;
-  const { lo, hi, ticks } = ratingScale(...seasonRange(model));
+  const range = ratingRange(model);
+  const { lo, hi, ticks } = ratingScale(range.lo, range.hi);
   const y = (v: number) => PLOT.pad + ((h - 2 * PLOT.pad) * (hi - v)) / (hi - lo);
   const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * PLOT.w);
-  const pts = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(2)}`);
+  const pts = (a: Abbr) => ser.map((d, i) => `${x(i).toFixed(1)},${y(Math.round(d.r[a])).toFixed(1)}`);
   const once = <T>(make: () => T) => {
     let v: T | undefined;
     return () => (v ??= make());
@@ -130,7 +141,7 @@ export function seasonPlot(model: Season, h: number = PLOT.h): SeasonPlot {
       const rank = ranksOf(d.r);
       const count = new Map<number, number>();
       for (const r of Object.values(rank)) count.set(r, (count.get(r) ?? 0) + 1);
-      return Object.fromEntries(Object.entries(rank).map(([a, r]) => [a, `${r}${count.get(r)! > 1 ? "t" : ""}`]));
+      return Object.fromEntries(Object.entries(rank).map(([a, r]): [Abbr, Place] => [a, { rank: r, tied: (count.get(r) ?? 0) > 1 }]));
     }),
   );
   // Each line keeps its width however far the page stretches the plot, as the page's own lines do.
@@ -144,7 +155,7 @@ export function seasonPlot(model: Season, h: number = PLOT.h): SeasonPlot {
     for (const ch of leagueLines()) v = Math.imul(v ^ ch.charCodeAt(0), 0x01000193);
     return (v >>> 0).toString(36);
   });
-  const plot: SeasonPlot = { n, lo, hi, ticks, x, y, pts, ranks: (a) => dayRanks().map((r) => r[a]).join(","), leagueLines, version };
+  const plot: SeasonPlot = { n, lo, hi, ticks, x, y, pts, ranks: (a) => ranksAttr(dayRanks().map((r) => r[a])), leagueLines, version };
   byHeight.set(h, plot);
   return plot;
 }

@@ -33,7 +33,7 @@ test("a played game shows its chances at tip-off and an upset; a game to come sh
   const played = gameView(model, games.find((g) => g.id === "upset")!);
   const result = model.results.find((r) => r.game.id === "upset")!;
   assert.equal(played.home.chance, result.p);
-  assert.equal(played.upset, true);
+  assert.deepEqual([played.away.upset, played.home.upset], [true, false]);
   const next = gameView(model, games.find((g) => g.id === "next")!);
   assert.equal(next.away.line, null);
   assert.equal(next.away.rating, model.r.IND);
@@ -47,15 +47,15 @@ test("a block takes its team's share of the points once played, held off the edg
   assert.equal(blockShare(next, { ...next.home, chance: 0.97 }), 0.76);
 });
 
-test("a played game shows each team's rank as its day left it, not as it stands now", () => {
+test("a played game shows each team's place as its day left it, not as it stands now", () => {
   // IND beats BOS four times after the upset, so IND ends the season 2nd where the upset left it 3rd.
   const later = [...games.filter((g) => g.id !== "next"), ...[11, 12, 13, 14].map((d) => game(`r${d}`, d, "IND", "BOS", 130, 90))];
   const m = compute({ season: "2025-26", teams, games: later });
   assert.equal(m.rank.IND, 2);
-  assert.equal(gameView(m, later.find((g) => g.id === "upset")!).away.rank, 3);
+  assert.equal(gameView(m, later.find((g) => g.id === "upset")!).away.place, "3rd");
 });
 
-test("a playoff game names the series' leader and its score after the game, or a tie", () => {
+test("a playoff game names the series' leader and its score after the game, or a tie, and counts only playoff games in the record", () => {
   const round = (id: string, day: number, home: string, away: string, hs: number, as: number, n: number): Game => ({
     ...game(id, day, home, away, hs, as), note: `West 1st Round - Game ${n}`,
   });
@@ -63,4 +63,5 @@ test("a playoff game names the series' leader and its score after the game, or a
   const m = compute({ season: "2025-26", teams, games: series });
   const at = (id: string) => gameView(m, series.find((g) => g.id === id)!).series;
   assert.deepEqual([at("p1"), at("p2"), at("p3"), at("upset")], ["OKC lead 1–0", "Series tied 1–1", "OKC lead 2–1", null]);
+  assert.deepEqual(gameView(m, series.find((g) => g.id === "p3")!).home.record, [1, 2]);
 });

@@ -139,8 +139,7 @@ export const teamPaths = () =>
 export const gamePaths = () =>
   allSeasons().flatMap((season) =>
     season.model.data.games.map((game) => {
-      const [day, matchup] = gameSlug(game).split("/");
-      return { params: { season: seasonParam(season), day, matchup }, props: { season, game } };
+      return { params: { season: seasonParam(season), ...gameSlug(game) }, props: { season, game } };
     }),
   );
 

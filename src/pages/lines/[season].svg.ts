@@ -10,5 +10,7 @@ export function getStaticPaths() {
   return allSeasons().map((season) => ({ params: { season: season.id }, props: { season } }));
 }
 
-export const GET: APIRoute = ({ props }) =>
-  new Response(seasonPlot((props as { season: SeasonView }).season.model).leagueLines(), { headers: { "Content-Type": "image/svg+xml" } });
+type Props = { season: SeasonView };
+
+export const GET: APIRoute<Props> = ({ props }) =>
+  new Response(seasonPlot(props.season.model).leagueLines(), { headers: { "Content-Type": "image/svg+xml" } });

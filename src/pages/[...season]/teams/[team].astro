@@ -4,9 +4,9 @@
 // In a season under way the next five games run down a side column as the games page shows them, with the chart
 // and the game log beside them; a finished season has nothing ahead, so the chart and the log take the width.
 import FixtureList from "../../../components/FixtureList.astro";
-import GameRow from "../../../components/GameRow.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
+import TeamGames from "../../../components/TeamGames.astro";
 import TeamHeader from "../../../components/TeamHeader.astro";
 import Base from "../../../layouts/Base.astro";
 import type { Abbr } from "../../../lib/elo.ts";
@@ -15,6 +15,7 @@ import { teamDescription } from "../../../lib/meta.ts";
 import { href, type Route } from "../../../lib/routes.ts";
 import { TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
 import { nextGames, teamGames } from "../../../lib/teams.ts";
+import { teamPaint } from "../../../lib/tint.ts";
 
 export function getStaticPaths() {
   return teamPaths();
@@ -29,6 +30,7 @@ const { season, abbr } = Astro.props;
 const route: Route = { kind: "team", season, abbr };
 const m = season.model;
 const me = team(season, abbr);
+const paint = teamPaint(me);
 const log = teamGames(m, abbr).reverse();
 const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 ---
@@ -40,28 +42,30 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
   route={route}
   ownHeading
 >
-  <TeamHeader season={season} abbr={abbr} route={route} />
+  <TeamHeader season={season} abbr={abbr} route={route} paint={paint} />
 
   <div class:list={["cols", { solo: !ahead }]}>
     {ahead && (
       <aside class="side">
         <Panel title="Coming up">
-          {ahead.length === 0 ? <p class="empty">No games scheduled.</p> : ahead.map((day) => <FixtureList season={season} day={day} />)}
+          {ahead.length === 0 ? (
+            <p class="empty">No games scheduled.</p>
+          ) : (
+            <div class="days">{ahead.map((day) => <div><FixtureList season={season} day={day} /></div>)}</div>
+          )}
         </Panel>
       </aside>
     )}
     <div class="main">
       <Panel title="Rating this season">
-        <RatingChart season={season} focus={[abbr]} />
+        <RatingChart season={season} focus={[abbr]} paint={{ [abbr]: paint }} />
       </Panel>
       <Panel title="Game log">
         {log.length === 0 ? (
           <p class="empty">No games yet.</p>
         ) : (
           <Fragment>
-            <ol class="rows" aria-label={`Games played by the ${me.short}, newest first`}>
-              {log.map((g) => <li><GameRow season={season} game={g} rating /></li>)}
-            </ol>
+            <TeamGames season={season} games={log} rating aria-label={`Games played by the ${me.short}, newest first`} />
             <p class="note">
               Every rating is worked out again after each day of games, so it also moves on days off and the rows won't always add up. <a href={href({ kind: "about" })}>How it works</a>
             </p>
@@ -73,14 +77,19 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 </Base>
 
 <style>
-  /* The next games down a side column, sticking as the log scrolls past; under 1024px everything stacks. */
+  /* The next games down a side column, sticking as the log scrolls past. Under 1024px everything stacks and the
+     days of games sit side by side, as on the games page, so they don't fill the screen above the chart. */
   .cols { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: var(--gap); align-items: start; margin-top: var(--gap); }
   .solo { grid-template-columns: minmax(0, 1fr); }
   .side { position: sticky; top: var(--gap); }
-  .side > :global(* + *), .main > :global(* + *) { margin-top: var(--gap); }
-  @media (max-width: 1023px) { .cols { grid-template-columns: minmax(0, 1fr); } .side { position: static; } }
+  .main > :global(* + *) { margin-top: var(--gap); }
+  .days { display: grid; gap: 16px; }
+  @media (max-width: 1023px) {
+    .cols { grid-template-columns: minmax(0, 1fr); }
+    .side { position: static; }
+    .days { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px 8px; }
+  }
 
-  .rows li + li { border-top: 1px solid var(--rule); }
   .empty { padding: 4px 0 8px; color: var(--muted); }
   .note { margin-top: 10px; font-size: var(--fs-small); line-height: 18px; color: var(--muted); }
   .note a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }

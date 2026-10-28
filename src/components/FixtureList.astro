@@ -6,7 +6,7 @@ import ChanceBar from "./ChanceBar.astro";
 import GameDay from "./GameDay.astro";
 import LocalTime from "./LocalTime.astro";
 import type { FixtureDay } from "../lib/fixtures.ts";
-import { longDay, nearDay, weekdayDay } from "../lib/format.ts";
+import { between, longDay, matchup, nearDay, weekdayDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import { TODAY, team, type SeasonView } from "../lib/season.ts";
 
@@ -27,11 +27,11 @@ const near = nearDay(day.day, TODAY);
     const name = (abbr: string) => <a class="nm" href={href({ kind: "team", season, abbr })}>{team(season, abbr).short}</a>;
     return (
       <li class="tile">
-        <a class="cover" href={href({ kind: "game", season, game: f.game })} aria-label={`${team(season, away.abbr).short} ${f.game.neutral ? "vs" : "at"} ${team(season, home.abbr).short}`}></a>
+        <a class="cover" href={href({ kind: "game", season, game: f.game })} aria-label={matchup(team(season, away.abbr).short, team(season, home.abbr).short, f.game.neutral)}></a>
         <p class="top num"><LocalTime at={f.game.t} /></p>
         <div class="teams">
           <span class:list={{ fav: f.fav === "a" }}>{name(away.abbr)}</span>
-          <span class:list={{ fav: f.fav === "h" }}>{f.game.neutral ? "vs " : "at "}{name(home.abbr)}</span>
+          <span class:list={{ fav: f.fav === "h" }}>{between(f.game.neutral)} {name(home.abbr)}</span>
         </div>
         <ChanceBar fixture={f} teams={season.model.data.teams} />
       </li>

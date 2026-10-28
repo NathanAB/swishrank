@@ -1,25 +1,29 @@
 // One game as its page shows it: the two teams side by side, away first, each with the figures its block shows
-// and its last five games before this one. A played game shows the rating, rank and record it left each team
+// and its last five games before this one. A played game shows the rating, place and record it left each team
 // with and the chances it was played at; a game to come shows them as they stand, with today's chances.
 import { dayKey, ranksOf, type Abbr, type Game, type Season } from "./elo.ts";
 import { outcome, upset, type Line } from "./facts.ts";
 import { fixture } from "./fixtures.ts";
-import { stage, teamGames, type Stage, type TeamGame } from "./teams.ts";
+import { placeLabel } from "./format.ts";
+import { RECENT, recordOf, stage, teamGames, tied, type Stage, type TeamGame } from "./teams.ts";
 
 export type GameSide = {
   abbr: Abbr;
+  /** Away on the left of the page, home on the right. */
+  side: "away" | "home";
   /** Win chance at tip-off for a played game; on today's ratings for one to come. */
   chance: number;
   /** The team's line of the result; null until the game is played. */
   line: Line | null;
+  /** Won with under UPSET percent at tip-off. */
+  upset: boolean;
   /** Rating after the game's day, or now. */
   rating: number;
-  rank: number;
-  /** Whether another team shares the rank. */
-  tied: boolean;
-  /** Wins and losses after the game, or now. */
+  /** League place after the game's day, or now: "9th" or "tied 9th". */
+  place: string;
+  /** Wins and losses after the game, or now, in the game's part of the season: the regular season, or after it. */
   record: [number, number];
-  /** Up to five games before this one, oldest first. */
+  /** Up to RECENT games before this one, oldest first. */
   previous: TeamGame[];
 };
 
@@ -27,17 +31,13 @@ export type GameView = {
   game: Game;
   /** The game's US Eastern day. */
   day: string;
+  played: boolean;
   stage: Stage;
   /** A playoff series' score after this game, "Knicks win 4–1"; null outside the playoffs. */
   series: string | null;
   away: GameSide;
   home: GameSide;
-  /** The winner had under UPSET percent at tip-off. */
-  upset: boolean;
 };
-
-/** How many earlier games a side lists. */
-const PREVIOUS = 5;
 
 /** The playoff series' score once `game` is played, or before it for one to come, named by the leader. */
 function seriesScore(model: Season, game: Game, short: (a: Abbr) => string): string | null {
@@ -60,32 +60,32 @@ export function gameView(model: Season, game: Game): GameView {
   const after = o && model.series.find((s) => s.day === day);
   const ranks = after ? ranksOf(after.r) : model.rank;
   const pHome = result ? result.p : fixture(game, model).lines[1].chance;
+  const regular = stage(game.note).phase === "regular";
 
-  const side = (abbr: Abbr, s: "h" | "a"): GameSide => {
+  const side = (abbr: Abbr, s: GameSide["side"]): GameSide => {
     const games = teamGames(model, abbr);
-    const upTo = games.filter((g) => g.result.day <= day);
-    const W = upTo.filter((g) => g.us.won).length;
-    const line = o ? (s === "h" ? o.home : o.away) : null;
+    const line = o ? (s === "home" ? o.home : o.away) : null;
     return {
       abbr,
-      chance: s === "h" ? pHome : 1 - pHome,
+      side: s,
+      chance: s === "home" ? pHome : 1 - pHome,
       line,
+      upset: o !== null && line?.won === true && upset(o),
       rating: line ? line.rating : model.r[abbr],
-      rank: ranks[abbr],
-      tied: Object.entries(ranks).some(([a, r]) => a !== abbr && r === ranks[abbr]),
-      record: [W, upTo.length - W],
-      previous: games.filter((g) => g.result.day < day).slice(-PREVIOUS),
+      place: placeLabel(ranks[abbr], tied(ranks, abbr)),
+      record: recordOf(games.filter((g) => g.result.day <= day && (g.stage.phase === "regular") === regular)),
+      previous: games.filter((g) => g.result.day < day).slice(-RECENT),
     };
   };
 
   return {
     game,
     day,
+    played: o !== null,
     stage: stage(game.note),
     series: seriesScore(model, game, (a) => model.data.teams[a].short),
-    away: side(game.away, "a"),
-    home: side(game.home, "h"),
-    upset: o !== null && upset(o),
+    away: side(game.away, "away"),
+    home: side(game.home, "home"),
   };
 }
 

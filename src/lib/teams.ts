@@ -1,8 +1,8 @@
 // One team's season as the team pages show it, and the conference each team plays in. Every change is the
 // displayed one (facts.ts outcome), so a team's log agrees with the league's lists.
-import { dayKey, ranksOf, type Abbr, type Game, type Result, type Season, type Snapshot } from "./elo.ts";
+import { addDays, dayKey, ranksOf, type Abbr, type Game, type Result, type Season, type Snapshot } from "./elo.ts";
 import { outcome, upset, type Line } from "./facts.ts";
-import { ordinal } from "./format.ts";
+import { placeLabel } from "./format.ts";
 import { WEEK } from "./fixtures.ts";
 
 export type Conference = "East" | "West";
@@ -32,11 +32,11 @@ export function standings(model: Season, conference?: Conference): { order: Abbr
   return { order, rank: ranksOf(Object.fromEntries(order.map((a) => [a, model.r[a]]))) };
 }
 
+/** Whether another team shares `abbr`'s rank in `ranks`. */
+export const tied = (ranks: Record<Abbr, number>, abbr: Abbr) => Object.entries(ranks).some(([a, r]) => a !== abbr && r === ranks[abbr]);
+
 /** A team's place in the league table: "9th", or "tied 9th" when another team shares its rank. */
-export function place(model: Season, abbr: Abbr): string {
-  const tied = model.order.some((a) => a !== abbr && model.rank[a] === model.rank[abbr]);
-  return `${tied ? "tied " : ""}${ordinal(model.rank[abbr])}`;
-}
+export const place = (model: Season, abbr: Abbr) => placeLabel(model.rank[abbr], tied(model.rank, abbr));
 
 export type Phase = "regular" | "play-in" | "playoffs";
 /** What kind of game it was, and a short tag for it ("Finals game 3", "NBA Cup", "Berlin"), if any. */
@@ -116,21 +116,28 @@ export function teamGames(model: Season, abbr: Abbr): TeamGame[] {
   });
 }
 
-/** How many games a team's page lists ahead. */
-const NEXT_GAMES = 5;
+/** How many games make a team's recent form, and how many a team's page lists ahead. */
+export const RECENT = 5;
 
-/** The team's next NEXT_GAMES games from `today` on, however far ahead, in tip-off order. */
+/** Wins and losses in `games`. */
+export function recordOf(games: readonly TeamGame[]): [number, number] {
+  const won = games.filter((g) => g.us.won).length;
+  return [won, games.length - won];
+}
+
+/** The team's next RECENT games from `today` on, however far ahead, in tip-off order. */
 export const nextGames = (model: Season, abbr: Abbr, today: string): Game[] =>
   model.upcoming
     .filter((g) => (g.home === abbr || g.away === abbr) && dayKey(g.t) >= today)
     .sort((x, y) => x.t.localeCompare(y.t))
-    .slice(0, NEXT_GAMES);
+    .slice(0, RECENT);
 
 /**
- * The ratings a week (WEEK days) before the season's latest day, for how far a team moved since; null until the
- * season has played a week, since before opening night every team sits level at 1000.
+ * The ratings a week (WEEK days) before the season's latest day, for how far a team moved since. Null until the
+ * season has played a week, since before opening night every team sits level at 1000, and once its latest day
+ * is more than a week before `today`, since then no team has moved this week.
  */
-export function weekAgo(model: Season): Snapshot | null {
+export function weekAgo(model: Season, today: string): Snapshot | null {
   const i = model.series.length - 1 - WEEK;
-  return i >= 1 ? model.series[i] : null;
+  return i >= 1 && model.series[i + WEEK].day >= addDays(today, -WEEK) ? model.series[i] : null;
 }

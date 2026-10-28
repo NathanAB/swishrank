@@ -5,7 +5,7 @@
 // the ratings gave them. The games page lists these tiles; How it works shows one on its own.
 import UpsetBadge from "./UpsetBadge.astro";
 import { upset, type Outcome } from "../lib/facts.ts";
-import { pct, signed } from "../lib/format.ts";
+import { between, matchup, pct, signed } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import { team, type SeasonView } from "../lib/season.ts";
 
@@ -21,7 +21,7 @@ const isUpset = upset(o);
 ---
 
 <Tag class:list={["tile", { upset: isUpset }]}>
-  <a class="cover" href={href({ kind: "game", season, game: o.result.game })} aria-label={`${team(season, o.away.abbr).short} ${o.result.game.neutral ? "vs" : "at"} ${team(season, o.home.abbr).short}, ${o.away.score}–${o.home.score}`}></a>
+  <a class="cover" href={href({ kind: "game", season, game: o.result.game })} aria-label={`${matchup(team(season, o.away.abbr).short, team(season, o.home.abbr).short, o.result.game.neutral)}, ${o.away.score}–${o.home.score}`}></a>
   {isUpset && (
     <p class="top">
       <span class="up">
@@ -32,7 +32,7 @@ const isUpset = upset(o);
   )}
   {[o.away, o.home].map((l) => (
     <div class:list={["ln", { win: l.won }]}>
-      <span class="who">{l.side === "h" && (o.result.game.neutral ? "vs " : "at ")}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a></span>
+      <span class="who">{l.side === "h" && `${between(o.result.game.neutral)} `}<a class="nm" href={href({ kind: "team", season, abbr: l.abbr })}>{team(season, l.abbr).short}</a></span>
       <span class="sc num">{l.score}</span>
       <span class:list={["ch num", { paid: isUpset && l.won }]}>{signed(l.change)}</span>
     </div>

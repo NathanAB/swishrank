@@ -10,9 +10,9 @@
 // only some teams, such as a game's page; otherwise the rank is among the lines drawn. On a touch screen a tap
 // shows the readout and a second tap on the same team opens its page.
 import { addDays } from "../lib/elo.ts";
-import { ordinal, weekdayDay } from "../lib/format.ts";
+import { placeLabel, weekdayDay } from "../lib/format.ts";
 import { dayAt, nearestLine, type PlotLine } from "../lib/pick.ts";
-import { parseScale, readout, type Scale } from "../lib/readout.ts";
+import { parseRanks, parseScale, readout, type Place, type Scale } from "../lib/readout.ts";
 
 const closestOf = (t: EventTarget | null, selector: string) => (t instanceof Element ? t.closest<HTMLElement | SVGElement>(selector) : null);
 const chartOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<SVGSVGElement>("svg[data-chart]") : null);
@@ -21,8 +21,8 @@ type Chart = {
   lines: PlotLine[];
   names: Record<string, string>;
   hrefs: Record<string, string>;
-  /** Each line's league rank by day as data-ranks gives it, "3" or "3t" for tied 3rd, where a line has one. */
-  ranks: Record<string, string[]>;
+  /** Each line's league rank by day, where its data-ranks gives one. */
+  ranks: Record<string, Place[]>;
   scale: Scale | null;
   days: string[];
   own: string | null;
@@ -37,17 +37,23 @@ const daysOf = (svg: SVGSVGElement, count: number): string[] =>
 
 const charts = new Map<SVGSVGElement, Chart>(
   [...document.querySelectorAll<SVGSVGElement>("svg[data-chart]")].map((svg) => {
-    const polys = [...svg.querySelectorAll<SVGPolylineElement>("polyline[data-team]")];
+    const polys = [...svg.querySelectorAll<SVGPolylineElement>("polyline[data-team]:not([data-trail])")];
+    // A line whose team's run has ended goes on in a trail of its own, which starts on the run's last point.
+    const ys = (l: SVGPolylineElement) => {
+      const trail = svg.querySelector<SVGPolylineElement>(`polyline[data-trail][data-team="${l.dataset.team}"]`);
+      return [...Array.from(l.points, (p) => p.y), ...Array.from(trail?.points ?? [], (p) => p.y).slice(1)];
+    };
+    const lines = polys.map((l) => ({ team: l.dataset.team ?? "", ys: ys(l) }));
     const by = (key: "name" | "href") => Object.fromEntries(polys.map((l) => [l.dataset.team ?? "", l.dataset[key] ?? ""]));
     return [
       svg,
       {
-        lines: polys.map((l) => ({ team: l.dataset.team ?? "", ys: Array.from(l.points, (p) => p.y) })),
+        lines,
         names: by("name"),
         hrefs: by("href"),
-        ranks: Object.fromEntries(polys.flatMap((l) => (l.dataset.ranks ? [[l.dataset.team ?? "", l.dataset.ranks.split(",")]] : []))),
+        ranks: Object.fromEntries(polys.flatMap((l) => (l.dataset.ranks ? [[l.dataset.team ?? "", parseRanks(l.dataset.ranks)]] : []))),
         scale: parseScale(svg.dataset.scale ?? ""),
-        days: daysOf(svg, polys[0]?.points.length ?? 0),
+        days: daysOf(svg, lines[0]?.ys.length ?? 0),
         own: svg.dataset.own ?? null,
         previewsNearest: svg.hasAttribute("data-plot"),
         cross: svg.querySelector<SVGPathElement>("[data-cross]"),
@@ -67,8 +73,8 @@ const preview = (team: string | null) => {
   if (team === previewed) return;
   previewed = team;
   for (const el of document.querySelectorAll<HTMLElement | SVGElement>("[data-team]")) el.classList.toggle("hov", el.dataset.team === team);
-  // Lines and curves are drawn in order, so the previewed one moves last to sit on top, under a team page's own line.
-  for (const c of ["hov", "own"]) for (const el of document.querySelectorAll(`[data-raise].${c}`)) el.parentNode?.appendChild(el);
+  // Lines are drawn in order, so the previewed one moves last to sit on top.
+  for (const el of document.querySelectorAll("[data-raise].hov")) el.parentNode?.appendChild(el);
 };
 
 function hideReadout(svg: SVGSVGElement) {
@@ -90,8 +96,8 @@ function showReadout(e: MouseEvent, svg: SVGSVGElement, c: Chart, team: string |
   const value = document.createElement("strong");
   value.textContent = String(r.rating);
   const rank = document.createElement("i");
-  const given = c.ranks[team ?? ""]?.[day];
-  rank.textContent = given ? `${given.endsWith("t") ? "tied " : ""}${ordinal(parseInt(given, 10))}` : `${r.tied ? "tied " : ""}${ordinal(r.rank)}`;
+  const { rank: n, tied } = c.ranks[team ?? ""]?.[day] ?? r;
+  rank.textContent = placeLabel(n, tied);
   const line = document.createElement("span");
   line.append(name, value, rank);
   const when = document.createElement("span");
