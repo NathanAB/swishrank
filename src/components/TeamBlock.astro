@@ -52,9 +52,8 @@ const share = blockShare(view, s);
     animation: grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1); transition: background-color 120ms ease;
   }
   /* The block opens its team's page: under the pointer or keyboard focus its fill lightens, as a game's tile
-     does, and the team's name underlines, as in a row of games. */
+     does. */
   .block:is(:hover, :focus-visible) { background: color-mix(in oklab, var(--text) 10%, var(--fill)); }
-  .block:is(:hover, :focus-visible) .nm { text-decoration: underline; text-underline-offset: 3px; }
   .block.home { text-align: right; border-left: 0; border-right: 4px solid var(--tint); border-radius: 0 4px 4px 0; }
   @keyframes grow { from { flex-grow: 0.5; } }
   @media (prefers-reduced-motion: reduce) { .block { animation: none; } }

@@ -3,10 +3,9 @@
 // (a playoff round, the play-in, the NBA Cup), W or L, the score and the rating change, and with `rating` the
 // rating it left the team at. A win's row is in ink and a loss's in grey. An upset carries the upset badge on
 // either team's row, and the winner's rating gain is in the accent. Under the pointer or keyboard focus a row's
-// highlight reaches 8px past its columns, clear of the rule below it, and the row turns to ink with the
-// opponent's name underlined. With `mirror` the rows read from the right on a wide screen, as the home side of a
-// game's page does. Each row lays itself out by its own width, so the list fits a side column, half a card or a
-// full one.
+// highlight reaches 8px past its columns, clear of the rule below it, and the row turns to ink. With `mirror` the
+// rows read from the right on a wide screen, as the home side of a game's page does. Each row lays itself out by
+// its own width, so the list fits a side column, half a card or a full one.
 import UpsetBadge from "./UpsetBadge.astro";
 import { pct, rating as shown, record, shortDay, signed, weekdayDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
@@ -52,7 +51,6 @@ const { season, games, rating = false, mirror = false, "aria-label": label } = A
   .row::before { content: ""; position: absolute; inset: 0 -8px 1px; z-index: -1; border-radius: 4px; transition: background-color 120ms ease; }
   .won, .row:is(:hover, :focus-visible) { color: var(--text); }
   .row:is(:hover, :focus-visible)::before { background: color-mix(in oklab, var(--text) 10%, var(--surface)); }
-  .row:is(:hover, :focus-visible) .nm { text-decoration: underline; text-underline-offset: 3px; }
 
   .in { display: grid; grid-template-columns: 72px minmax(0, 1fr) 20px 96px 48px; align-items: center; column-gap: 16px; min-height: 48px; font-size: var(--fs-card); white-space: nowrap; }
   .rated { grid-template-columns: 72px minmax(0, 1fr) 20px 96px 48px 56px; }
