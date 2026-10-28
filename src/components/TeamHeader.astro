@@ -2,14 +2,14 @@
 // The top of a team's page, on the page itself rather than in a card: the season menu in the top right, as on
 // every page, the team's name large on the left, and its headline figures on the right, each label over its
 // number, both standing on one rule in the team's colour. The figures are the rating,
-// the rank, the regular season's record and the postseason's once it has one, the last five games and, while the
+// the rank, the record in the standings and the postseason's once it has one, the last five games and, while the
 // season has games this week, how far the rating moved in it (lib/teams.ts weekAgo).
 import SeasonMenu from "./SeasonMenu.astro";
 import type { Abbr } from "../lib/elo.ts";
 import { rating, record, signed } from "../lib/format.ts";
 import type { Route } from "../lib/routes.ts";
 import { TODAY, team, type SeasonView } from "../lib/season.ts";
-import { place, RECENT, recordOf, teamGames, weekAgo } from "../lib/teams.ts";
+import { place, RECENT, recordOf, standingsRecord, teamGames, weekAgo } from "../lib/teams.ts";
 
 interface Props {
   season: SeasonView;
@@ -23,14 +23,13 @@ const { season, abbr, route, paint } = Astro.props;
 const m = season.model;
 const me = team(season, abbr);
 const games = teamGames(m, abbr);
-const regular = games.filter((g) => g.stage.phase === "regular");
 const postseason = games.filter((g) => g.stage.phase !== "regular");
 const recent = games.slice(-RECENT);
 const then = weekAgo(m, TODAY);
 const figures = [
   { label: "Rating", value: rating(m.r[abbr]) },
   { label: "Rank", value: place(m, abbr) },
-  { label: "Record", value: record(...recordOf(regular)) },
+  { label: "Record", value: record(...standingsRecord(m, abbr)) },
   ...(postseason.length ? [{ label: "Postseason", value: record(...recordOf(postseason)) }] : []),
   ...(recent.length ? [{ label: `Last ${RECENT}`, value: record(...recordOf(recent)) }] : []),
   ...(then ? [{ label: "This week", value: signed(Math.round(m.r[abbr]) - Math.round(then.r[abbr])) }] : []),

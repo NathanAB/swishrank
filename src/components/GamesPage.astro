@@ -13,7 +13,7 @@ import { monthName, monthShort } from "../lib/format.ts";
 import { monthRoute, months, recentDays } from "../lib/results.ts";
 import { href, type Route } from "../lib/routes.ts";
 import { TODAY, noGamesAhead, type SeasonView } from "../lib/season.ts";
-import { RECENT } from "../lib/teams.ts";
+import { NEXT_GAMES } from "../lib/teams.ts";
 
 interface Props {
   season: SeasonView;
@@ -66,7 +66,7 @@ const switcher = [
         <section class="part" aria-labelledby="ahead">
           <div class="part-head">
             <h2 id="ahead">Coming up</h2>
-            <p class="meta">The next {AHEAD_DAYS} game days. Chances use today's ratings, and each team's page lists its next {RECENT} games.</p>
+            <p class="meta">The next {AHEAD_DAYS} game days. Chances use today's ratings, and each team's page lists its next {NEXT_GAMES} games.</p>
           </div>
           {ahead.length === 0 ? <p class="empty">{noGamesAhead(season)}</p> : ahead.map((d, i) => <FixtureList season={season} day={d} lead={i === 0} />)}
         </section>

@@ -39,18 +39,21 @@ export const tied = (ranks: Record<Abbr, number>, abbr: Abbr) => Object.entries(
 export const place = (model: Season, abbr: Abbr) => placeLabel(model.rank[abbr], tied(model.rank, abbr));
 
 export type Phase = "regular" | "play-in" | "playoffs";
-/** What kind of game it was, and a short tag for it ("Finals game 3", "NBA Cup", "Berlin"), if any. */
-export type Stage = { phase: Phase; label: string | null };
+/**
+ * What kind of game it was, a short tag for it ("Finals game 3", "NBA Cup", "Berlin"), if any, and whether it
+ * counts in the standings: every regular-season game but the NBA Cup final, as the league counts them.
+ */
+export type Stage = { phase: Phase; label: string | null; standings: boolean };
 
 // ESPN's game notes, tried in order. "NBA Cup - Semifinals" is a regular-season game, so the conference
 // rounds are matched on their whole prefix. The Cup was the In-Season Tournament in its first season, 2023-24.
-const STAGES: readonly (readonly [RegExp, Phase, string])[] = [
+const STAGES: readonly (readonly [RegExp, Phase, string, standings?: false])[] = [
   [/^NBA Finals - Game (\d+)$/, "playoffs", "Finals game $1"],
   [/^(East|West) Finals - Game (\d+)$/, "playoffs", "$1 finals game $2"],
   [/^(East|West) Semifinals - Game (\d+)$/, "playoffs", "$1 semis game $2"],
   [/^(East|West) 1st Round - Game (\d+)$/, "playoffs", "1st round game $2"],
   [/^NBA Play-In\b.*$/, "play-in", "Play-In"],
-  [/^NBA (?:Cup|In-Season Tournament) Championship$/, "regular", "NBA Cup final"],
+  [/^NBA (?:Cup|In-Season Tournament) Championship$/, "regular", "NBA Cup final", false],
   [/^NBA (?:Cup|In-Season Tournament) - Semifinals$/, "regular", "NBA Cup semifinal"],
   [/^NBA (?:Cup|In-Season Tournament) - Quarterfinals$/, "regular", "NBA Cup quarterfinal"],
   [/^NBA (?:Cup|In-Season Tournament) - Group Play$/, "regular", "NBA Cup"],
@@ -58,9 +61,11 @@ const STAGES: readonly (readonly [RegExp, Phase, string])[] = [
 ];
 
 export function stage(note: string | null): Stage {
-  if (note === null) return { phase: "regular", label: null };
-  for (const [pattern, phase, label] of STAGES) if (pattern.test(note)) return { phase, label: note.replace(pattern, label) };
-  return { phase: "regular", label: note };
+  if (note === null) return { phase: "regular", label: null, standings: true };
+  for (const [pattern, phase, label, standings] of STAGES) {
+    if (pattern.test(note)) return { phase, label: note.replace(pattern, label), standings: phase === "regular" && standings !== false };
+  }
+  return { phase: "regular", label: note, standings: true };
 }
 
 /** The last day of the regular season, once the play-in or the playoffs has a game, played or scheduled; null before. */
@@ -116,7 +121,7 @@ export function teamGames(model: Season, abbr: Abbr): TeamGame[] {
   });
 }
 
-/** How many games make a team's recent form, and how many a team's page lists ahead. */
+/** How many games make a team's recent form. */
 export const RECENT = 5;
 
 /** Wins and losses in `games`. */
@@ -125,12 +130,18 @@ export function recordOf(games: readonly TeamGame[]): [number, number] {
   return [won, games.length - won];
 }
 
-/** The team's next RECENT games from `today` on, however far ahead, in tip-off order. */
+/** A team's record in the standings, the one the league table shows: its regular-season games bar the NBA Cup final. */
+export const standingsRecord = (model: Season, abbr: Abbr) => recordOf(teamGames(model, abbr).filter((g) => g.stage.standings));
+
+/** How many games a team's page lists ahead. */
+export const NEXT_GAMES = 5;
+
+/** The team's next NEXT_GAMES games from `today` on, however far ahead, in tip-off order. */
 export const nextGames = (model: Season, abbr: Abbr, today: string): Game[] =>
   model.upcoming
     .filter((g) => (g.home === abbr || g.away === abbr) && dayKey(g.t) >= today)
     .sort((x, y) => x.t.localeCompare(y.t))
-    .slice(0, RECENT);
+    .slice(0, NEXT_GAMES);
 
 /**
  * The ratings a week (WEEK days) before the season's latest day, for how far a team moved since. Null until the

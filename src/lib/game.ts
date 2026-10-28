@@ -21,7 +21,7 @@ export type GameSide = {
   rating: number;
   /** League place after the game's day, or now: "9th" or "tied 9th". */
   place: string;
-  /** Wins and losses after the game, or now, in the game's part of the season: the regular season, or after it. */
+  /** Wins and losses after the game, or now: in the standings for a regular-season game, in the postseason for one after it. */
   record: [number, number];
   /** Up to RECENT games before this one, oldest first. */
   previous: TeamGame[];
@@ -60,7 +60,7 @@ export function gameView(model: Season, game: Game): GameView {
   const after = o && model.series.find((s) => s.day === day);
   const ranks = after ? ranksOf(after.r) : model.rank;
   const pHome = result ? result.p : fixture(game, model).lines[1].chance;
-  const regular = stage(game.note).phase === "regular";
+  const postseason = stage(game.note).phase !== "regular";
 
   const side = (abbr: Abbr, s: GameSide["side"]): GameSide => {
     const games = teamGames(model, abbr);
@@ -73,7 +73,7 @@ export function gameView(model: Season, game: Game): GameView {
       upset: o !== null && line?.won === true && upset(o),
       rating: line ? line.rating : model.r[abbr],
       place: placeLabel(ranks[abbr], tied(ranks, abbr)),
-      record: recordOf(games.filter((g) => g.result.day <= day && (g.stage.phase === "regular") === regular)),
+      record: recordOf(games.filter((g) => g.result.day <= day && (postseason ? g.stage.phase !== "regular" : g.stage.standings))),
       previous: games.filter((g) => g.result.day < day).slice(-RECENT),
     };
   };

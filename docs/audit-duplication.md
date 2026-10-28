@@ -62,7 +62,7 @@ The header cell, row rule and last-row rules are repeated in LeagueTable and `se
 
 - `PreviousGames` re-implements Panel's card to get its team-colour edges. An edge option on Panel would end that.
 - The selected-tab style (the site nav and the games-page month switch) is written twice, as is the 8px control radius.
-- 640px appears in 13 media queries and 1023/1024px in five files. CSS `@custom-media` would name them once, but browsers don't support it yet without a build step.
+- 640px appears in 11 media queries, and 1023/1024px media queries are in four files. CSS `@custom-media` would name them once, but browsers don't support it yet without a build step.
 - 11px, and most of the game and team pages' large type (40, 48, 64px), have no token.
 
 ### 9. Empty states and notes (medium-low)

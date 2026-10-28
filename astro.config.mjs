@@ -11,7 +11,7 @@ const MOVED = /\/(graph|fixtures|results(\/[^/]+)?|teams)\/$/;
 // https://astro.build/config
 export default defineConfig({
   site: 'https://swishrank.com',
-  // One stylesheet file every page shares and the browser caches, rather than a copy inside each of some fifteen
+  // Stylesheets as files the pages share and the browser caches, rather than a copy inside each of some fifteen
   // thousand pages (https://docs.astro.build/en/reference/configuration-reference/#buildinlinestylesheets).
   build: { inlineStylesheets: 'never' },
   // Astro downloads the face at build time and serves it from the site, with metric-matched fallbacks.

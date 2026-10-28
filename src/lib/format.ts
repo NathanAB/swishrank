@@ -21,7 +21,7 @@ export const percent = (p: number) => Math.round(p * 100);
 /** A probability as a whole percentage: 64%. */
 export const pct = (p: number) => `${percent(p)}%`;
 
-export const ordinal = (n: number) => {
+const ordinal = (n: number) => {
   const tens = n % 100;
   const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
   return `${n}${suffix}`;

@@ -19,7 +19,7 @@ import { rating, record } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
 import { href } from "../lib/routes.ts";
 import type { SeasonView } from "../lib/season.ts";
-import { standings, type Conference } from "../lib/teams.ts";
+import { standings, standingsRecord, type Conference } from "../lib/teams.ts";
 import { tintStyles } from "../lib/tint.ts";
 
 interface Props {
@@ -97,7 +97,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
     </thead>
     <tbody>
       {order.map((a, i) => {
-        const s = m.stats[a];
+        const [W, L] = standingsRecord(m, a);
         return (
           <tr data-team={a} data-preview data-href={href({ kind: "team", season, abbr: a })}>
             {i === 0 && (
@@ -131,7 +131,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
                             points={l.run}
                           />
                         ))}
-                        {lines.map((l) => l.trail && <polyline class="trail" data-team={l.a} data-trail style={tint[l.a]} points={l.trail} />)}
+                        {lines.map((l) => l.trail && <polyline class="trail" data-team={l.a} data-trail data-raise style={tint[l.a]} points={l.trail} />)}
                       </g>
                     </svg>
                   )}
@@ -156,10 +156,10 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
             <td class="num rank">{rank[a]}</td>
             <td class="team">
               <a class="go" href={href({ kind: "team", season, abbr: a })} data-team={a} data-preview><span class="name">{m.data.teams[a].short}</span></a>
-              <span class="sub">{record(s.W, s.L)}</span>
+              <span class="sub">{record(W, L)}</span>
             </td>
             <td class="num rating">{rating(m.r[a])}</td>
-            <td class="num opt">{record(s.W, s.L)}</td>
+            <td class="num opt">{record(W, L)}</td>
           </tr>
         );
       })}

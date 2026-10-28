@@ -77,8 +77,9 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 </Base>
 
 <style>
-  /* The next games down a side column, sticking as the log scrolls past. Under 1024px everything stacks and the
-     days of games sit side by side, as on the games page, so they don't fill the screen above the chart. */
+  /* The next games down a side column, sticking as the log scrolls past. Under 1024px everything stacks, and on
+     a tablet the days of games sit side by side, as on the games page, so they don't fill the screen above the
+     chart. */
   .cols { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: var(--gap); align-items: start; margin-top: var(--gap); }
   .solo { grid-template-columns: minmax(0, 1fr); }
   .side { position: sticky; top: var(--gap); }

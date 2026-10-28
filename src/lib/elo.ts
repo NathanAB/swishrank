@@ -180,7 +180,7 @@ export type Result = { game: Game; day: string; p: number; pre: Pair; post: Pair
 export type Snapshot = { day: string; r: Record<Abbr, number> };
 export type TeamGame = { result: Result; side: "h" | "a" };
 /** `hi` and `lo` are the team's highest and lowest rating on any day of the season, 1000 included. */
-export type TeamStats = { W: number; L: number; hi: number; lo: number };
+export type TeamStats = { hi: number; lo: number };
 
 export type Season = {
   data: SeasonData;
@@ -250,13 +250,7 @@ export function compute(data: SeasonData): Season {
 
   const stats = Object.fromEntries(
     abbrs.map((a) => {
-      const s: TeamStats = { W: 0, L: 0, hi: START, lo: START };
-      for (const { result, side } of log[a]) {
-        const g = result.game;
-        const mine = side === "h" ? g.hs! : g.as!;
-        const theirs = side === "h" ? g.as! : g.hs!;
-        s[mine > theirs ? "W" : "L"]++;
-      }
+      const s: TeamStats = { hi: START, lo: START };
       for (const d of series) {
         s.hi = Math.max(s.hi, d.r[a]);
         s.lo = Math.min(s.lo, d.r[a]);

@@ -70,11 +70,12 @@ const share = blockShare(view, s);
   .chg:not(.paid) { font-weight: 400; }
   .chg { font-size: var(--fs-body); }
 
-  /* About half a 1024px page: too narrow for four figures in a row beside the big number, so they stand two by
-     two, mirrored in the home block, rather than leave one on a line of its own. */
+  /* About half a 1024px page: too narrow for a played game's four figures in a row beside the big number, so
+     they stand two by two, mirrored in the home block, rather than leave one on a line of its own. A game to
+     come has three, which fit in a row. */
   @container (max-width: 559px) {
-    .stats { display: grid; grid-template-columns: repeat(2, max-content); }
-    .home .stats { direction: rtl; }
+    .stats:has(> :nth-child(4)) { display: grid; grid-template-columns: repeat(2, max-content); }
+    .home .stats:has(> :nth-child(4)) { direction: rtl; }
     .home .stats > div { direction: ltr; }
   }
 
