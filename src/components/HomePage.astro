@@ -1,14 +1,17 @@
 ---
 // A season's home: the league table with every team's season drawn into it, for the whole league or one
-// conference, picked by the switch in the card's header, which is the page's header too.
+// conference, picked by the switch in the card's header, which is the page's header too. Each page holds all
+// three tables, so the switch filters in place: it shows the picked one and puts its URL and titles on the
+// page without loading it. Without script the switch's links load each view's own page.
 import Base from "../layouts/Base.astro";
 import LeagueTable from "./LeagueTable.astro";
 import Panel from "./Panel.astro";
 import ScaleKey from "./ScaleKey.astro";
 import SeasonMenu from "./SeasonMenu.astro";
 import Segmented from "./Segmented.astro";
-import { homeDescription, homeTitle } from "../lib/meta.ts";
+import { homeDescription, homeTitle, SITE_NAME } from "../lib/meta.ts";
 import { href, type Route } from "../lib/routes.ts";
+import { seasonSwitch } from "../lib/season.ts";
 import type { SeasonView } from "../lib/season.ts";
 import { CONFERENCE_ORDER, type Conference } from "../lib/teams.ts";
 
@@ -20,7 +23,9 @@ interface Props {
 
 const { season, conference } = Astro.props;
 const route: Route = { kind: "home", season, conference };
+const heading = (c?: Conference) => (c ? `${season.label} · ${c}ern Conference` : `${season.label} ratings`);
 const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
+  conference: c,
   label: c ?? "All",
   href: href({ kind: "home", season, conference: c }),
   current: c === conference,
@@ -34,15 +39,56 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   route={route}
   ownHeading
 >
-  <Panel level={1} title={conference ? `${season.label} · ${conference}ern Conference` : `${season.label} ratings`} meta={season.note ?? undefined}>
+  <Panel level={1} title={heading(conference)} meta={season.note ?? undefined}>
     <Fragment slot="aside">
       <Segmented label="Conference" options={views} />
       <SeasonMenu route={route} />
     </Fragment>
     <ScaleKey class="lead" />
-    <LeagueTable season={season} conference={conference} />
+    {views.map((v) => (
+      <div
+        hidden={!v.current}
+        data-view={v.href}
+        data-heading={heading(v.conference)}
+        data-doc-title={`${homeTitle(season, v.conference)} · ${SITE_NAME}`}
+        data-seasons={JSON.stringify(seasonSwitch({ kind: "home", season, conference: v.conference }).map((o) => o.href))}
+      >
+        <LeagueTable season={season} conference={v.conference} />
+      </div>
+    ))}
   </Panel>
 </Base>
+
+<script>
+  const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Conference"] a')];
+  const heading = document.querySelector("h1");
+  const menu = document.querySelector<HTMLSelectElement>("select[data-season-menu]");
+
+  function show(path: string) {
+    const view = views.find((v) => v.dataset.view === path);
+    if (!view) return false;
+    for (const v of views) v.hidden = v !== view;
+    for (const a of links) {
+      if (a.pathname === path) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    }
+    if (heading) heading.textContent = view.dataset.heading ?? "";
+    document.title = view.dataset.docTitle ?? document.title;
+    const seasons: unknown = JSON.parse(view.dataset.seasons ?? "[]");
+    if (menu && Array.isArray(seasons)) seasons.forEach((s, i) => menu.options[i] && (menu.options[i].value = String(s)));
+    return true;
+  }
+
+  for (const a of links) {
+    a.addEventListener("click", (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      if (a.pathname !== location.pathname && show(a.pathname)) history.pushState(null, "", a.href);
+    });
+  }
+  addEventListener("popstate", () => show(location.pathname) || location.reload());
+</script>
 
 <style>
   .lead { margin: -4px 0 16px; }
