@@ -1,35 +1,33 @@
 /* Tokens from the data-terminal prototype: a true neutral palette, Public Sans, and basketball-leather
    orange as the one accent. The accent marks the mark, a selection (a 1px line as wide as its label), focus
    and the about page's worked examples; everything else is ink and greys, but for the charts' lines, which
-   carry each team's colour. Dark has its own values, not an inversion of light, and applies when the root's
-   data-theme is dark: the system's setting until the reader picks one with the switch in the top bar. Every page keeps to a 1400px column. */
+   carry each team's colour. The site is dark only. Every page keeps to a 1400px column. */
 :root {
-  color-scheme: light;
-  /* Cards sit lighter than the page in both themes, edged by a border a step darker than either, so every
-     card reads as a raised surface. */
-  --ground: #f7f7f7;
-  --surface: #ffffff;
-  /* A block set inside a card, such as a game's tile: a step off the card, lighter than a line. */
-  --raised: #f4f4f4;
-  --border: #e5e5e5;
-  --rule: #efefef;
-  --control: #d4d4d4;
-  --text: #111111;
-  --muted: #5c5c5c;
-  --accent: #c2560c;
-  --grid: #ebebeb;
-  --line-other: #bcbcbc;
-  --bar: #888888;
-  /* How much of a team's colour its line carries at rest, and what the rest of the line is: on light the
-     card's white, so a resting line is a clean pale shade of the team colour rather than a greyed one; on
-     dark the grey of an ordinary line. A previewed team draws in its full colour. */
-  --tint-mix: 60%;
-  --tint-base: var(--surface);
+  color-scheme: dark;
+  /* Cards sit lighter than the page, edged by a border lighter than either, so every card reads as a raised
+     surface. */
+  --ground: #0c0c0c;
+  --surface: #191919;
+  /* A block set inside a card, such as a game's tile: a step off the card. */
+  --raised: #0c0c0c;
+  --border: #2e2e2e;
+  --rule: #242424;
+  --control: #444444;
+  --text: #f5f5f5;
+  --muted: #999999;
+  --accent: #f08c3a;
+  --grid: #2a2a2a;
+  --line-other: #646464;
+  --bar: #737373;
+  /* How much of a team's colour its line carries at rest, mixed into the grey of an ordinary line. A previewed
+     team draws in its full colour. */
+  --tint-mix: 50%;
+  --tint-base: var(--line-other);
   /* A switch's track, and the pill that raises its current option (components/Segmented.astro); the
-     season menu sits on the same track. The light pill is the card's white, so a shadow lifts it. */
-  --seg-track: #efefef;
-  --seg-pill: #ffffff;
-  --seg-lift: 0 1px 2px rgba(0, 0, 0, 0.12);
+     season menu sits on the same track. */
+  --seg-track: #262626;
+  --seg-pill: #454545;
+  --seg-lift: none;
   --panel-edge: 1px solid var(--border);
 
   --font: var(--font-public-sans), system-ui, sans-serif;
@@ -50,30 +48,8 @@
   --control-h: 28px;
 }
 
-/* A team's line colour for this theme (lib/tint.ts), on whatever draws that team, and its resting shade. */
-[data-team] { --tint: var(--tint-light); --tint-rest: color-mix(in oklab, var(--tint) var(--tint-mix), var(--tint-base)); }
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --ground: #0c0c0c;
-  --surface: #191919;
-  --raised: #0c0c0c;
-  --border: #2e2e2e;
-  --rule: #242424;
-  --control: #444444;
-  --text: #f5f5f5;
-  --muted: #999999;
-  --accent: #f08c3a;
-  --grid: #2a2a2a;
-  --line-other: #646464;
-  --tint-mix: 50%;
-  --tint-base: var(--line-other);
-  --bar: #737373;
-  --seg-track: #262626;
-  --seg-pill: #454545;
-  --seg-lift: none;
-}
-:root[data-theme="dark"] [data-team] { --tint: var(--tint-dark); }
+/* A team's line colour (lib/tint.ts) is set as --tint on whatever draws that team; this is its resting shade. */
+[data-team] { --tint-rest: color-mix(in oklab, var(--tint) var(--tint-mix), var(--tint-base)); }
 
 
 @media (max-width: 640px) {
