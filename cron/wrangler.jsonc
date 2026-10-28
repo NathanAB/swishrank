@@ -1,5 +1,6 @@
 {
   "name": "nba-elo-cron",
+  "account_id": "f8a103773e6ba1a5a81e5a40b3e107a7",
   "main": "index.js",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
