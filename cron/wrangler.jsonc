@@ -9,7 +9,7 @@
     "crons": ["17 8 * * *"]
   },
   "vars": {
-    "REPO": "NathanAB/nba-elo"
+    "REPO": "NathanAB/swishrank"
   },
   // GITHUB_TOKEN is a secret: a fine-grained token for this repo with Actions read and write.
   "observability": {
