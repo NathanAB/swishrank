@@ -37,9 +37,10 @@ test("the re-fit moves a team that did not play when a past opponent's results c
 });
 
 test("a game's ratings before and after are the team's ratings at the end of the day before and of its day", () => {
+  // B and D have a game to come, so neither season is over and nothing holds a rating.
   const m = compute({
     season: "x", teams: teams("A", "B", "C", "D"),
-    games: [game("1", "2026-10-20T23:00Z", "A", "B", 120, 100), game("2", "2026-10-21T23:00Z", "C", "A", 101, 100)],
+    games: [game("1", "2026-10-20T23:00Z", "A", "B", 120, 100), game("2", "2026-10-21T23:00Z", "C", "A", 101, 100), game("3", "2026-10-23T23:00Z", "D", "B", null, null)],
   });
   const second = m.results[1];
   const [, dayOne, dayTwo] = m.series;

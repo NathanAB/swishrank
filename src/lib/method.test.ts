@@ -53,7 +53,8 @@ test("leaves out a kind with no game yet", () => {
 test("names a team that rose on a day it did not play, and the team it had beaten that won that day", () => {
   // A beats B, D beats C and I beats H; two days later B, C, D and I all win. A and H rest and rise, H by more,
   // but H lost to I rather than beat it. D rises most and had beaten C, but D played. K and L open the season a
-  // year earlier, so by these days the pull toward each team's seed has faded and one game moves a rating.
+  // year earlier, so by these days the pull toward each team's seed has faded and one game moves a rating. A and H
+  // still have a game to come, so their seasons are not over.
   const dayTwo = (g: Game): Game => ({ ...g, t: "2026-10-22T23:00Z" });
   const m = compute({
     season: "x",
@@ -67,6 +68,7 @@ test("names a team that rose on a day it did not play, and the team it had beate
       dayTwo(game("C beats F", "F", "C", 100, 130, true)),
       dayTwo(game("D beats G", "G", "D", 100, 140, true)),
       dayTwo(game("I beats J", "J", "I", 100, 160, true)),
+      { ...game("A and H to come", "H", "A", 0, 0), t: "2026-10-24T23:00Z", hs: null, as: null, final: false },
     ],
   });
   const pick = offDay(m.results, m.series);

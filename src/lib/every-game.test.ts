@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { compute, counted, EARLY, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, phi, playerPart, shownChange, shownLineups, type Abbr, type SeasonData } from "./elo.ts";
+import { compute, counted, dayKey, EARLY, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, phi, playerPart, shownChange, shownLineups, type Abbr, type SeasonData } from "./elo.ts";
 import { modelInputs } from "./inputs.ts";
 import type { Lineup } from "./players.ts";
 
@@ -126,6 +126,18 @@ test("no player counts for two teams on the same day", () => {
         assert.ok(!teamOf.has(athlete), `${id} ${day}: athlete ${athlete} counts for ${teamOf.get(athlete)} and ${a}`);
         teamOf.set(athlete, a);
       }
+    }
+  }
+});
+
+test("after a team's last game of the season, only the shift moves its rating", () => {
+  for (const { id, data, model } of seasons) {
+    const lastDay = new Map<Abbr, string>();
+    for (const g of data.games) for (const a of [g.home, g.away]) if (dayKey(g.t) > (lastDay.get(a) ?? "")) lastDay.set(a, dayKey(g.t));
+    for (let i = 1; i < model.series.length; i++) {
+      const [was, now] = [model.series[i - 1], model.series[i]];
+      const moves = model.abbrs.filter((a) => was.day >= lastDay.get(a)!).map((a) => [a, now.r[a] - was.r[a]] as const);
+      for (const [a, move] of moves) assert.ok(Math.abs(move - moves[0][1]) < 1e-9, `${id} ${now.day}: ${a} moved ${move}, ${moves[0][0]} ${moves[0][1]}`);
     }
   }
 });

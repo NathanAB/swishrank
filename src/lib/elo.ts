@@ -409,7 +409,8 @@ export function shownLineups(data: SeasonData, rotation: SeasonRotations | undef
  * the same amount for every team so the league's mean is 1000. Until a team's first game is played it shows its
  * seed alone; once it is, the days before it count that game's rotation, if it has one. A game's `pre` and `post` hold the
  * rotation the team had before its day and the day's shift, so their difference is what the game did: a change
- * of players, or of the shift, shows on the chart and never in the game's change.
+ * of players, or of the shift, shows on the chart and never in the game's change. After a team's last game in
+ * the season's file, played or to come, its rating holds where that game day left it, and only the shift moves it.
  */
 export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const abbrs = Object.keys(data.teams);
@@ -430,6 +431,9 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const log: Record<Abbr, TeamGame[]> = Object.fromEntries(abbrs.map((a) => [a, []]));
   const results: Result[] = [];
   const endOfDay = new Map<string, Record<Abbr, number>>();
+  const lastDay = new Map<Abbr, string>();
+  for (const g of data.games) for (const a of [g.home, g.away]) if (dayKey(g.t) > (lastDay.get(a) ?? "")) lastDay.set(a, dayKey(g.t));
+  const held = new Map<Abbr, number>();
 
   for (const { day, games, before, after } of days) {
     const priced = games.map((pg) => ({
@@ -441,6 +445,11 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
     Object.assign(next, players?.lineups.next.get(day));
     usual = shown.after.get(day)!;
     const now = rated(after, usual);
+    for (const a of abbrs) {
+      const h = held.get(a);
+      if (h !== undefined) now[a] = h;
+      else if (lastDay.get(a) === day) held.set(a, now[a]);
+    }
     const by = shiftTo1000(now);
     r = shifted(now, by);
     latest = after;
