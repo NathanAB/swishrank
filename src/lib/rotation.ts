@@ -1,8 +1,9 @@
-// The rotation behind each team's shown rating (docs/model-v2.md, What the reader sees). A rating is the team's
-// expected strength over its next 10 games: its team part plus each player's value times the minutes the team
-// can expect from him over those games. Those are his usual minutes when he plays times his availability, which
-// comes from the day's archived injury report when it gives his return, and otherwise from the games he has
-// missed in a row. A player out for the season fades to nothing; one who missed a game keeps most of his weight.
+// Expected minutes, the rotation npm run ratings scores against the usual one the site shows (docs/model-v2.md,
+// How the injury report will be judged); nothing on the site reads it. A rating is the team's expected strength
+// over its next 10 games: its team part plus each player's value times the minutes the team can expect from
+// him over those games. Those are his usual minutes when he plays times his availability, which comes from the
+// day's archived injury report when it gives his return, and otherwise from the games he has missed in a row.
+// A player out for the season fades to nothing; one who missed a game keeps most of his weight.
 import { finalDays, dayKey, addDays, type Abbr, type SeasonData } from "./elo.ts";
 import { beforeTip, type InjuryArchive } from "./injuries.ts";
 import { scaled, type Athlete, type SeasonPlayers, type SeasonRotations } from "./players.ts";

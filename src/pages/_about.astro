@@ -117,7 +117,7 @@ const game = opener && {
       <dt>Scale</dt>
       <dd>Borrowed from chess's Elo ratings. Unlike Elo, which moves a rating after each game, these are refitted to the whole season every day.</dd>
       <dt>Players</dt>
-      <dd>Each player has a value, measured from his box scores over past seasons and his team's results this season. A team's rating counts the players from its last game, so it drops while a regular sits out.</dd>
+      <dd>Each player has a value, measured from his box scores over past seasons and his team's results this season. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
       <dt>Chances</dt>
       <dd>They follow how often past favorites won at each gap, within one percentage point of Elo's formula, 1 / (1 + 10^(−gap / 400)).</dd>
       <dt>Later games</dt>

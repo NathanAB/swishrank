@@ -387,7 +387,7 @@ export const addDays = (key: string, n: number) => new Date(Date.parse(key + "T0
 
 /**
  * The season as the site shows it. A team's shown rating is its team part plus the player part of its rotation
- * (src/lib/rotation.ts), on the Elo scale: the fitted margin units times ELO_PER_SIGMA / SIGMA, shifted each day by
+ * (lineups() in src/lib/players.ts), on the Elo scale: the fitted margin units times ELO_PER_SIGMA / SIGMA, shifted each day by
  * the same amount for every team so the league's mean is 1000. Until a team's first game is played it shows its
  * seed alone; once it is, the days before it count that game's rotation. A game's `pre` and `post` hold the
  * rotation the team had before its day and the day's shift, so their difference is what the game did: a change

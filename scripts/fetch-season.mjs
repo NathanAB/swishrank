@@ -74,7 +74,7 @@ async function fetchBox(id, finals) {
   console.log(`${id}: box scores for ${added} more games, ${finals.length - Object.keys(box.games).length} final games without one`);
 }
 
-// The report only weighs who is expected to play in each team's shown rating, so a failed, empty or
+// Nothing on the site reads the report yet: it is archived for docs/model-v2.md's judgment. So a failed, empty or
 // unreadable one is a warning and never fails the run.
 async function fetchInjuries(id) {
   try {
