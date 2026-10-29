@@ -337,7 +337,13 @@ export type TeamStats = { hi: number; lo: number };
 export type Season = {
   data: SeasonData;
   abbrs: Abbr[];
+  /** Each team's shown rating today. */
   r: Record<Abbr, number>;
+  /**
+   * Each team's rating as the chances of games to come read it, in Elo points: its team part plus the player part of
+   * the lineup it takes into its next game. Only a gap between two of them means anything.
+   */
+  pricing: Record<Abbr, number>;
   /** The home edge the latest fit measured, in Elo points. */
   home: number;
   rank: Record<Abbr, number>;
@@ -366,8 +372,11 @@ export const dayKey = (iso: string) => dayFmt.format(new Date(iso));
 export const addDays = (key: string, n: number) => new Date(Date.parse(key + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
 /**
- * The season as the site shows it. A team's rating is its team part plus the player part of the lineup it takes
- * into its next game, on the Elo scale: 1000 plus the fitted margin units times ELO_PER_SIGMA / SIGMA.
+ * The season as the site shows it. A team's shown rating is its team part plus the player part of its usual
+ * rotation, on the Elo scale: the fitted margin units times ELO_PER_SIGMA / SIGMA, shifted each day by the same
+ * amount for every team so the league's mean is 1000. Until a team's first game is played it shows its seed alone;
+ * once it is, the days before it count that game's rotation. A game's `post` keeps the rotation of its `pre`, so a
+ * change of players shows on the chart on its day and never in the game's change.
  */
 export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const abbrs = Object.keys(data.teams);
@@ -375,11 +384,17 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const scale = ELO_PER_SIGMA / PARAMS.sigma;
   const days = fitSeason(data, PARAMS, { centres, players: players && { ...players, lineups: players.lineups.previous } });
   const next: Record<Abbr, Lineup> = Object.fromEntries(abbrs.map((a) => [a, []]));
-  const shown = (fit: Fit) => Object.fromEntries(abbrs.map((a) => [a, START + (fit.r[a] + playerPart(fit, next[a])) * scale]));
+  const usual: Record<Abbr, Lineup> = { ...next };
+  // Each team's rotation after its first game, so the latest day's is applied first and the earliest last.
+  for (const byTeam of [...(players?.lineups.rotation.values() ?? [])].reverse()) Object.assign(usual, byTeam);
+  const rated = (fit: Fit, lineups: Record<Abbr, Lineup>) => Object.fromEntries(abbrs.map((a) => [a, (fit.r[a] + playerPart(fit, lineups[a])) * scale]));
+  const shiftTo1000 = (raw: Record<Abbr, number>) => START - abbrs.reduce((s, a) => s + raw[a], 0) / (abbrs.length || 1);
+  const shifted = (raw: Record<Abbr, number>, by: number) => Object.fromEntries(abbrs.map((a) => [a, raw[a] + by]));
   const start = days[0]?.before ?? startFit(abbrs, PARAMS, centres);
-  const opening = shown(start);
+  const startRated = rated(start, usual);
+  const opening = shifted(startRated, shiftTo1000(startRated));
   let r = opening;
-  let home = start.home * scale;
+  let latest = start;
   const log: Record<Abbr, TeamGame[]> = Object.fromEntries(abbrs.map((a) => [a, []]));
   const results: Result[] = [];
   const endOfDay = new Map<string, Record<Abbr, number>>();
@@ -390,11 +405,15 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
       p: phi(expected(before, pg) / (PARAMS.sigma * (played(log, pg.game) < EARLY.games ? EARLY.widen : 1))),
       pre: { h: r[pg.game.home], a: r[pg.game.away] },
     }));
+    const kept = rated(after, usual);
     Object.assign(next, players?.lineups.next.get(day));
-    r = shown(after);
-    home = after.home * scale;
+    Object.assign(usual, players?.lineups.rotation.get(day));
+    const now = rated(after, usual);
+    const by = shiftTo1000(now);
+    r = shifted(now, by);
+    latest = after;
     for (const { pg: { game }, p, pre } of priced) {
-      const result: Result = { game, day, p, pre, post: { h: r[game.home], a: r[game.away] } };
+      const result: Result = { game, day, p, pre, post: { h: kept[game.home] + by, a: kept[game.away] + by } };
       results.push(result);
       log[game.home].push({ result, side: "h" });
       log[game.away].push({ result, side: "a" });
@@ -428,8 +447,9 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
 
   const second = secondNights(data);
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
+  const pricing = rated(latest, next);
   return {
-    data, abbrs, r, home, rank: ranksOf(r), log, results, series, stats, order,
+    data, abbrs, r, pricing, home: latest.home * scale, rank: ranksOf(r), log, results, series, stats, order,
     upcoming: data.games.filter((g) => !g.final),
     b2b: Object.fromEntries(data.games.map((g) => [g.id, b2bTerm(PARAMS, second.get(g.id)!) * scale])),
   };

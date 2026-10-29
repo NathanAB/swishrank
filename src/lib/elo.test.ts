@@ -65,7 +65,7 @@ test("the win chance shown for a rating gap is the model's own chance for that g
   const m = compute(data);
   const fit = fitSeason(data, PARAMS).at(-1)!.after;
   const next = m.upcoming[0];
-  near(winProb(gap(next, m.r, m.home)), phi((fit.r.A - fit.r.C + fit.home) / PARAMS.sigma), "A's chance against C");
+  near(winProb(gap(next, m.pricing, m.home)), phi((fit.r.A - fit.r.C + fit.home) / PARAMS.sigma), "A's chance against C");
 });
 
 test("a 43-point win counts at most four times a 1-point win, and a loss counts as the same win negated", () => {

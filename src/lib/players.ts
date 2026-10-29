@@ -92,8 +92,16 @@ export function boxRatings(seasons: readonly SeasonPlayers[], halfLife: number):
   return out;
 }
 
-/** A season's lineups. `next` holds, after each game day, the lineup each team that played takes into its next game. */
-export type Lineups = { previous: Map<string, Sides<Lineup>>; atTip: Map<string, Sides<Lineup>>; next: Map<string, Partial<Record<Abbr, Lineup>>> };
+/**
+ * A season's lineups. `next` holds, after each game day, the lineup each team that played takes into its next game,
+ * and `rotation` its usual rotation, which the site shows its rating with.
+ */
+export type Lineups = {
+  previous: Map<string, Sides<Lineup>>;
+  atTip: Map<string, Sides<Lineup>>;
+  next: Map<string, Partial<Record<Abbr, Lineup>>>;
+  rotation: Map<string, Partial<Record<Abbr, Lineup>>>;
+};
 
 /** A lineup's minutes: everyone's expected minutes scaled so the team's total is 240. */
 const MINUTES = 240;
@@ -103,28 +111,43 @@ const ROTATION = 10;
 const RECENT = 10;
 /** Expected minutes of a player with no appearances. */
 const UNKNOWN = 15;
+/** A team's games its usual rotation reads. */
+const USUAL = 10;
+
+const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+/** Players at their expected minutes, scaled so the team's total is 240, as shares of 48. */
+const scaled = (players: readonly { athlete: Athlete; min: number }[]): Lineup => {
+  const total = players.reduce((s, p) => s + p.min, 0);
+  return players.map((p) => ({ athlete: p.athlete, share: (p.min * MINUTES) / total / 48 }));
+};
 
 /**
  * Every season's lineups. A game's `previous` lineup is the players who played in the team's latest game this
  * season with lines; `atTip` is the players who played in the game itself, or `previous` for a side without lines.
  * Either keeps those whose expected minutes, the mean of their last 10 appearances on any team, are at least 10.
- * A team's first game has none.
+ * A team's first game has none. Its `rotation` is everyone who played in any of its last 10 games this season
+ * with lines, each at the mean of his last 10 appearances for it this season.
  */
 export function lineups(seasons: readonly SeasonPlayers[]): Map<string, Lineups> {
   const recent = new Map<Athlete, number[]>();
   const expected = (a: Athlete) => {
     const r = recent.get(a);
-    return r ? r.reduce((s, m) => s + m, 0) / r.length : UNKNOWN;
+    return r ? mean(r) : UNKNOWN;
   };
-  const lineup = (lines: readonly BoxLine[] | undefined): Lineup => {
-    const kept = (lines ?? []).map((l) => ({ athlete: l[0], min: expected(l[0]) })).filter((p) => p.min >= ROTATION);
-    const total = kept.reduce((s, p) => s + p.min, 0);
-    return kept.map((p) => ({ athlete: p.athlete, share: (p.min * MINUTES) / total / 48 }));
-  };
+  const lineup = (lines: readonly BoxLine[] | undefined): Lineup =>
+    scaled((lines ?? []).map((l) => ({ athlete: l[0], min: expected(l[0]) })).filter((p) => p.min >= ROTATION));
   const out = new Map<string, Lineups>();
   for (const { data, box } of seasons) {
     const latest = new Map<Abbr, BoxLine[]>();
-    const season: Lineups = { previous: new Map(), atTip: new Map(), next: new Map() };
+    const usual = new Map<Abbr, { games: Athlete[][]; minutes: Map<Athlete, number[]> }>();
+    const rotation = (abbr: Abbr, lines: readonly BoxLine[]): Lineup => {
+      const team = usual.get(abbr) ?? { games: [], minutes: new Map() };
+      usual.set(abbr, team);
+      team.games = [...team.games, lines.map((l) => l[0])].slice(-USUAL);
+      for (const l of lines) team.minutes.set(l[0], [...(team.minutes.get(l[0]) ?? []), l[1]].slice(-RECENT));
+      return scaled([...new Set(team.games.flat())].map((athlete) => ({ athlete, min: mean(team.minutes.get(athlete)!) })));
+    };
+    const season: Lineups = { previous: new Map(), atTip: new Map(), next: new Map(), rotation: new Map() };
     for (const { day, games } of finalDays(data)) {
       for (const g of games) {
         const lines = box.games[g.id] ?? {};
@@ -133,13 +156,16 @@ export function lineups(seasons: readonly SeasonPlayers[]): Map<string, Lineups>
         season.atTip.set(g.id, { home: lines[g.home] ? lineup(lines[g.home]) : previous.home, away: lines[g.away] ? lineup(lines[g.away]) : previous.away });
       }
       const played: Abbr[] = [];
+      const rotations: Partial<Record<Abbr, Lineup>> = {};
       for (const g of games) for (const [abbr, lines] of Object.entries(box.games[g.id] ?? {})) {
         if (!lines) continue;
         latest.set(abbr, lines);
         played.push(abbr);
+        rotations[abbr] = rotation(abbr, lines);
         for (const l of lines) recent.set(l[0], [...(recent.get(l[0]) ?? []), l[1]].slice(-RECENT));
       }
       season.next.set(day, Object.fromEntries(played.map((abbr) => [abbr, lineup(latest.get(abbr))])));
+      season.rotation.set(day, rotations);
     }
     out.set(data.season, season);
   }

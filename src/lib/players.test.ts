@@ -27,3 +27,19 @@ test("a game is predicted with the players of the team's previous game, never wi
   assert.deepEqual(players(season.previous.get("3")!.home), [1, 3], "player 2 missed the game before");
   assert.deepEqual(players(season.next.get("2026-10-22")!.A), [1, 3]);
 });
+
+test("a team's usual rotation is everyone in its last 10 games, each at his mean minutes for it, scaled to 240", () => {
+  // Player 2 plays A's first game only, for 40 minutes; player 1 plays all twelve, 30 minutes then 20.
+  const games = Array.from({ length: 12 }, (_, i) => ({ ...game(String(i + 1), 10 + i) }));
+  const data: SeasonData = { season: "x", teams: { A: team("A"), B: team("B") }, games };
+  const box: SeasonBox = {
+    season: "x",
+    games: Object.fromEntries(games.map((g, i) => [g.id, { A: i === 0 ? [line(1, 30), line(2, 40)] : [line(1, 20)], B: [line(9, 30)] }])),
+  };
+  const rotation = lineups([{ data, box }]).get("x")!.rotation;
+  const shares = (day: number) => Object.fromEntries(rotation.get(`2026-10-${10 + day}`)!.A!.map((p) => [p.athlete, (p.share * 48).toFixed(6)]));
+  const of = (minutes: Record<number, number>) => Object.fromEntries(Object.entries(minutes).map(([a, m]) => [a, m.toFixed(6)]));
+  assert.deepEqual(shares(0), of({ 1: 240 * (30 / 70), 2: 240 * (40 / 70) }));
+  assert.deepEqual(shares(9), of({ 1: 240 * (21 / 61), 2: 240 * (40 / 61) }), "player 1's mean is (30 + 9 * 20) / 10");
+  assert.deepEqual(shares(10), of({ 1: 240 }), "player 2 has missed A's last 10 games");
+});
