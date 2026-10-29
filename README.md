@@ -13,7 +13,7 @@ A GitHub Action ([deploy.yml](.github/workflows/deploy.yml)) runs three times a 
 ```sh
 npm install
 npm run fetch   # pull the current season from ESPN
-npm test        # the model, its guard against the old Elo, and page logic
+npm test        # the model, its settings against docs/model-v2.md's choice, and page logic
 npm run backtest  # rerun the backtest and rewrite docs/model.md's results
 npm run backtest:v2  # the same for version 2 and docs/model-v2.md
 npm run dev     # http://localhost:4321/
