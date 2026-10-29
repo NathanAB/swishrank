@@ -13,10 +13,10 @@
 // margin of those games, less home court and the back-to-back, and the team's rating less the mean rating of
 // the 10 opponents, all as they stood that day. Lower root mean square is better.
 import { readFileSync, existsSync } from "node:fs";
-import { b2bTerm, compute, counted, EARLY, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, phi, playerPart, secondNights, shownChange, type Abbr, type ModelInputs, type Season, type SeasonData } from "../src/lib/elo.ts";
+import { b2bTerm, compute, counted, EARLY, ELO_PER_SIGMA, fitModel, PARAMS, phi, playerPart, secondNights, shownChange, type Abbr, type ModelInputs, type Season, type SeasonData } from "../src/lib/elo.ts";
 import { beforeTip, parseArchive } from "../src/lib/injuries.ts";
 import { modelInputs } from "../src/lib/inputs.ts";
-import { scaled, type Athlete, type Lineup, type SeasonRotations } from "../src/lib/players.ts";
+import { usualRotations, type Lineup, type SeasonRotations } from "../src/lib/players.ts";
 import { missedCurves, rotations, type SeasonFiles } from "../src/lib/rotation.ts";
 import { regularSeasonEnd } from "../src/lib/teams.ts";
 import { blockBootstrap, loadBox } from "./evaluate.ts";
@@ -39,39 +39,7 @@ const curves = missedCurves(walked);
 const withReport = rotations(walked, curves);
 const curveOnly = rotations(walked.map(({ data, box }) => ({ data, box })), curves);
 
-/** Definition B, the site's usual rotation (lineups() in src/lib/players.ts), kept here so it stays checkable if the site's moves on. */
-function usualRotations(): Map<string, SeasonRotations> {
-  const out = new Map<string, SeasonRotations>();
-  let lastSeason = new Map<Athlete, number>();
-  for (const { data, box } of walked) {
-    const usual = new Map<Abbr, Map<Athlete, number>[]>();
-    const thisSeason = new Map<Athlete, { minutes: number; games: number }>();
-    const season: SeasonRotations = new Map();
-    for (const { day, games } of finalDays(data)) {
-      const byTeam: Partial<Record<Abbr, Lineup>> = {};
-      for (const g of games) for (const [abbr, lines] of Object.entries(box.games[g.id] ?? {})) {
-        if (!lines) continue;
-        const window = [...(usual.get(abbr) ?? []), new Map(lines.map((l) => [l[0], l[1]]))].slice(-NEXT);
-        usual.set(abbr, window);
-        const prior = window.length < NEXT ? 1 : 0;
-        byTeam[abbr] = scaled([...new Set(window.flatMap((w) => [...w.keys()]))].map((athlete) => {
-          const minutes = window.reduce((s, w) => s + (w.get(athlete) ?? 0), 0);
-          const last = lastSeason.get(athlete);
-          return { athlete, min: last === undefined ? minutes / window.length : (minutes + prior * last) / (window.length + prior) };
-        }));
-        for (const l of lines) {
-          const so = thisSeason.get(l[0]) ?? { minutes: 0, games: 0 };
-          thisSeason.set(l[0], { minutes: so.minutes + l[1], games: so.games + 1 });
-        }
-      }
-      season.set(day, byTeam);
-    }
-    out.set(data.season, season);
-    lastSeason = new Map([...thisSeason].map(([athlete, { minutes, games }]) => [athlete, minutes / games]));
-  }
-  return out;
-}
-const usual = usualRotations();
+const usual = usualRotations(walked);
 
 type Definition = { name: string; inputs: (id: string) => ModelInputs };
 const withRotation = (rotation: Map<string, SeasonRotations>) => (id: string): ModelInputs => {

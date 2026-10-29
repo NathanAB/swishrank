@@ -3,7 +3,7 @@
 // team without a total is seeded from its rating at the end of the season before, so the seasons are walked
 // together, oldest first.
 import { fitModel, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
-import { boxRatings, lineups, parseBox } from "./players.ts";
+import { boxRatings, lineups, parseBox, usualRotations } from "./players.ts";
 import { parsePreseason } from "./preseason.ts";
 
 /** One season's raw files: its games, parsed, and its box scores and preseason totals as read from JSON, undefined where a file is missing. */
@@ -18,7 +18,8 @@ export function modelInputs(seasons: readonly SeasonFiles[]): Map<string, ModelI
     .sort((x, y) => x.data.season.localeCompare(y.data.season))
     .map((s) => ({ ...s, box: s.box === undefined ? { season: s.data.season, games: {} } : parseBox(s.box, s.data.season) }));
   const ratings = boxRatings(walked, PARAMS.players.halfLife);
-  const rotations = lineups(walked);
+  const lineupsBySeason = lineups(walked);
+  const rotations = usualRotations(walked);
   const out = new Map<string, ModelInputs>();
   let before: { data: SeasonData; inputs: ModelInputs } | null = null;
   for (const { data, box, preseason } of walked) {
@@ -28,7 +29,7 @@ export function modelInputs(seasons: readonly SeasonFiles[]): Map<string, ModelI
     const last = before && !everyTotal ? lastTeamParts(before.data, before.inputs) : {};
     const inputs: ModelInputs = {
       centres: seedCentres(PARAMS.seed, abbrs, { preseason: totals, last }),
-      players: { box, ratings: ratings.get(data.season)!, lineups: rotations.get(data.season)!, rotation: rotations.get(data.season)!.rotation },
+      players: { box, ratings: ratings.get(data.season)!, lineups: lineupsBySeason.get(data.season)!, rotation: rotations.get(data.season)! },
     };
     out.set(data.season, inputs);
     before = { data, inputs };

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Game, SeasonData } from "./elo.ts";
-import { lineups, type BoxLine, type SeasonBox } from "./players.ts";
+import { lineups, usualRotations, type BoxLine, type SeasonBox } from "./players.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
 const game = (id: string, day: number): Game => ({
@@ -36,7 +36,7 @@ test("a team's usual rotation is everyone in its last 10 games, each at his minu
     season: "x",
     games: Object.fromEntries(games.map((g, i) => [g.id, { A: i === 0 ? [line(1, 30), line(2, 40)] : [line(1, 20)], B: [line(9, 30)] }])),
   };
-  const rotation = lineups([{ data, box }]).get("x")!.rotation;
+  const rotation = usualRotations([{ data, box }]).get("x")!;
   const shares = (day: number) => Object.fromEntries(rotation.get(`2026-10-${10 + day}`)!.A!.map((p) => [p.athlete, (p.share * 48).toFixed(6)]));
   const of = (minutes: Record<number, number>) => Object.fromEntries(Object.entries(minutes).map(([a, m]) => [a, m.toFixed(6)]));
   assert.deepEqual(shares(0), of({ 1: 240 * (30 / 70), 2: 240 * (40 / 70) }));
@@ -53,7 +53,7 @@ test("until a team has played 10 games, a player's minutes per game last season 
     { data: { season: "w", teams: { A: team("A"), B: team("B") }, games: before }, box: { season: "w", games: Object.fromEntries(before.map((g, i) => [g.id, { A: [line(9, 30)], B: [line(1, i ? 42 : 30)] }])) } },
     { data: { season: "x", teams: { A: team("A"), B: team("B") }, games: now }, box: { season: "x", games: Object.fromEntries(now.map((g) => [g.id, { A: [line(1, 18), line(3, 18)], B: [line(9, 30)] }])) } },
   ];
-  const rotation = lineups(seasons).get("x")!.rotation;
+  const rotation = usualRotations(seasons).get("x")!;
   const minutes = (day: number) => Object.fromEntries(rotation.get(`2026-10-${10 + day}`)!.A!.map((p) => [p.athlete, (p.share * 48).toFixed(6)]));
   assert.deepEqual(minutes(0), { 1: (240 * (27 / 45)).toFixed(6), 3: (240 * (18 / 45)).toFixed(6) }, "player 1 counts (18 + 36) / 2, player 3 18");
   assert.deepEqual(minutes(8), { 1: (240 * (19.8 / 37.8)).toFixed(6), 3: (240 * (18 / 37.8)).toFixed(6) }, "player 1 counts (9 * 18 + 36) / 10");
