@@ -113,6 +113,8 @@ const RECENT = 10;
 const UNKNOWN = 15;
 /** A team's games its usual rotation reads. */
 const USUAL = 10;
+/** Games a player's minutes per game last season count for in his team's rotation until it has played USUAL games. */
+const PRIOR = 1;
 
 const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
 /** Players at their expected minutes, scaled so the team's total is 240, as shares of 48. */
@@ -126,7 +128,8 @@ const scaled = (players: readonly { athlete: Athlete; min: number }[]): Lineup =
  * season with lines; `atTip` is the players who played in the game itself, or `previous` for a side without lines.
  * Either keeps those whose expected minutes, the mean of their last 10 appearances on any team, are at least 10.
  * A team's first game has none. Its `rotation` is everyone who played in any of its last 10 games this season
- * with lines, each at the mean of his last 10 appearances for it this season.
+ * with lines, each at his minutes per team game over those games, a game he missed counting 0. Until the team has
+ * played 10, his minutes per game last season, on any team, count as one more game.
  */
 export function lineups(seasons: readonly SeasonPlayers[]): Map<string, Lineups> {
   const recent = new Map<Athlete, number[]>();
@@ -137,15 +140,20 @@ export function lineups(seasons: readonly SeasonPlayers[]): Map<string, Lineups>
   const lineup = (lines: readonly BoxLine[] | undefined): Lineup =>
     scaled((lines ?? []).map((l) => ({ athlete: l[0], min: expected(l[0]) })).filter((p) => p.min >= ROTATION));
   const out = new Map<string, Lineups>();
+  let lastSeason = new Map<Athlete, number>();
   for (const { data, box } of seasons) {
     const latest = new Map<Abbr, BoxLine[]>();
-    const usual = new Map<Abbr, { games: Athlete[][]; minutes: Map<Athlete, number[]> }>();
+    const usual = new Map<Abbr, Map<Athlete, number>[]>();
+    const thisSeason = new Map<Athlete, { minutes: number; games: number }>();
     const rotation = (abbr: Abbr, lines: readonly BoxLine[]): Lineup => {
-      const team = usual.get(abbr) ?? { games: [], minutes: new Map() };
-      usual.set(abbr, team);
-      team.games = [...team.games, lines.map((l) => l[0])].slice(-USUAL);
-      for (const l of lines) team.minutes.set(l[0], [...(team.minutes.get(l[0]) ?? []), l[1]].slice(-RECENT));
-      return scaled([...new Set(team.games.flat())].map((athlete) => ({ athlete, min: mean(team.minutes.get(athlete)!) })));
+      const games = [...(usual.get(abbr) ?? []), new Map(lines.map((l) => [l[0], l[1]]))].slice(-USUAL);
+      usual.set(abbr, games);
+      const prior = games.length < USUAL ? PRIOR : 0;
+      return scaled([...new Set(games.flatMap((g) => [...g.keys()]))].map((athlete) => {
+        const minutes = games.reduce((s, g) => s + (g.get(athlete) ?? 0), 0);
+        const last = lastSeason.get(athlete);
+        return { athlete, min: last === undefined ? minutes / games.length : (minutes + prior * last) / (games.length + prior) };
+      }));
     };
     const season: Lineups = { previous: new Map(), atTip: new Map(), next: new Map(), rotation: new Map() };
     for (const { day, games } of finalDays(data)) {
@@ -162,12 +170,17 @@ export function lineups(seasons: readonly SeasonPlayers[]): Map<string, Lineups>
         latest.set(abbr, lines);
         played.push(abbr);
         rotations[abbr] = rotation(abbr, lines);
-        for (const l of lines) recent.set(l[0], [...(recent.get(l[0]) ?? []), l[1]].slice(-RECENT));
+        for (const l of lines) {
+          recent.set(l[0], [...(recent.get(l[0]) ?? []), l[1]].slice(-RECENT));
+          const so = thisSeason.get(l[0]) ?? { minutes: 0, games: 0 };
+          thisSeason.set(l[0], { minutes: so.minutes + l[1], games: so.games + 1 });
+        }
       }
       season.next.set(day, Object.fromEntries(played.map((abbr) => [abbr, lineup(latest.get(abbr))])));
       season.rotation.set(day, rotations);
     }
     out.set(data.season, season);
+    lastSeason = new Map([...thisSeason].map(([athlete, { minutes, games }]) => [athlete, minutes / games]));
   }
   return out;
 }
