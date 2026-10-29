@@ -87,9 +87,9 @@ const expectedMargin = (p: number, widen: number) => {
   return ((lo + hi) / 2) * PARAMS.sigma * widen;
 };
 
-/** The display's behaviour: wrong-way changes, moves on days a team did not play, and every-game.test.ts's three caps. */
+/** The display's behaviour: wrong-way changes in the game log and on the chart, the largest moves, and every-game.test.ts's three caps. */
 function behaviour(model: Season, def: Definition) {
-  let wrong = 0, worstWrong = 0, against = 0, idle = 0;
+  let wrong = 0, worstWrong = 0, chartWrong = 0, chartWorst = 0, move = 0, against = 0, idle = 0;
   const played: Record<Abbr, number> = Object.fromEntries(model.abbrs.map((a) => [a, 0]));
   for (const { game, p, pre, post } of model.results) {
     const widen = Math.min(played[game.home], played[game.away]) < EARLY.games ? EARLY.widen : 1;
@@ -108,8 +108,15 @@ function behaviour(model: Season, def: Definition) {
   for (let i = 1; i < model.series.length; i++) {
     const { day, r } = model.series[i];
     if (!gameDays.has(day)) continue;
-    const busy = new Set(model.results.filter((x) => x.day === day).flatMap((x) => [x.game.home, x.game.away]));
-    for (const a of model.abbrs) if (!busy.has(a)) idle = Math.max(idle, Math.abs(shownChange(model.series[i - 1].r[a], r[a])));
+    const today = model.results.filter((x) => x.day === day);
+    for (const a of model.abbrs) {
+      const change = shownChange(model.series[i - 1].r[a], r[a]);
+      move = Math.max(move, Math.abs(change));
+      const g = today.find((x) => x.game.home === a || x.game.away === a)?.game;
+      if (!g) { idle = Math.max(idle, Math.abs(change)); continue; }
+      const won = (g.home === a) === (g.hs! > g.as!);
+      if (won ? change < 0 : change > 0) { chartWrong++; chartWorst = Math.max(chartWorst, Math.abs(change)); }
+    }
   }
   let rotation = 0;
   const own = def.inputs(model.data.season);
@@ -123,7 +130,7 @@ function behaviour(model: Season, def: Definition) {
       }
     }
   }
-  return { wrong, worstWrong, idle, first, against, rotation };
+  return { wrong, worstWrong, chartWrong, chartWorst, move, idle, first, against, rotation };
 }
 
 const pad = (x: string | number, n: number) => String(x).padStart(n);
@@ -170,9 +177,9 @@ if (judged) {
     }
     console.log(`${def.name.padEnd(18)} ${pad(rms(all).toFixed(4), 8)} ${per.join(" ")}`);
   }
-  console.log("\nPer finished season, the range over seasons: wrong-way changes (count, largest), largest move on a day the team did not play, largest first-game change, largest change against the surprise, largest one-day rotation move");
+  console.log("\nPer finished season, the range over seasons: wrong-way changes in the game log and on the chart (count, largest), largest one-day move on the chart, largest move on a day the team did not play, largest first-game change, largest change against the surprise, largest one-day rotation move");
   for (const [name, bs] of behaviours) {
     const range = (f: (b: ReturnType<typeof behaviour>) => number) => `${Math.min(...bs.map(f)).toFixed(0)}-${Math.max(...bs.map(f)).toFixed(0)}`;
-    console.log(`${name.padEnd(18)} wrong ${range((b) => b.wrong)} by ${range((b) => b.worstWrong)}  idle ${range((b) => b.idle)}  first ${range((b) => b.first)}  against ${range((b) => b.against)}  rotation ${range((b) => b.rotation)}`);
+    console.log(`${name.padEnd(18)} wrong ${range((b) => b.wrong)} by ${range((b) => b.worstWrong)}  chart ${range((b) => b.chartWrong)} by ${range((b) => b.chartWorst)}  move ${range((b) => b.move)}  idle ${range((b) => b.idle)}  first ${range((b) => b.first)}  against ${range((b) => b.against)}  rotation ${range((b) => b.rotation)}`);
   }
 }
