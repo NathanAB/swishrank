@@ -1,0 +1,196 @@
+// npm run ratings: scores definitions of a team's shown rating on how well each predicts the team's next 10
+// games (docs/model-v2.md, What the reader sees). For every finished season it compares
+//   A  results only: the team fit with its seeds, no players;
+//   B  the usual rotation the site showed until 2026-10-29: minutes per team game over the last 10, with last
+//      season as one more game until the team has played 10;
+//   C  expected minutes from the games-missed curve, the injury report left out (src/lib/rotation.ts).
+// `npm run ratings -- 2026-27` instead judges the injury report, as docs/model-v2.md declares: C with the report
+// against C without it, from the first archived day through the last regular-season game day.
+//
+// The score: after each game day, for each team with 10 games still to play, the miss between the mean counted
+// margin of those games, less home court and the back-to-back, and the team's rating less the mean rating of
+// the 10 opponents, all as they stood that day. Lower root mean square is better.
+import { readFileSync, existsSync } from "node:fs";
+import { b2bTerm, compute, counted, EARLY, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, phi, playerPart, secondNights, shownChange, type Abbr, type ModelInputs, type Season, type SeasonData } from "../src/lib/elo.ts";
+import { parseArchive } from "../src/lib/injuries.ts";
+import { modelInputs } from "../src/lib/inputs.ts";
+import { scaled, type Athlete, type Lineup, type SeasonRotations } from "../src/lib/players.ts";
+import { missedCurves, rotations, type SeasonFiles } from "../src/lib/rotation.ts";
+import { regularSeasonEnd } from "../src/lib/teams.ts";
+import { loadBox } from "./evaluate.ts";
+
+const SCALE = ELO_PER_SIGMA / PARAMS.sigma;
+const NEXT = 10;
+const read = (path: string): unknown => {
+  const url = new URL(`../src/data/${path}`, import.meta.url);
+  return existsSync(url) ? JSON.parse(readFileSync(url, "utf8")) : undefined;
+};
+const list = read("seasons.json") as { id: string; end?: string }[];
+const ids = list.map((s) => s.id).sort();
+const files = ids.map((id) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`) }));
+const inputs = modelInputs(files);
+const walked: SeasonFiles[] = ids.map((id, i) => {
+  const injuries = read(`injuries/${id}.json`);
+  return { data: files[i].data, box: loadBox(id), injuries: injuries === undefined ? undefined : parseArchive(injuries, id) };
+});
+const curves = missedCurves(walked);
+const withReport = rotations(walked, curves);
+const curveOnly = rotations(walked.map(({ data, box }) => ({ data, box })), curves);
+
+/** Definition B, the rotation the site showed at a84fcb3, kept here so it stays checkable. */
+function usualRotations(): Map<string, SeasonRotations> {
+  const out = new Map<string, SeasonRotations>();
+  let lastSeason = new Map<Athlete, number>();
+  for (const { data, box } of walked) {
+    const usual = new Map<Abbr, Map<Athlete, number>[]>();
+    const thisSeason = new Map<Athlete, { minutes: number; games: number }>();
+    const season: SeasonRotations = new Map();
+    for (const { day, games } of finalDays(data)) {
+      const byTeam: Partial<Record<Abbr, Lineup>> = {};
+      for (const g of games) for (const [abbr, lines] of Object.entries(box.games[g.id] ?? {})) {
+        if (!lines) continue;
+        const window = [...(usual.get(abbr) ?? []), new Map(lines.map((l) => [l[0], l[1]]))].slice(-NEXT);
+        usual.set(abbr, window);
+        const prior = window.length < NEXT ? 1 : 0;
+        byTeam[abbr] = scaled([...new Set(window.flatMap((w) => [...w.keys()]))].map((athlete) => {
+          const minutes = window.reduce((s, w) => s + (w.get(athlete) ?? 0), 0);
+          const last = lastSeason.get(athlete);
+          return { athlete, min: last === undefined ? minutes / window.length : (minutes + prior * last) / (window.length + prior) };
+        }));
+        for (const l of lines) {
+          const so = thisSeason.get(l[0]) ?? { minutes: 0, games: 0 };
+          thisSeason.set(l[0], { minutes: so.minutes + l[1], games: so.games + 1 });
+        }
+      }
+      season.set(day, byTeam);
+    }
+    out.set(data.season, season);
+    lastSeason = new Map([...thisSeason].map(([athlete, { minutes, games }]) => [athlete, minutes / games]));
+  }
+  return out;
+}
+const usual = usualRotations();
+
+type Definition = { name: string; inputs: (id: string) => ModelInputs };
+const withRotation = (rotation: Map<string, SeasonRotations>) => (id: string): ModelInputs => {
+  const own = inputs.get(id)!;
+  return { ...own, players: { ...own.players!, rotation: rotation.get(id)! } };
+};
+const A: Definition = { name: "A results only", inputs: (id) => ({ centres: inputs.get(id)!.centres }) };
+const B: Definition = { name: "B usual rotation", inputs: withRotation(usual) };
+const C: Definition = { name: "C curve", inputs: withRotation(curveOnly) };
+const CF: Definition = { name: "C with report", inputs: withRotation(withReport) };
+
+/** Each counted miss, in margin units, for game days `from` to `to`. */
+function misses(model: Season, from = "", to = "9999"): number[] {
+  const second = secondNights(model.data);
+  const byDay = new Map(model.series.map((s) => [s.day, s.r]));
+  const days = [...new Set(model.results.map((r) => r.day))].filter((d) => d >= from && d <= to);
+  const out: number[] = [];
+  for (const day of days) {
+    const r = byDay.get(day)!;
+    for (const abbr of model.abbrs) {
+      const next = model.log[abbr].filter((g) => g.result.day > day).slice(0, NEXT);
+      if (next.length < NEXT) continue;
+      let margin = 0, opponents = 0;
+      for (const { result: { game }, side } of next) {
+        const sign = side === "h" ? 1 : -1;
+        const edge = (game.neutral ? 0 : PARAMS.home.value) + b2bTerm(PARAMS, second.get(game.id)!);
+        margin += sign * (counted(game.hs! - game.as!, PARAMS.margin) - edge);
+        opponents += r[side === "h" ? game.away : game.home];
+      }
+      out.push(margin / NEXT - (r[abbr] - opponents / NEXT) / SCALE);
+    }
+  }
+  return out;
+}
+const rms = (xs: number[]) => Math.sqrt(xs.reduce((s, x) => s + x * x, 0) / xs.length);
+
+/** The expected home margin, in counted units, that a home chance `p` came from. */
+const expectedMargin = (p: number, widen: number) => {
+  let lo = -20, hi = 20;
+  for (let i = 0; i < 100; i++) {
+    const mid = (lo + hi) / 2;
+    if (phi(mid) < p) lo = mid;
+    else hi = mid;
+  }
+  return ((lo + hi) / 2) * PARAMS.sigma * widen;
+};
+
+/** The display's behaviour: wrong-way changes, moves on days a team did not play, and every-game.test.ts's three caps. */
+function behaviour(model: Season, def: Definition) {
+  let wrong = 0, worstWrong = 0, against = 0, idle = 0;
+  const played: Record<Abbr, number> = Object.fromEntries(model.abbrs.map((a) => [a, 0]));
+  for (const { game, p, pre, post } of model.results) {
+    const widen = Math.min(played[game.home], played[game.away]) < EARLY.games ? EARLY.widen : 1;
+    const surprise = counted(game.hs! - game.as!, PARAMS.margin) - expectedMargin(p, widen);
+    for (const [side, sign] of [["h", 1], ["a", -1]] as const) {
+      const change = shownChange(pre[side], post[side]);
+      const won = sign * (game.hs! - game.as!) > 0;
+      if (won ? change < 0 : change > 0) { wrong++; worstWrong = Math.max(worstWrong, Math.abs(change)); }
+      against = Math.max(against, sign * surprise > 0 ? -change : change);
+    }
+    played[game.home]++;
+    played[game.away]++;
+  }
+  const first = Math.max(...model.abbrs.map((a) => model.log[a][0]).filter((g) => g).map((g) => Math.abs(shownChange(g.result.pre[g.side], g.result.post[g.side]))));
+  const gameDays = new Set(model.results.map((r) => r.day));
+  for (let i = 1; i < model.series.length; i++) {
+    const { day, r } = model.series[i];
+    if (!gameDays.has(day)) continue;
+    const busy = new Set(model.results.filter((x) => x.day === day).flatMap((x) => [x.game.home, x.game.away]));
+    for (const a of model.abbrs) if (!busy.has(a)) idle = Math.max(idle, Math.abs(shownChange(model.series[i - 1].r[a], r[a])));
+  }
+  let rotation = 0;
+  const own = def.inputs(model.data.season);
+  if (own.players) {
+    const was: Partial<Record<Abbr, Lineup>> = {};
+    for (const { day, after } of fitModel(model.data, own)) {
+      for (const [abbr, lineup] of Object.entries(own.players.rotation.get(day) ?? {})) {
+        const before = was[abbr];
+        if (before && lineup) rotation = Math.max(rotation, Math.abs(playerPart(after, lineup) - playerPart(after, before)) * SCALE);
+        was[abbr] = lineup;
+      }
+    }
+  }
+  return { wrong, worstWrong, idle, first, against, rotation };
+}
+
+const pad = (x: string | number, n: number) => String(x).padStart(n);
+const judged = process.argv[2];
+if (judged) {
+  const id = judged;
+  const archive = walked.find((s) => s.data.season === id)?.injuries;
+  if (!archive || !Object.keys(archive.days).length) throw new Error(`${id} has no archived injury report`);
+  const from = Object.keys(archive.days).sort()[0];
+  const data = files.find((f) => f.data.season === id)!.data;
+  const curve = compute(data, C.inputs(id));
+  const to = regularSeasonEnd(curve);
+  console.log(`${id}, game days ${from} to ${to ?? "today (the regular season is still on)"}, teams with 10 games still to play`);
+  for (const def of [C, CF]) {
+    const m = misses(compute(data, def.inputs(id)), from, to ?? undefined);
+    console.log(`${def.name.padEnd(16)} RMS miss ${rms(m).toFixed(4)} over ${m.length} team-days`);
+  }
+} else {
+  const finished = list.filter((s) => s.end).map((s) => s.id).sort();
+  console.log("Curve, share of the next 10 games played by games missed in a row, learned without 2026-27:", curves.get("2026-27")!.map((x) => x.toFixed(3)).join(" "));
+  console.log(`\n${"".padEnd(18)} ${"pooled".padStart(8)} ${finished.map((id) => pad(id.slice(2), 6)).join(" ")}`);
+  const behaviours = new Map<string, ReturnType<typeof behaviour>[]>();
+  for (const def of [A, B, C]) {
+    const all: number[] = [], per: string[] = [];
+    behaviours.set(def.name, []);
+    for (const id of finished) {
+      const model = compute(files.find((f) => f.data.season === id)!.data, def.inputs(id));
+      const m = misses(model);
+      all.push(...m);
+      per.push(pad(rms(m).toFixed(3), 6));
+      behaviours.get(def.name)!.push(behaviour(model, def));
+    }
+    console.log(`${def.name.padEnd(18)} ${pad(rms(all).toFixed(4), 8)} ${per.join(" ")}`);
+  }
+  console.log("\nPer finished season, the range over seasons: wrong-way changes (count, largest), largest move on a day the team did not play, largest first-game change, largest change against the surprise, largest one-day rotation move");
+  for (const [name, bs] of behaviours) {
+    const range = (f: (b: ReturnType<typeof behaviour>) => number) => `${Math.min(...bs.map(f)).toFixed(0)}-${Math.max(...bs.map(f)).toFixed(0)}`;
+    console.log(`${name.padEnd(18)} wrong ${range((b) => b.wrong)} by ${range((b) => b.worstWrong)}  idle ${range((b) => b.idle)}  first ${range((b) => b.first)}  against ${range((b) => b.against)}  rotation ${range((b) => b.rotation)}`);
+  }
+}

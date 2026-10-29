@@ -120,7 +120,7 @@ const PRIOR = 1;
 
 const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
 /** Players at their expected minutes, scaled so the team's total is 240, as shares of 48. */
-const scaled = (players: readonly { athlete: Athlete; min: number }[]): Lineup => {
+export const scaled = (players: readonly { athlete: Athlete; min: number }[]): Lineup => {
   const total = players.reduce((s, p) => s + p.min, 0);
   return players.map((p) => ({ athlete: p.athlete, share: (p.min * MINUTES) / total / 48 }));
 };
