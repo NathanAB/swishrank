@@ -119,8 +119,8 @@ export const lostFinals = (before: readonly Game[], after: readonly Game[]): str
   return before.filter((g) => g.final && !final.has(g.id)).map((g) => g.id);
 };
 
-type SummaryAthlete = { athlete?: { id?: string }; didNotPlay?: boolean; stats?: string[] };
-/** The parts of ESPN's game summary (site.api.espn.com .../summary?event=<id>) the box scores read. */
+type SummaryAthlete = { athlete?: { id?: string; displayName?: string }; didNotPlay?: boolean; stats?: string[] };
+/** The parts of ESPN's game summary (site.api.espn.com .../summary?event=<id>) the box scores and names read. */
 export type EspnSummary = { boxscore?: { players?: { team: { abbreviation: string }; statistics?: { labels?: string[]; athletes?: SummaryAthlete[] }[] }[] } };
 
 // ESPN writes a blank stat as "--" or leaves it out; it counts as 0, as a whole number with a "+" does as itself.
@@ -159,4 +159,16 @@ export function boxLines(summary: EspnSummary): SeasonBox["games"][string] {
     if (lines.length) out[team.team.abbreviation] = lines;
   }
   return out;
+}
+
+/** Each player's name in a summary's box score, by athlete id, those who did not play included. */
+export function playerNames(summary: EspnSummary): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const team of summary.boxscore?.players ?? []) {
+    for (const { athlete } of team.statistics?.flatMap((s) => s.athletes ?? []) ?? []) {
+      const id = athlete?.id, name = athlete?.displayName;
+      if (id && /^\d+$/.test(id) && name) names[id] = name;
+    }
+  }
+  return names;
 }

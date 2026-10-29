@@ -1,22 +1,26 @@
 // Fetch a season's NBA games from ESPN's public scoreboard into src/data/games/<season>.json, the box score of
 // every final game src/data/box/<season>.json lacks from ESPN's game summary, and the day's injury report into
-// src/data/injuries/<season>.json.
+// src/data/injuries/<season>.json. Then src/data/players.json gets the name of every player in the box scores
+// and injury reports: from each summary the box step reads, and from ESPN's athlete page for any still missing.
 //
 //   node scripts/fetch-season.mjs            seasons still in progress (no "end" in seasons.json)
 //   node scripts/fetch-season.mjs 2025-26    one season by id
+//   node scripts/fetch-season.mjs --names    only the names players.json lacks
 //
 // ESPN's scoreboard takes one date per request (date ranges return 400), so this walks the season day by day.
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
 import { dayKey } from "../src/lib/elo.ts";
-import { boxLines, fetchEvents, fetchJson, lostFinals, parse } from "../src/lib/espn.ts";
+import { boxLines, fetchEvents, fetchJson, lostFinals, parse, playerNames } from "../src/lib/espn.ts";
 import { parseArchive, parseFeed, withReport } from "../src/lib/injuries.ts";
 
 const SEASONS = JSON.parse(await readFile(new URL("../src/data/seasons.json", import.meta.url), "utf8"));
 const OUT_DIR = new URL("../src/data/games/", import.meta.url);
 const BOX_DIR = new URL("../src/data/box/", import.meta.url);
 const INJURY_DIR = new URL("../src/data/injuries/", import.meta.url);
+const NAMES_FILE = new URL("../src/data/players.json", import.meta.url);
 const INJURIES = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries";
+const ATHLETE = (id) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${id}`;
 const SUMMARY = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
 const URL_FOR = (ymd) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${ymd}`;
 // Two weeks of games ahead, so a team's page can always show its next five.
@@ -24,6 +28,9 @@ const FIXTURE_DAYS = 14;
 
 const DAY = 86_400_000;
 const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+// Only id to name: the repository is public, so nothing else about a player is kept.
+const names = JSON.parse(await readFile(NAMES_FILE, "utf8").catch(() => "{}"));
 
 const fetchDay = (day) => fetchEvents(URL_FOR(day.replaceAll("-", "")));
 
@@ -62,7 +69,9 @@ async function fetchBox(id, finals) {
   for (let i = 0; i < missing.length; i += 8) {
     await Promise.all(missing.slice(i, i + 8).map(async (g) => {
       try {
-        const lines = boxLines(await fetchJson(SUMMARY(g.id)));
+        const summary = await fetchJson(SUMMARY(g.id));
+        Object.assign(names, playerNames(summary));
+        const lines = boxLines(summary);
         if (Object.keys(lines).length) { box.games[g.id] = lines; added++; }
       } catch (err) {
         console.warn(`${id}: no box score for game ${g.id} this time: ${err.message}`);
@@ -74,8 +83,8 @@ async function fetchBox(id, finals) {
   console.log(`${id}: box scores for ${added} more games, ${finals.length - Object.keys(box.games).length} final games without one`);
 }
 
-// Nothing on the site reads the report yet: it is archived for docs/model-v2.md's judgment. So a failed, empty or
-// unreadable one is a warning and never fails the run.
+// A missing day costs the team pages' History section only that day's injury lines, so a failed, empty or
+// unreadable report is a warning and never fails the run.
 async function fetchInjuries(id) {
   try {
     const { season, injuries, dropped } = parseFeed(await fetchJson(INJURIES));
@@ -97,10 +106,45 @@ async function fetchInjuries(id) {
   }
 }
 
+const readAll = async (dir) =>
+  Promise.all((await readdir(dir).catch(() => [])).filter((f) => f.endsWith(".json")).map(async (f) => JSON.parse(await readFile(new URL(f, dir), "utf8"))));
+
+// A name ESPN cannot give leaves the player out, never a stand-in, so the next run asks again; the site then
+// shows no name for him, where a failed run would hold back scores.
+async function fetchNames() {
+  const boxes = await readAll(BOX_DIR), archives = await readAll(INJURY_DIR);
+  const wanted = new Set([
+    ...boxes.flatMap((box) => Object.values(box.games).flatMap((teams) => Object.values(teams).flat().map((line) => line[0]))),
+    ...archives.flatMap((archive) => Object.values(archive.days).flatMap((report) => report.injuries.map((i) => i.athlete))),
+  ]);
+  const missing = [...wanted].filter((id) => !names[id]);
+  let found = 0;
+  for (let i = 0; i < missing.length; i += 8) {
+    await Promise.all(missing.slice(i, i + 8).map(async (id) => {
+      try {
+        const name = (await fetchJson(ATHLETE(id))).athlete?.displayName;
+        if (typeof name !== "string" || !name) throw new Error("no displayName");
+        names[id] = name;
+        found++;
+      } catch (err) {
+        console.warn(`no name for athlete ${id} this time: ${err.message}`);
+      }
+    }));
+  }
+  // Integer keys come out in ascending order whatever order they went in, so the file stays sorted.
+  await writeFile(NAMES_FILE, JSON.stringify(names, null, 1) + "\n");
+  console.log(`names: ${wanted.size} players, ${found} looked up, ${missing.length - found} still without a name`);
+}
+
 const ids = process.argv.slice(2);
-const targets = ids.length ? SEASONS.filter((s) => ids.includes(s.id)) : SEASONS.filter((s) => !s.end);
-if (ids.length && targets.length !== ids.length) throw new Error(`Unknown season in ${ids.join(", ")}`);
-for (const season of targets) {
-  if (!season.end) await fetchInjuries(season.id);
-  await fetchSeason(season);
+if (ids.includes("--names")) {
+  await fetchNames();
+} else {
+  const targets = ids.length ? SEASONS.filter((s) => ids.includes(s.id)) : SEASONS.filter((s) => !s.end);
+  if (ids.length && targets.length !== ids.length) throw new Error(`Unknown season in ${ids.join(", ")}`);
+  for (const season of targets) {
+    if (!season.end) await fetchInjuries(season.id);
+    await fetchSeason(season);
+  }
+  await fetchNames();
 }

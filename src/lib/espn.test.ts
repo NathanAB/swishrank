@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dayKey, type SeasonData } from "./elo.ts";
-import { boxLines, canonicalNote, fetchEvents, fetchJson, lostFinals, parse, type EspnEvent } from "./espn.ts";
+import { boxLines, canonicalNote, fetchEvents, fetchJson, lostFinals, parse, playerNames, type EspnEvent } from "./espn.ts";
 import { stage } from "./teams.ts";
 
 const side = (homeAway: "home" | "away", id: string, abbreviation: string) => ({
@@ -90,4 +90,20 @@ test("a summary's box line keeps made and attempted shots apart and skips player
     },
   });
   assert.deepEqual(lines, { BOS: [[4251, 31, 38, 12, 21, 7, 8, 0, 5, 3, 5, 0, 4, 2]] });
+});
+
+test("a summary names every player in its box score by athlete id, and skips an entry without an id or a name", () => {
+  const names = playerNames({
+    boxscore: {
+      players: [
+        { team: { abbreviation: "BOS" }, statistics: [{ athletes: [
+          { athlete: { id: "4065648", displayName: "Jayson Tatum" }, stats: ["31"] },
+          { athlete: { id: "9", displayName: "Bench Player" }, didNotPlay: true, stats: [] },
+          { athlete: { displayName: "No Id" }, stats: ["4"] },
+        ] }] },
+        { team: { abbreviation: "DET" }, statistics: [{ athletes: [{ athlete: { id: "7" }, stats: [] }] }] },
+      ],
+    },
+  });
+  assert.deepEqual(names, { "4065648": "Jayson Tatum", "9": "Bench Player" });
 });
