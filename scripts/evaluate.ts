@@ -112,19 +112,29 @@ export type Diff = { n: number; blocks: number; a: number; b: number; d: number;
  * its 95% interval from resampling whole (season, week) blocks.
  */
 export function compare(a: Scored[], b: Scored[], keep: (s: Scored) => boolean = () => true): Diff {
-  const blocks = new Map<string, { sum: number; n: number }>();
-  let la = 0, lb = 0, n = 0;
+  const paired: Paired[] = [];
   a.forEach((x, i) => {
     const y = b[i];
     if (x.id !== y.id) throw new Error(`compare: game ${x.id} lines up with ${y.id}`);
-    if (!keep(x)) return;
-    const da = loss(x.p, x.y), db = loss(y.p, y.y);
+    if (keep(x)) paired.push({ season: x.season, day: x.day, a: loss(x.p, x.y), b: loss(y.p, y.y) });
+  });
+  return blockBootstrap(paired);
+}
+
+/** One item two models are scored on: its season, its day counted from the season's first game day, and each model's loss. */
+export type Paired = { season: string; day: number; a: number; b: number };
+
+/** Each model's mean loss over `paired`, the mean difference a - b, and its 95% interval from resampling whole (season, week) blocks. */
+export function blockBootstrap(paired: Paired[]): Diff {
+  const blocks = new Map<string, { sum: number; n: number }>();
+  let la = 0, lb = 0, n = 0;
+  for (const { season, day, a: da, b: db } of paired) {
     la += da; lb += db; n++;
-    const key = `${x.season}:${Math.floor(x.day / 7)}`;
+    const key = `${season}:${Math.floor(day / 7)}`;
     const blk = blocks.get(key) ?? { sum: 0, n: 0 };
     blk.sum += da - db; blk.n++;
     blocks.set(key, blk);
-  });
+  }
   const list = [...blocks.values()];
   const rnd = mulberry32(BOOTSTRAP.seed);
   const means: number[] = [];

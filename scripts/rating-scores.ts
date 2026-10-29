@@ -1,11 +1,13 @@
 // npm run ratings: scores definitions of a team's shown rating on how well each predicts the team's next 10
 // games (docs/model-v2.md, What the reader sees). For every finished season it compares
 //   A  results only: the team fit with its seeds, no players;
-//   B  the usual rotation the site showed until 2026-10-29: minutes per team game over the last 10, with last
-//      season as one more game until the team has played 10;
+//   B  the usual rotation the site shows: minutes per team game over the last 10, with last season as one more
+//      game until the team has played 10;
 //   C  expected minutes from the games-missed curve, the injury report left out (src/lib/rotation.ts).
-// `npm run ratings -- 2026-27` instead judges the injury report, as docs/model-v2.md declares: C with the report
-// against C without it, from the first archived day through the last regular-season game day.
+// `npm run ratings -- 2026-27` instead judges the injury report as docs/model-v2.md declares: D, which is C with
+// each player the report gives a return for counted for the share of the next 10 games on or after it, against
+// B, from the first archived day through the last regular-season game day, with the 95% interval of D minus B
+// from version 1's weekly block bootstrap.
 //
 // The score: after each game day, for each team with 10 games still to play, the miss between the mean counted
 // margin of those games, less home court and the back-to-back, and the team's rating less the mean rating of
@@ -17,7 +19,7 @@ import { modelInputs } from "../src/lib/inputs.ts";
 import { scaled, type Athlete, type Lineup, type SeasonRotations } from "../src/lib/players.ts";
 import { missedCurves, rotations, type SeasonFiles } from "../src/lib/rotation.ts";
 import { regularSeasonEnd } from "../src/lib/teams.ts";
-import { loadBox } from "./evaluate.ts";
+import { blockBootstrap, loadBox } from "./evaluate.ts";
 
 const SCALE = ELO_PER_SIGMA / PARAMS.sigma;
 const NEXT = 10;
@@ -37,7 +39,7 @@ const curves = missedCurves(walked);
 const withReport = rotations(walked, curves);
 const curveOnly = rotations(walked.map(({ data, box }) => ({ data, box })), curves);
 
-/** Definition B, the rotation the site showed at a84fcb3, kept here so it stays checkable. */
+/** Definition B, the site's usual rotation (lineups() in src/lib/players.ts), kept here so it stays checkable if the site's moves on. */
 function usualRotations(): Map<string, SeasonRotations> {
   const out = new Map<string, SeasonRotations>();
   let lastSeason = new Map<Athlete, number>();
@@ -79,14 +81,14 @@ const withRotation = (rotation: Map<string, SeasonRotations>) => (id: string): M
 const A: Definition = { name: "A results only", inputs: (id) => ({ centres: inputs.get(id)!.centres }) };
 const B: Definition = { name: "B usual rotation", inputs: withRotation(usual) };
 const C: Definition = { name: "C curve", inputs: withRotation(curveOnly) };
-const CF: Definition = { name: "C with report", inputs: withRotation(withReport) };
+const D: Definition = { name: "D with report", inputs: withRotation(withReport) };
 
-/** Each counted miss, in margin units, for game days `from` to `to`. */
-function misses(model: Season, from = "", to = "9999"): number[] {
+/** Each team-day's counted miss, in margin units, for game days `from` to `to`. */
+function misses(model: Season, from = "", to = "9999"): { day: string; abbr: Abbr; miss: number }[] {
   const second = secondNights(model.data);
   const byDay = new Map(model.series.map((s) => [s.day, s.r]));
   const days = [...new Set(model.results.map((r) => r.day))].filter((d) => d >= from && d <= to);
-  const out: number[] = [];
+  const out: { day: string; abbr: Abbr; miss: number }[] = [];
   for (const day of days) {
     const r = byDay.get(day)!;
     for (const abbr of model.abbrs) {
@@ -99,7 +101,7 @@ function misses(model: Season, from = "", to = "9999"): number[] {
         margin += sign * (counted(game.hs! - game.as!, PARAMS.margin) - edge);
         opponents += r[side === "h" ? game.away : game.home];
       }
-      out.push(margin / NEXT - (r[abbr] - opponents / NEXT) / SCALE);
+      out.push({ day, abbr, miss: margin / NEXT - (r[abbr] - opponents / NEXT) / SCALE });
     }
   }
   return out;
@@ -162,14 +164,25 @@ if (judged) {
   const id = judged;
   const archive = walked.find((s) => s.data.season === id)?.injuries;
   if (!archive || !Object.keys(archive.days).length) throw new Error(`${id} has no archived injury report`);
-  const from = Object.keys(archive.days).sort()[0];
+  const reportDays = Object.keys(archive.days).sort();
+  const from = reportDays[0];
   const data = files.find((f) => f.data.season === id)!.data;
-  const curve = compute(data, C.inputs(id));
-  const to = regularSeasonEnd(curve);
+  const [b, d] = [B, D].map((def) => compute(data, def.inputs(id)));
+  const to = regularSeasonEnd(b);
+  const [mb, md] = [b, d].map((model) => misses(model, from, to ?? undefined));
   console.log(`${id}, game days ${from} to ${to ?? "today (the regular season is still on)"}, teams with 10 games still to play`);
-  for (const def of [C, CF]) {
-    const m = misses(compute(data, def.inputs(id)), from, to ?? undefined);
-    console.log(`${def.name.padEnd(16)} RMS miss ${rms(m).toFixed(4)} over ${m.length} team-days`);
+  if (!mb.length) {
+    console.log(`Too few report days to judge: ${reportDays.length} archived, ${from} to ${reportDays.at(-1)}, and no team has played 10 games since the first.`);
+  } else {
+    const first = Date.parse(b.results[0].day);
+    const diff = blockBootstrap(mb.map((x, i) => {
+      const y = md[i];
+      if (x.day !== y.day || x.abbr !== y.abbr) throw new Error(`B's ${x.day} ${x.abbr} lines up with D's ${y.day} ${y.abbr}`);
+      return { season: id, day: Math.round((Date.parse(x.day) - first) / 86_400_000), a: y.miss ** 2, b: x.miss ** 2 };
+    }));
+    for (const [def, m] of [[B, mb], [D, md]] as const) console.log(`${def.name.padEnd(16)} RMS miss ${rms(m.map((x) => x.miss)).toFixed(4)} over ${m.length} team-days`);
+    console.log(`D minus B, mean squared miss ${diff.d.toFixed(5)}, 95% interval ${diff.lo.toFixed(5)} to ${diff.hi.toFixed(5)} over ${diff.blocks} weeks`);
+    console.log(to === null ? "Not judged until the regular season ends." : diff.d < 0 && diff.hi < 0 ? "D replaces B." : "The site keeps B.");
   }
 } else {
   const finished = list.filter((s) => s.end).map((s) => s.id).sort();
@@ -181,7 +194,7 @@ if (judged) {
     behaviours.set(def.name, []);
     for (const id of finished) {
       const model = compute(files.find((f) => f.data.season === id)!.data, def.inputs(id));
-      const m = misses(model);
+      const m = misses(model).map((x) => x.miss);
       all.push(...m);
       per.push(pad(rms(m).toFixed(3), 6));
       behaviours.get(def.name)!.push(behaviour(model, def));
