@@ -165,11 +165,11 @@ type Minutes = ReadonlyMap<Athlete, number> | null;
 
 /**
  * Every season's usual rotations, the lineups the site shows each team's rating with, for each team after each
- * day it plays. A team's rotation is everyone who played in its last 10 games this season, each at his minutes
- * per team game over those of them with box scores, a game he missed counting 0. It is empty when none has one,
- * and while fewer than half the team's games this season have one: the fit then had few of its players to
- * separate, so its team part already holds them. Until the team has played 10, his minutes per game last season,
- * on any team, count as one more game.
+ * day it plays or loses a player. A team's rotation is everyone who played in its last 10 games this season and
+ * has not played for another team since, each at his minutes per team game over those of them with box scores,
+ * a game he missed counting 0. It is empty when none has one, and while fewer than half the team's games this
+ * season have one: the fit then had few of its players to separate, so its team part already holds them. Until
+ * the team has played 10, his minutes per game last season, on any team, count as one more game.
  */
 export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, SeasonRotations> {
   const out = new Map<string, SeasonRotations>();
@@ -179,6 +179,7 @@ export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, S
     const played = new Map<Abbr, number>();
     const boxed = new Map<Abbr, number>();
     const thisSeason = new Map<Athlete, { minutes: number; games: number }>();
+    const teamOf = new Map<Athlete, Abbr>();
     const rotation = (abbr: Abbr): Lineup => {
       if (2 * (boxed.get(abbr) ?? 0) < played.get(abbr)!) return [];
       const games = windows.get(abbr)!.filter((g) => g !== null);
@@ -191,19 +192,26 @@ export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, S
     };
     const season: SeasonRotations = new Map();
     for (const { day, games } of finalDays(data)) {
-      const teams: Abbr[] = [];
+      const teams = new Set<Abbr>();
       for (const g of games) for (const abbr of [g.home, g.away]) {
         const lines = box.games[g.id]?.[abbr];
         windows.set(abbr, [...(windows.get(abbr) ?? []), lines ? new Map(lines.map((l) => [l[0], l[1]])) : null].slice(-USUAL));
         played.set(abbr, (played.get(abbr) ?? 0) + 1);
         if (lines) boxed.set(abbr, (boxed.get(abbr) ?? 0) + 1);
-        teams.push(abbr);
+        teams.add(abbr);
         for (const l of lines ?? []) {
           const so = thisSeason.get(l[0]) ?? { minutes: 0, games: 0 };
           thisSeason.set(l[0], { minutes: so.minutes + l[1], games: so.games + 1 });
+          const left = teamOf.get(l[0]);
+          teamOf.set(l[0], abbr);
+          if (left === undefined || left === abbr) continue;
+          const window = windows.get(left)!;
+          if (!window.some((w) => w?.has(l[0]))) continue;
+          windows.set(left, window.map((w) => w && new Map([...w].filter(([athlete]) => athlete !== l[0]))));
+          teams.add(left);
         }
       }
-      season.set(day, Object.fromEntries(teams.map((abbr) => [abbr, rotation(abbr)])));
+      season.set(day, Object.fromEntries([...teams].map((abbr) => [abbr, rotation(abbr)])));
     }
     out.set(data.season, season);
     lastSeason = new Map([...thisSeason].map(([athlete, { minutes, games }]) => [athlete, minutes / games]));

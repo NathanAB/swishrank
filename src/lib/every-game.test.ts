@@ -25,9 +25,11 @@ const FIRST_GAME = 50;
 const AGAINST = 10;
 /**
  * How far a day's new rotation may move a team's shown rating, the fit and the shift held fixed. Weighting players
- * by minutes per team game moves one 36 at most, a star's first game of a season; by minutes per appearance moved one 62.
+ * by minutes per team game moves one 36 at most from a team's own games, a star's first game of a season; by
+ * minutes per appearance moved one 62. A player leaves his old team's rotation the day he plays for a new one, and
+ * James Harden's first game for BKN took 57 off HOU on 2021-01-16.
  */
-const ROTATION = 40;
+const ROTATION = 60;
 
 test("every day of every season, the shown ratings average 1000", () => {
   for (const { id, model } of seasons) {
@@ -110,6 +112,19 @@ test("no team's shown rating counts players while none of its last 10 games has 
       for (const [a, lineup] of Object.entries(shown.after.get(day)!)) {
         if (!boxed[a].length) continue;
         assert.ok(boxed[a].slice(-10).some((b) => b) || !lineup.length, `${id} ${day} ${a} counts ${lineup.length} players`);
+      }
+    }
+  }
+});
+
+test("no player counts for two teams on the same day", () => {
+  for (const { id, data } of seasons) {
+    const shown = shownLineups(data, inputs.get(id)!.players!.rotation);
+    for (const [day, lineups] of [["opening", shown.opening] as const, ...shown.after]) {
+      const teamOf = new Map<number, Abbr>();
+      for (const [a, lineup] of Object.entries(lineups)) for (const { athlete } of lineup) {
+        assert.ok(!teamOf.has(athlete), `${id} ${day}: athlete ${athlete} counts for ${teamOf.get(athlete)} and ${a}`);
+        teamOf.set(athlete, a);
       }
     }
   }
