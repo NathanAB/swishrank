@@ -103,15 +103,15 @@ Log loss pooled over the 8 tuning seasons (10206 games), against the baseline El
 | n0 8, power 0.8, fixed home | 7.1x | 1.532 | 7.545 | 0.6300 | -0.0078 [-0.0106, -0.0048] | 8 of 8 | 0 | 0.2201 | 64.5% |
 | n0 12, power 0.5, fixed home | 3.4x | 0.622 | 2.866 | 0.6301 | -0.0077 [-0.0104, -0.0050] | 8 of 8 | 0 | 0.2202 | 64.4% |
 | n0 8, power 0.6, fixed home | 4.3x | 0.838 | 4.140 | 0.6301 | -0.0077 [-0.0105, -0.0047] | 8 of 8 | 0 | 0.2202 | 64.5% |
-| n0 12, power 0.8, fitted home | 7.1x | 1.532 | 7.037 | 0.6302 | -0.0076 [-0.0105, -0.0045] | 8 of 8 | 0 | 0.2202 | 64.3% |
+| n0 12, power 0.8, fitted home | 7.1x | 1.532 | 7.037 | 0.6302 | -0.0075 [-0.0105, -0.0045] | 8 of 8 | 0 | 0.2202 | 64.3% |
 | n0 12, cap 25, fixed home | 25.0x | 2.185 | 10.128 | 0.6303 | -0.0075 [-0.0103, -0.0047] | 8 of 8 | 0 | 0.2202 | 64.3% |
-| n0 12, power 0.6, fitted home | 4.3x | 0.838 | 3.866 | 0.6303 | -0.0075 [-0.0105, -0.0044] | 8 of 8 | 0 | 0.2202 | 64.4% |
+| n0 12, power 0.6, fitted home | 4.3x | 0.838 | 3.867 | 0.6303 | -0.0075 [-0.0105, -0.0044] | 8 of 8 | 0 | 0.2202 | 64.4% |
 | n0 8, power 0.5, fixed home | 3.4x | 0.622 | 3.086 | 0.6303 | -0.0074 [-0.0103, -0.0045] | 8 of 8 | 0 | 0.2203 | 64.5% |
-| n0 8, power 0.8, fitted home | 7.1x | 1.532 | 7.568 | 0.6304 | -0.0073 [-0.0106, -0.0041] | 7 of 8 | 0 | 0.2203 | 64.2% |
+| n0 8, power 0.8, fitted home | 7.1x | 1.532 | 7.569 | 0.6304 | -0.0073 [-0.0106, -0.0041] | 7 of 8 | 0 | 0.2203 | 64.2% |
 | n0 12, power 0.5, fitted home | 3.4x | 0.622 | 2.884 | 0.6305 | -0.0073 [-0.0103, -0.0042] | 8 of 8 | 0 | 0.2203 | 64.2% |
 | n0 8, power 0.6, fitted home | 4.3x | 0.838 | 4.158 | 0.6305 | -0.0073 [-0.0105, -0.0040] | 8 of 8 | 0 | 0.2203 | 64.3% |
 | n0 8, cap 25, fixed home | 25.0x | 2.185 | 10.906 | 0.6305 | -0.0072 [-0.0102, -0.0041] | 7 of 8 | 0 | 0.2204 | 64.3% |
-| n0 12, raw, fixed home | 43.0x | 2.389 | 11.065 | 0.6306 | -0.0072 [-0.0099, -0.0043] | 7 of 8 | 1 | 0.2204 | 64.1% |
+| n0 12, raw, fixed home | 43.0x | 2.389 | 11.066 | 0.6306 | -0.0072 [-0.0099, -0.0043] | 7 of 8 | 1 | 0.2204 | 64.1% |
 | n0 8, power 0.5, fitted home | 3.4x | 0.622 | 3.102 | 0.6307 | -0.0071 [-0.0103, -0.0038] | 8 of 8 | 0 | 0.2204 | 64.2% |
 | n0 5, power 0.8, fixed home | 7.1x | 1.532 | 8.123 | 0.6308 | -0.0070 [-0.0101, -0.0038] | 7 of 8 | 0 | 0.2205 | 64.6% |
 | n0 12, cap 25, fitted home | 25.0x | 2.185 | 10.154 | 0.6308 | -0.0070 [-0.0100, -0.0039] | 7 of 8 | 0 | 0.2204 | 64.0% |
@@ -119,23 +119,23 @@ Log loss pooled over the 8 tuning seasons (10206 games), against the baseline El
 | n0 5, power 0.6, fixed home | 4.3x | 0.838 | 4.459 | 0.6309 | -0.0069 [-0.0099, -0.0036] | 7 of 8 | 0 | 0.2205 | 64.6% |
 | n0 8, cap 25, fitted home | 25.0x | 2.185 | 10.934 | 0.6310 | -0.0068 [-0.0100, -0.0034] | 7 of 8 | 0 | 0.2206 | 64.1% |
 | n0 5, power 0.5, fixed home | 3.4x | 0.622 | 3.326 | 0.6312 | -0.0066 [-0.0097, -0.0034] | 7 of 8 | 0 | 0.2206 | 64.5% |
-| n0 5, power 0.8, fitted home | 7.1x | 1.532 | 8.146 | 0.6312 | -0.0066 [-0.0100, -0.0031] | 7 of 8 | 0 | 0.2206 | 64.2% |
+| n0 5, power 0.8, fitted home | 7.1x | 1.532 | 8.147 | 0.6312 | -0.0066 [-0.0100, -0.0031] | 7 of 8 | 0 | 0.2206 | 64.2% |
 | n0 12, raw, fitted home | 43.0x | 2.389 | 11.083 | 0.6312 | -0.0066 [-0.0097, -0.0033] | 7 of 8 | 1 | 0.2206 | 64.1% |
 | n0 5, power 0.6, fitted home | 4.3x | 0.838 | 4.476 | 0.6313 | -0.0065 [-0.0099, -0.0031] | 7 of 8 | 0 | 0.2207 | 64.4% |
-| n0 5, cap 25, fixed home | 25.0x | 2.184 | 11.750 | 0.6313 | -0.0065 [-0.0096, -0.0031] | 7 of 8 | 0 | 0.2207 | 64.3% |
-| n0 8, raw, fitted home | 43.0x | 2.389 | 11.939 | 0.6315 | -0.0063 [-0.0097, -0.0029] | 7 of 8 | 0 | 0.2208 | 64.3% |
+| n0 5, cap 25, fixed home | 25.0x | 2.184 | 11.751 | 0.6313 | -0.0064 [-0.0096, -0.0031] | 7 of 8 | 0 | 0.2207 | 64.3% |
+| n0 8, raw, fitted home | 43.0x | 2.389 | 11.940 | 0.6315 | -0.0063 [-0.0097, -0.0029] | 7 of 8 | 0 | 0.2208 | 64.3% |
 | n0 5, power 0.5, fitted home | 3.4x | 0.622 | 3.340 | 0.6315 | -0.0063 [-0.0096, -0.0029] | 7 of 8 | 0 | 0.2208 | 64.3% |
 | n0 5, raw, fixed home | 43.0x | 2.389 | 12.842 | 0.6317 | -0.0061 [-0.0092, -0.0028] | 7 of 8 | 0 | 0.2208 | 64.4% |
 | n0 5, cap 25, fitted home | 25.0x | 2.184 | 11.780 | 0.6318 | -0.0060 [-0.0094, -0.0025] | 7 of 8 | 0 | 0.2209 | 64.2% |
 | n0 3, power 0.8, fixed home | 7.1x | 1.532 | 8.697 | 0.6320 | -0.0058 [-0.0091, -0.0023] | 7 of 8 | 0 | 0.2209 | 64.7% |
 | n0 3, power 0.6, fixed home | 4.3x | 0.838 | 4.777 | 0.6322 | -0.0056 [-0.0089, -0.0021] | 7 of 8 | 0 | 0.2210 | 64.5% |
-| n0 5, raw, fitted home | 43.0x | 2.389 | 12.870 | 0.6323 | -0.0055 [-0.0091, -0.0020] | 7 of 8 | 0 | 0.2211 | 64.2% |
+| n0 5, raw, fitted home | 43.0x | 2.389 | 12.871 | 0.6323 | -0.0055 [-0.0091, -0.0020] | 7 of 8 | 0 | 0.2211 | 64.2% |
 | n0 3, power 0.8, fitted home | 7.1x | 1.532 | 8.722 | 0.6324 | -0.0054 [-0.0089, -0.0018] | 7 of 8 | 0 | 0.2211 | 64.4% |
-| n0 3, power 0.5, fixed home | 3.4x | 0.622 | 3.565 | 0.6324 | -0.0054 [-0.0086, -0.0019] | 7 of 8 | 1 | 0.2211 | 64.5% |
+| n0 3, power 0.5, fixed home | 3.4x | 0.622 | 3.565 | 0.6324 | -0.0054 [-0.0086, -0.0019] | 7 of 8 | 1 | 0.2212 | 64.5% |
 | n0 3, power 0.6, fitted home | 4.3x | 0.838 | 4.793 | 0.6325 | -0.0053 [-0.0088, -0.0017] | 7 of 8 | 0 | 0.2211 | 64.3% |
-| n0 3, cap 25, fixed home | 25.0x | 2.184 | 12.588 | 0.6326 | -0.0052 [-0.0087, -0.0017] | 7 of 8 | 0 | 0.2212 | 64.3% |
+| n0 3, cap 25, fixed home | 25.0x | 2.184 | 12.589 | 0.6326 | -0.0052 [-0.0087, -0.0017] | 7 of 8 | 0 | 0.2212 | 64.3% |
 | n0 3, power 0.5, fitted home | 3.4x | 0.622 | 3.578 | 0.6327 | -0.0051 [-0.0086, -0.0015] | 7 of 8 | 1 | 0.2213 | 64.5% |
-| n0 3, raw, fixed home | 43.0x | 2.389 | 13.762 | 0.6329 | -0.0049 [-0.0083, -0.0012] | 7 of 8 | 0 | 0.2213 | 64.3% |
+| n0 3, raw, fixed home | 43.0x | 2.389 | 13.763 | 0.6329 | -0.0049 [-0.0083, -0.0012] | 7 of 8 | 0 | 0.2213 | 64.3% |
 | n0 3, cap 25, fitted home | 25.0x | 2.184 | 12.621 | 0.6330 | -0.0048 [-0.0084, -0.0011] | 7 of 8 | 0 | 0.2214 | 64.1% |
 | n0 2, power 0.8, fixed home | 7.1x | 1.532 | 9.113 | 0.6331 | -0.0047 [-0.0082, -0.0008] | 7 of 8 | 0 | 0.2214 | 64.7% |
 | n0 2, power 0.6, fixed home | 4.3x | 0.838 | 5.007 | 0.6333 | -0.0045 [-0.0079, -0.0008] | 6 of 8 | 0 | 0.2215 | 64.4% |
@@ -143,7 +143,7 @@ Log loss pooled over the 8 tuning seasons (10206 games), against the baseline El
 | n0 3, raw, fitted home | 43.0x | 2.389 | 13.798 | 0.6335 | -0.0043 [-0.0081, -0.0006] | 7 of 8 | 0 | 0.2216 | 64.2% |
 | n0 2, power 0.5, fixed home | 3.4x | 0.622 | 3.738 | 0.6336 | -0.0042 [-0.0076, -0.0005] | 6 of 8 | 1 | 0.2216 | 64.6% |
 | n0 2, power 0.6, fitted home | 4.3x | 0.838 | 5.024 | 0.6336 | -0.0042 [-0.0078, -0.0004] | 6 of 8 | 0 | 0.2216 | 64.3% |
-| n0 2, cap 25, fixed home | 25.0x | 2.184 | 13.195 | 0.6337 | -0.0041 [-0.0077, -0.0002] | 6 of 8 | 0 | 0.2216 | 64.3% |
+| n0 2, cap 25, fixed home | 25.0x | 2.184 | 13.195 | 0.6337 | -0.0041 [-0.0076, -0.0002] | 6 of 8 | 0 | 0.2216 | 64.3% |
 | n0 2, power 0.5, fitted home | 3.4x | 0.622 | 3.752 | 0.6339 | -0.0039 [-0.0076, -0.0002] | 5 of 8 | 1 | 0.2217 | 64.5% |
 | n0 2, raw, fixed home | 43.0x | 2.389 | 14.431 | 0.6341 | -0.0037 [-0.0075, +0.0002] | 6 of 8 | 0 | 0.2218 | 64.3% |
 | n0 2, cap 25, fitted home | 25.0x | 2.184 | 13.230 | 0.6342 | -0.0036 [-0.0074, +0.0002] | 6 of 8 | 0 | 0.2218 | 64.1% |
@@ -169,14 +169,14 @@ The site's model against the baseline Elo on the held-out seasons, scored once a
 
 | Season | Games | Elo log loss | Model log loss | Model - Elo [95%] | Verdict | Elo Brier | Model Brier | Elo accuracy | Model accuracy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2023-24 | 1319 | 0.6349 | 0.6173 | -0.0176 [-0.0264, -0.0092] | better | 0.2225 | 0.2150 | 63.8% | 65.0% |
+| 2023-24 | 1319 | 0.6348 | 0.6173 | -0.0176 [-0.0263, -0.0093] | better | 0.2225 | 0.2150 | 63.6% | 65.0% |
 | 2024-25 | 1321 | 0.6326 | 0.6185 | -0.0141 [-0.0198, -0.0085] | better | 0.2214 | 0.2155 | 63.9% | 65.0% |
 | 2025-26 | 1322 | 0.6153 | 0.6055 | -0.0099 [-0.0179, -0.0020] | better | 0.2134 | 0.2086 | 66.3% | 68.5% |
-| Pooled | 3962 | 0.6276 | 0.6138 | -0.0138 [-0.0182, -0.0095] | better | 0.2191 | 0.2130 | 64.7% | 66.2% |
+| Pooled | 3962 | 0.6276 | 0.6137 | -0.0138 [-0.0182, -0.0095] | better | 0.2191 | 0.2130 | 64.6% | 66.1% |
 
 | Unconstrained best, season | Best - Elo [95%] | Site's model - best [95%] |
 | --- | --- | --- |
-| 2023-24 | -0.0173 [-0.0260, -0.0086] | -0.0003 [-0.0014, +0.0007] |
+| 2023-24 | -0.0172 [-0.0260, -0.0086] | -0.0003 [-0.0014, +0.0007] |
 | 2024-25 | -0.0147 [-0.0211, -0.0085] | +0.0006 [-0.0015, +0.0026] |
 | 2025-26 | -0.0122 [-0.0201, -0.0044] | +0.0023 [+0.0007, +0.0039] |
 | Pooled | -0.0147 [-0.0192, -0.0102] | +0.0009 [-0.0001, +0.0019] |
@@ -194,7 +194,7 @@ The site's model against Elo by part of the season, days counted from each seaso
 | Held-out | Weeks 1-2 | 314 | 0.6903 | 0.6727 | -0.0176 [-0.0299, -0.0039] | better |
 | Held-out | Weeks 3-4 | 305 | 0.6153 | 0.5904 | -0.0249 [-0.0490, -0.0014] | better |
 | Held-out | Weeks 5-6 | 289 | 0.6183 | 0.6057 | -0.0126 [-0.0292, +0.0040] | tie |
-| Held-out | Rest of season | 3054 | 0.6232 | 0.6108 | -0.0125 [-0.0169, -0.0078] | better |
+| Held-out | Rest of season | 3054 | 0.6232 | 0.6108 | -0.0125 [-0.0169, -0.0077] | better |
 
 ### Table 5. Two-week windows, held-out seasons pooled
 
@@ -205,19 +205,19 @@ Window w holds days 14w to 14w + 13 of each season. The constraint fails on a wi
 | 0 | 0-13 | 314 | 6 | 0.6903 | 0.6727 | -0.0176 [-0.0299, -0.0039] | better |
 | 1 | 14-27 | 305 | 6 | 0.6153 | 0.5904 | -0.0249 [-0.0490, -0.0014] | better |
 | 2 | 28-41 | 289 | 6 | 0.6183 | 0.6057 | -0.0126 [-0.0292, +0.0040] | tie |
-| 3 | 42-55 | 258 | 6 | 0.6163 | 0.5949 | -0.0214 [-0.0309, -0.0130] | better |
-| 4 | 56-69 | 286 | 6 | 0.6702 | 0.6598 | -0.0104 [-0.0246, +0.0037] | tie |
-| 5 | 70-83 | 313 | 6 | 0.6461 | 0.6377 | -0.0084 [-0.0169, -0.0011] | better |
-| 6 | 84-97 | 308 | 6 | 0.6577 | 0.6462 | -0.0115 [-0.0267, +0.0027] | tie |
-| 7 | 98-111 | 316 | 6 | 0.6407 | 0.6196 | -0.0211 [-0.0338, -0.0083] | better |
-| 8 | 112-125 | 188 | 6 | 0.6445 | 0.6104 | -0.0341 [-0.0554, -0.0093] | better |
+| 3 | 42-55 | 258 | 6 | 0.6162 | 0.5946 | -0.0215 [-0.0304, -0.0133] | better |
+| 4 | 56-69 | 286 | 6 | 0.6701 | 0.6598 | -0.0103 [-0.0246, +0.0038] | tie |
+| 5 | 70-83 | 313 | 6 | 0.6463 | 0.6378 | -0.0085 [-0.0170, -0.0012] | better |
+| 6 | 84-97 | 308 | 6 | 0.6576 | 0.6461 | -0.0114 [-0.0266, +0.0028] | tie |
+| 7 | 98-111 | 316 | 6 | 0.6407 | 0.6196 | -0.0211 [-0.0337, -0.0083] | better |
+| 8 | 112-125 | 188 | 6 | 0.6443 | 0.6103 | -0.0340 [-0.0553, -0.0092] | better |
 | 9 | 126-139 | 324 | 6 | 0.6160 | 0.6017 | -0.0143 [-0.0248, -0.0037] | better |
-| 10 | 140-153 | 322 | 6 | 0.5523 | 0.5549 | +0.0027 [-0.0094, +0.0138] | tie |
-| 11 | 154-167 | 305 | 6 | 0.5815 | 0.5703 | -0.0112 [-0.0259, +0.0060] | tie |
+| 10 | 140-153 | 322 | 6 | 0.5523 | 0.5550 | +0.0027 [-0.0094, +0.0138] | tie |
+| 11 | 154-167 | 305 | 6 | 0.5814 | 0.5703 | -0.0112 [-0.0258, +0.0060] | tie |
 | 12 | 168-181 | 215 | 6 | 0.5674 | 0.5661 | -0.0013 [-0.0122, +0.0099] | tie |
-| 13 | 182-195 | 110 | 6 | 0.6753 | 0.6563 | -0.0190 [-0.0346, -0.0055] | better |
-| 14 | 196-209 | 62 | 6 | 0.6860 | 0.6762 | -0.0098 [-0.0501, +0.0350] | tie |
-| 15 | 210-223 | 30 | 6 | 0.6459 | 0.6319 | -0.0140 [-0.0614, +0.0375] | tie |
+| 13 | 182-195 | 110 | 6 | 0.6753 | 0.6564 | -0.0189 [-0.0346, -0.0054] | better |
+| 14 | 196-209 | 62 | 6 | 0.6860 | 0.6763 | -0.0097 [-0.0500, +0.0351] | tie |
+| 15 | 210-223 | 30 | 6 | 0.6459 | 0.6318 | -0.0141 [-0.0617, +0.0375] | tie |
 | 16 | 224-237 | 15 | 6 | 0.6901 | 0.6908 | +0.0007 [-0.0503, +0.0708] | tie |
 | 17 | 238-251 | 2 | 1 | 0.5069 | 0.6474 | +0.1404 [+0.1404, +0.1404] | worse, one block |
 
@@ -227,13 +227,13 @@ Games bucketed by the favourite's stated chance. A calibrated model's favourites
 
 | Stated chance | Model games | Model says | Model favourite won | Elo games | Elo says | Elo favourite won |
 | --- | --- | --- | --- | --- | --- | --- |
-| 50-55% | 701 | 52.5% | 54.2% | 556 | 52.4% | 52.7% |
-| 55-60% | 738 | 57.5% | 58.9% | 562 | 57.6% | 56.6% |
-| 60-65% | 670 | 62.4% | 60.4% | 733 | 62.7% | 58.8% |
-| 65-70% | 544 | 67.5% | 65.8% | 586 | 67.4% | 62.6% |
-| 70-75% | 461 | 72.4% | 74.0% | 519 | 72.4% | 67.1% |
-| 75-80% | 361 | 77.4% | 78.7% | 393 | 77.4% | 74.0% |
-| 80-85% | 257 | 82.3% | 82.9% | 305 | 82.3% | 82.0% |
+| 50-55% | 702 | 52.5% | 54.0% | 561 | 52.4% | 52.6% |
+| 55-60% | 739 | 57.5% | 59.0% | 559 | 57.6% | 56.2% |
+| 60-65% | 668 | 62.4% | 60.5% | 731 | 62.7% | 58.7% |
+| 65-70% | 544 | 67.5% | 65.8% | 586 | 67.4% | 62.8% |
+| 70-75% | 461 | 72.4% | 74.0% | 522 | 72.4% | 67.0% |
+| 75-80% | 362 | 77.4% | 78.7% | 391 | 77.4% | 73.9% |
+| 80-85% | 256 | 82.3% | 82.8% | 304 | 82.3% | 82.2% |
 | 85-90% | 164 | 87.2% | 89.0% | 210 | 87.2% | 84.8% |
 | 90-95% | 60 | 92.1% | 88.3% | 87 | 92.0% | 87.4% |
 | 95-100% | 6 | 95.7% | 100.0% | 11 | 95.7% | 100.0% |
@@ -260,7 +260,7 @@ k is the number of games the less experienced side had played before a game. E(k
 | 3 | 127 | 0.0666 | +0.0404 |
 | 4 | 121 | 0.0663 | +0.0401 |
 | 5 | 126 | 0.0703 | +0.0441 |
-| 6 | 124 | 0.0602 | +0.0341 |
+| 6 | 124 | 0.0602 | +0.0340 |
 | 7 | 127 | 0.0509 | +0.0247 |
 | 8 | 117 | 0.0436 | +0.0174 |
 | 9 | 123 | 0.0357 | +0.0095 |
@@ -274,20 +274,20 @@ k is the number of games the less experienced side had played before a game. E(k
 | 17 | 121 | 0.0253 | -0.0009 |
 | 18 | 122 | 0.0298 | +0.0036 |
 | 19 | 126 | 0.0301 | +0.0039 |
-| 20 | 119 | 0.0316 | +0.0055 |
+| 20 | 119 | 0.0316 | +0.0054 |
 | 21 | 123 | 0.0269 | +0.0007 |
 | 22 | 121 | 0.0292 | +0.0030 |
-| 23 | 127 | 0.0286 | +0.0025 |
+| 23 | 127 | 0.0286 | +0.0024 |
 | 24 | 114 | 0.0330 | +0.0068 |
 | 25 | 124 | 0.0389 | +0.0128 |
 | 26 | 119 | 0.0350 | +0.0089 |
-| 27 | 115 | 0.0305 | +0.0044 |
+| 27 | 115 | 0.0305 | +0.0043 |
 | 28 | 120 | 0.0287 | +0.0025 |
 | 29 | 126 | 0.0269 | +0.0007 |
 | 30 | 123 | 0.0271 | +0.0009 |
 | 31 | 124 | 0.0312 | +0.0050 |
 | 32 | 116 | 0.0313 | +0.0051 |
-| 33 | 122 | 0.0314 | +0.0053 |
+| 33 | 122 | 0.0314 | +0.0052 |
 | 34 | 118 | 0.0302 | +0.0041 |
 | 35 | 116 | 0.0298 | +0.0036 |
 | 36 | 127 | 0.0311 | +0.0049 |
@@ -302,7 +302,7 @@ A rating is 1000 plus the fitted rating times 295.7 / SIGMA Elo points, so a gap
 | Quantity | Value |
 | --- | --- |
 | SIGMA, margin units | 2.866 |
-| Elo points per margin unit | 103.16 |
+| Elo points per margin unit | 103.15 |
 | h0, margin units | 0.622 |
 | h0, Elo points | 64.2 |
 | Chance at a 100-point gap, model / classic Elo | 63.2% / 64.0% |
@@ -330,11 +330,11 @@ Written after the results. Each setting lived in `src/lib/elo.ts` (`PARAMS`, `PR
 - **Margins, `(|m| + 3)^0.5`.** The only rule in the grid within the owner's limit: a 43-point win counts 3.4 times a 1-point win (table 1). The power 0.6 rule just misses the limit at 4.3x.
 - **What the limit costs.** The unconstrained best is `n0` 12 with `(|m| + 3)^0.8`, the 7.1x rule the old Elo also used (table 2). Against it the site's model gives up 0.0003 of log loss on the tuning seasons and 0.0009 on the held-out seasons. Both intervals cross 0, so both are ties (table 2). Season by season, the limit costs nothing measurable in 2023-24 and 2024-25, and 0.0023 [0.0007, 0.0039] in 2025-26, the one season where the gap is outside the noise (table 3).
 - **Home edge, fixed at 0.622 margin units, 64 Elo points.** Fixed beats fitted from the season's own games at every `n0` and margin rule (table 1), and for the site's model by 0.0004, a tie (table 7). The `w_h` rows the plan reports for a fitted home edge do not apply, as the chosen edge is fixed. A home team facing an equal rival is a 59% favourite.
-- **`SIGMA` = 2.866 margin units.** Fitted once by maximum likelihood on the tuning seasons (table 1). Its calibration on the held-out seasons, which it never saw, is within 2.5 points in every bucket with more than 60 games, where Elo's favourites from 60% to 80% won 3.4 to 5.3 points less often than it said (table 6).
+- **`SIGMA` = 2.866 margin units.** Fitted once by maximum likelihood on the tuning seasons (table 1). Its calibration on the held-out seasons, which it never saw, is within 2.5 points in every bucket with more than 60 games, where Elo's favourites from 60% to 80% won 3.5 to 5.4 points less often than it said (table 6).
 - **The Elo scale, 295.7 Elo points per `SIGMA`.** A rating is 1000 plus the fitted rating times 295.7 / 2.866, about 103 Elo points per margin unit. At that scale the model's own chance for a gap, `Phi(gap / 295.7)`, is never more than 0.0095 from classic Elo's chance for the same gap (table 9). The fixtures, the team pages, the About page's curve and its home court line all use the model's chance, not the classic formula.
 - **Softer chances for a team's first 5 games, `EARLY` in `src/lib/elo.ts`.** Added 2026-10-26, after the results and outside the plan. Over all eleven seasons, favourites the model called 60% or more in the first two weeks won 61.1% against 66.0% stated (432 games). While either side has played fewer than 5 games, a gap now counts 1.55 times less. The pair was fitted on the tuning seasons over a grid of 2 to 10 games and 1.0 to 1.6. On the held-out seasons it cuts the first two weeks' log loss from 0.6727 to 0.6718 (314 games) and leaves weeks 3-4 unchanged (0.5904). A smooth widening that shrank with every game played helped the first two weeks less and hurt weeks 3-4, so the site uses the cutoff. The gain is small, and it touches only the chances, never the ratings.
 - **Provisional until 26 games.** Table 8's rule gives 26. The curve is noisy: the excess first falls within 0.01 of the settled level at 9 games, and again from 15 to 24, but a bump at 25 (0.013) holds the rule's answer at 26. The rule was fixed in advance, so the site uses 26. A smoother rule would likely give a smaller number. That would need a new pre-registration.
-- **Against the old Elo.** The site's model wins all eight tuning seasons and all three held-out seasons. Pooled over the held-out seasons its log loss is 0.0138 lower, [0.0095, 0.0182], with Brier 0.2130 against 0.2191 and accuracy 66.2% against 64.7% (table 3). It is better in weeks 1-2, 3-4 and the rest of the season, and ties in weeks 5-6 (table 4). `scripts/backtest.test.ts` fails if a later change loses that edge on whole-season log loss.
+- **Against the old Elo.** The site's model wins all eight tuning seasons and all three held-out seasons. Pooled over the held-out seasons its log loss is 0.0138 lower, [0.0095, 0.0182], with Brier 0.2130 against 0.2191 and accuracy 66.1% against 64.6% (table 3). It is better in weeks 1-2, 3-4 and the rest of the season, and ties in weeks 5-6 (table 4). `scripts/backtest.test.ts` fails if a later change loses that edge on whole-season log loss.
 
 ### Deviation from the plan
 

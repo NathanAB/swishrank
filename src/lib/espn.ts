@@ -52,6 +52,22 @@ const isFranchise = (team: Competitor["team"]) => Number(team.id) >= 1 && Number
 // ESPN flags only 3 games of 2019-20 as neutral, but everything from the restart on was in the Orlando bubble.
 const inBubble = (season: string, t: string) => season === "2019-20" && dayKey(t) >= "2020-07-30";
 
+type Correction = Partial<Pick<Game, "t" | "neutral">> & { source: string };
+/**
+ * Facts ESPN's scoreboard gets wrong, by ESPN event id, each with the NBA record that shows the right one. A `t`
+ * is the first period's start in the NBA's play-by-play, which prints the arena's local time.
+ */
+const CORRECTIONS: Record<string, Correction> = {
+  // ESPN stores these four at early-morning Eastern times, which would file each a day late.
+  "401161490": { t: "2020-02-24T02:11Z", source: "https://statsdmz.nba.com/pdfs/20200223/20200223_DETPOR_book.pdf" },
+  "401161528": { t: "2020-02-29T03:41Z", source: "https://statsdmz.nba.com/pdfs/20200228/20200228_DENLAC_book.pdf" },
+  "401161530": { t: "2020-03-01T00:42Z", source: "https://statsdmz.nba.com/pdfs/20200229/20200229_PORATL_book.pdf" },
+  "401161536": { t: "2020-03-01T02:10Z", source: "https://statsdmz.nba.com/pdfs/20200229/20200229_GSWPHX_book.pdf" },
+  // The 2023-24 Cup semifinals were at T-Mobile Arena, Las Vegas, which ESPN stores as home games.
+  "401607494": { neutral: true, source: "https://statsdmz.nba.com/pdfs/20231207/20231207_INDMIL_book.pdf" },
+  "401607493": { neutral: true, source: "https://statsdmz.nba.com/pdfs/20231207/20231207_NOPLAL.pdf" },
+};
+
 const title = (word: string) => (word === "NBA" ? word : word[0] + word.slice(1).toLowerCase());
 const ROUNDS: Record<string, string> = { "1ST ROUND": "1st Round", SEMIFINALS: "Semifinals", FINALS: "Finals" };
 
@@ -95,15 +111,17 @@ export function parse(season: string, events: readonly EspnEvent[], teams: Recor
       return Number(c.score);
     };
     const note = comp.notes?.find((n) => n.headline)?.headline;
+    const fix: Correction | undefined = CORRECTIONS[e.id];
+    const t = fix?.t ?? e.date;
     games.push({
       id: e.id,
-      t: e.date,
+      t,
       home: home.team.abbreviation,
       away: away.team.abbreviation,
       hs: final ? score(home) : null,
       as: final ? score(away) : null,
       final,
-      neutral: Boolean(comp.neutralSite) || inBubble(season, e.date),
+      neutral: fix?.neutral ?? (Boolean(comp.neutralSite) || inBubble(season, t)),
       note: note ? canonicalNote(note) : null,
     });
   }

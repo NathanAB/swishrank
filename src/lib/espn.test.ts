@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dayKey, type SeasonData } from "./elo.ts";
+import { readdirSync, readFileSync } from "node:fs";
+import { dayKey, TZ, type SeasonData } from "./elo.ts";
 import { boxLines, canonicalNote, fetchEvents, fetchJson, lostFinals, parse, playerNames, type EspnEvent } from "./espn.ts";
 import { stage } from "./teams.ts";
 
@@ -25,6 +25,35 @@ test("2019-20 games from the restart on July 30, 2020 are neutral, as the Orland
 
   const stored: SeasonData = JSON.parse(readFileSync(new URL("../data/games/2019-20.json", import.meta.url), "utf8"));
   assert.deepEqual(stored.games.filter((g) => dayKey(g.t) >= "2020-07-30" && !g.neutral).map((g) => g.id), []);
+});
+
+test("a re-fetch reads ESPN's misdated 2019-20 games on the day they were played", () => {
+  const day = (id: string, espnDate: string) => dayKey(parse("2019-20", [event(id, espnDate)], {})[0].t);
+  assert.equal(day("401161490", "2020-02-24T12:00Z"), "2020-02-23");
+  assert.equal(day("401161528", "2020-02-29T13:30Z"), "2020-02-28");
+  assert.equal(day("401161530", "2020-03-01T11:00Z"), "2020-02-29");
+  assert.equal(day("401161536", "2020-03-01T12:30Z"), "2020-02-29");
+  assert.equal(day("other", "2020-03-01T12:30Z"), "2020-03-01");
+});
+
+test("a re-fetch reads the 2023-24 Cup semifinals, played in Las Vegas, as neutral", () => {
+  const games = parse("2023-24", [event("401607494", "2023-12-07T22:00Z"), event("401607493", "2023-12-08T02:00Z")], {});
+  assert.deepEqual(games.map((g) => g.neutral), [true, true]);
+});
+
+const gamesDir = new URL("../data/games/", import.meta.url);
+const storedGames = readdirSync(gamesDir).flatMap((f) => (JSON.parse(readFileSync(new URL(f, gamesDir), "utf8")) as SeasonData).games);
+
+test("no stored game tips off between 2 and 10 in the morning US Eastern, when no NBA game does", () => {
+  const hour = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", hourCycle: "h23" });
+  const early = (t: string) => Number(hour.format(new Date(t))) >= 2 && Number(hour.format(new Date(t))) < 10;
+  assert.deepEqual(storedGames.filter((g) => early(g.t)).map((g) => g.id), []);
+});
+
+test("every stored Cup semifinal and final is neutral, as each was played in Las Vegas", () => {
+  const lasVegas = storedGames.filter((g) => /^NBA (Cup|In-Season Tournament)( - Semifinals| Championship)$/.test(g.note ?? ""));
+  assert.equal(lasVegas.length, 9);
+  assert.deepEqual(lasVegas.filter((g) => !g.neutral).map((g) => g.id), []);
 });
 
 test("older seasons' playoff notes read as the same rounds as today's", () => {
