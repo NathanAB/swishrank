@@ -1,22 +1,20 @@
-// PROTOTYPE (team ledger): every move of a team's shown rating split into its parts, so each row adds up
-// exactly to the change shown. Mirrors compute() in elo.ts day by day. Throwaway; see prototype/team-ledger.
-import { ELO_PER_SIGMA, PARAMS, START, addDays, dayKey, fitSeasonSteps, playerPart, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
+// Every move of a team's shown rating split into its parts, so each row adds up exactly to the change shown.
+// Mirrors compute() in elo.ts day by day.
+import { ELO_PER_SIGMA, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, playerPart, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
 import { shortDay } from "./format.ts";
 import { parseArchive, type Injury } from "./injuries.ts";
+import { playerName } from "./names.ts";
 import type { Lineup } from "./players.ts";
 import { seasonInputs, team, type SeasonView } from "./season.ts";
 
-const NAME_FILES = import.meta.glob<Record<string, string>>("../data/prototype-names-*.json", { eager: true, import: "default" });
 const INJURY_FILES = import.meta.glob<unknown>("../data/injuries/*.json", { eager: true, import: "default" });
 
+/** A player whose counted minutes changed that day, and what the change did at his value after the day. */
 export type PlayerMove = {
   athlete: number;
   name: string;
-  /** Minutes a game the rating counted him for, before and after the day. */
+  /** Minutes a game the rating counted him for before the day. */
   before: number;
-  after: number;
-  /** His value per 48 minutes, in rating points. */
-  value: number;
   points: number;
   /** His minutes in the team's game that day, null when he did not play in it, undefined on a day off. */
   played?: number | null;
@@ -27,19 +25,21 @@ export type PlayerMove = {
 };
 
 export type LedgerGame = {
-  opp: Abbr; venue: "home" | "away" | "neutral"; won: boolean; us: number; them: number; id: string; stage: string | null;
+  id: string;
+  opp: Abbr;
+  venue: "home" | "away" | "neutral";
+  won: boolean;
   /** Whether the model made this team the favourite before the game; null for an even game. */
   favored: boolean | null;
+  /** Whether the team's counted margin beat the margin the model expected of it before the game. */
+  beat: boolean;
 };
 
-/** The parts, in rating points: the team's own game, everyone else's games that day, and its players. */
-export type Parts<T> = { game: T; others: T; rotation: T };
+/** One other game that day, what adding it to the fit did to this team, and which of its sides this team has played. */
+export type OtherGame = { home: Abbr; away: Abbr; hs: number; as: number; points: number; met: Abbr[] };
 
-/** One other game that day, and what adding it to the fit did to this team. */
-export type OtherGame = { home: Abbr; away: Abbr; hs: number; as: number; points: number; met: { abbr: Abbr; day: string; won: boolean }[] };
-
-/** One player's value change from the team's own game, times his share of the minutes. */
-export type OwnPlayer = { athlete: number; name: string; points: number };
+/** One player's value change from his box score in the team's own game, times his share of the minutes. */
+export type BoxPlayer = { athlete: number; name: string; points: number };
 
 export type LedgerRow = {
   day: string;
@@ -48,15 +48,21 @@ export type LedgerRow = {
   /** The change the page shows: the gap between the two rounded ratings. */
   change: number;
   game: LedgerGame | null;
-  raw: Parts<number>;
+  /**
+   * The move in rating points, in the walk's three parts, which add up to it exactly. `result` is what the team's
+   * own game did before its players' box scores counted, and the team part's shift when they did; `players` is
+   * each player's value change from his box score plus what his change in counted minutes did; `others` is the
+   * day's other games and the seed's daily fading.
+   */
+  raw: Record<WalkKey, number>;
+  /** Each player of the rotation the team took into the day, and his value change from his box score. */
+  box: BoxPlayer[];
   /** Players whose counted minutes changed, largest effect first. */
   players: PlayerMove[];
-  /** The day's other games, largest effect on this team first, and what the seed's daily fading did. */
+  /** The day's other games, largest effect on this team first. */
   others: OtherGame[];
-  priors: { raw: number };
-  /** What the team's own game did: its team part, and each player's value change times his share of the minutes. */
-  own: { team: number; players: OwnPlayer[] };
-  held: boolean;
+  /** What the seed's daily fading did. */
+  seed: number;
 };
 
 /** Whole numbers that add up to `total`, as close to `raw` as the largest-remainder rule allows. */
@@ -75,10 +81,20 @@ export function apportion<K extends string>(raw: Record<K, number>, total: numbe
   return out;
 }
 
+const ledgers = new Map<string, LedgerRow[]>();
+
+/** A team's rows for a season, worked out once per build: a team page and every game page of its season read them. */
 export function ledger(season: SeasonView, abbr: Abbr): LedgerRow[] {
+  const key = `${season.id} ${abbr}`;
+  let rows = ledgers.get(key);
+  if (!rows) ledgers.set(key, (rows = teamLedger(season, abbr)));
+  return rows;
+}
+
+function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   const data = season.model.data;
   const inputs = seasonInputs(season.id) ?? {};
-  const names = NAME_FILES[`../data/prototype-names-${season.id}.json`] ?? {};
+  const name = (athlete: number) => playerName(athlete) ?? `#${athlete}`;
   const rawInjuries = INJURY_FILES[`../data/injuries/${season.id}.json`];
   const injuries = rawInjuries ? parseArchive(rawInjuries, season.id) : null;
   const scale = ELO_PER_SIGMA / PARAMS.sigma;
@@ -90,7 +106,8 @@ export function ledger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   const box = pl?.box.games ?? {};
   const rate = (fit: Fit, lineup: Lineup) => START + (fit.r[abbr] + playerPart(fit, lineup)) * scale;
   const lastDay = [...data.games].filter((g) => g.home === abbr || g.away === abbr).map((g) => dayKey(g.t)).sort().at(-1) ?? "";
-  const met: { abbr: Abbr; day: string; won: boolean }[] = [];
+  /** This team's opponents so far. */
+  const met = new Set<Abbr>();
   /** Everyone with minutes in a game on an earlier day this season. */
   const seen = new Set<number>();
 
@@ -101,60 +118,67 @@ export function ledger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   const rows: LedgerRow[] = [];
 
   for (const { day, games, before, after, priors, steps } of days) {
-    const old = usual;
+    const was = usual[abbr];
     usual = shown.after.get(day)!;
-    const was = old[abbr];
     const held = heldAt !== null;
     const shownNow = held ? heldAt! : rate(after, usual[abbr]);
     if (!held && lastDay === day) heldAt = shownNow;
-    const g = games.find((pg) => pg.game.home === abbr || pg.game.away === abbr)?.game;
-    let at = rate(priors, was);
-    const own = g ? rate(steps[0].fit, was) - at : 0;
-    const ownParts = {
-      team: g ? (steps[0].fit.r[abbr] - priors.r[abbr]) * scale : 0,
-      players: g ? was.map((p): OwnPlayer => {
-        const v = (fit: Fit) => (fit.v.get(p.athlete) ?? 0) * p.share * scale;
-        return { athlete: p.athlete, name: names[String(p.athlete)] ?? `#${p.athlete}`, points: v(steps[0].fit) - v(priors) };
-      }) : [],
-    };
-    if (g) at = rate(steps[0].fit, was);
+    const pg = games.find((p) => p.game.home === abbr || p.game.away === abbr);
+    const g = pg?.game;
+    // The team's own game is the first step, fitted once before its players' box ratings move (`result`) and once after.
+    const own = g ? steps[0] : undefined;
+    const value = (fit: Fit, athlete: number) => (fit.v.get(athlete) ?? 0) * scale;
+    const result = own?.result;
+    const boxed: BoxPlayer[] = own && result
+      ? was.map((p) => ({ athlete: p.athlete, name: name(p.athlete), points: (value(own.fit, p.athlete) - value(result, p.athlete)) * p.share }))
+      : [];
+    let at = rate(own?.fit ?? priors, was);
     const others: OtherGame[] = [];
-    for (const step of steps.slice(g ? 1 : 0)) {
+    for (const step of steps.slice(own ? 1 : 0)) {
       const next = rate(step.fit, was);
       const og = step.game;
-      others.push({ home: og.home, away: og.away, hs: og.hs, as: og.as, points: next - at, met: met.filter((m) => m.abbr === og.home || m.abbr === og.away) });
+      others.push({ home: og.home, away: og.away, hs: og.hs, as: og.as, points: next - at, met: [og.home, og.away].filter((t) => met.has(t)) });
       at = next;
     }
-    const priorMove = rate(priors, was) - rate(before, was) + rate(after, was) - rate(steps.at(-1)?.fit ?? priors, was);
-    const raw: Parts<number> = held
-      ? { game: 0, others: 0, rotation: 0 }
-      : { game: own, others: priorMove + others.reduce((s, o) => s + o.points, 0), rotation: rate(after, usual[abbr]) - rate(after, was) };
-    const residual = shownNow - prevShown - (raw.game + raw.others + raw.rotation);
+    const seed = rate(priors, was) - rate(before, was) + rate(after, was) - rate(steps.at(-1)?.fit ?? priors, was);
+    const minutes = rate(after, usual[abbr]) - rate(after, was);
+    const boxPoints = boxed.reduce((s, p) => s + p.points, 0);
+    const raw: Record<WalkKey, number> = held
+      ? { result: 0, players: 0, others: 0 }
+      : {
+          result: own ? rate(own.fit, was) - rate(priors, was) - boxPoints : 0,
+          players: boxPoints + minutes,
+          others: seed + others.reduce((s, o) => s + o.points, 0),
+        };
+    const residual = shownNow - prevShown - (raw.result + raw.players + raw.others);
     if (Math.abs(residual) > 1e-6) throw new Error(`ledger ${season.id} ${abbr} ${day}: parts miss the move by ${residual}`);
     const change = shownChange(prevShown, shownNow);
-    if (g) met.push({ abbr: g.home === abbr ? g.away : g.home, day, won: (g.home === abbr) === (g.hs > g.as) });
-    const game: LedgerGame | null = g
-      ? {
-          id: g.id, stage: g.note,
-          opp: g.home === abbr ? g.away : g.home,
-          venue: g.neutral ? "neutral" : g.home === abbr ? "home" : "away",
-          won: (g.home === abbr) === (g.hs > g.as),
-          us: g.home === abbr ? g.hs : g.as, them: g.home === abbr ? g.as : g.hs,
-          favored: favoredSide(homeChance.get(g.id), g.home === abbr),
-        }
-      : null;
+    let game: LedgerGame | null = null;
+    if (pg && g) {
+      const home = g.home === abbr;
+      const opp = home ? g.away : g.home;
+      met.add(opp);
+      // The score against the margin the chances priced, both in counted points for the home side.
+      const surprise = counted(g.hs - g.as, PARAMS.margin) - expected(before, pg);
+      game = {
+        id: g.id, opp,
+        venue: g.neutral ? "neutral" : home ? "home" : "away",
+        won: home === g.hs > g.as,
+        favored: favoredSide(homeChance.get(g.id), home),
+        beat: home ? surprise > 0 : surprise < 0,
+      };
+    }
     const lines = g ? box[g.id]?.[abbr] : undefined;
     const report = (injuries?.days[day] ?? injuries?.days[addDays(day, 1)])?.injuries ?? [];
     const ids = new Set([...was, ...usual[abbr]].map((p) => p.athlete));
     const players: PlayerMove[] = held ? [] : [...ids].flatMap((athlete) => {
       const s0 = was.find((p) => p.athlete === athlete)?.share ?? 0;
       const s1 = usual[abbr].find((p) => p.athlete === athlete)?.share ?? 0;
-      const value = (after.v.get(athlete) ?? 0) * scale;
-      const points = (s1 - s0) * value;
+      const points = (s1 - s0) * value(after, athlete);
       if (Math.abs(points) < 0.05) return [];
       const line = lines?.find((l) => l[0] === athlete);
       return [{
-        athlete, name: names[String(athlete)] ?? `#${athlete}`, before: s0 * 48, after: s1 * 48, value, points,
+        athlete, name: name(athlete), before: s0 * 48, points,
         played: g ? (lines ? (line ? line[1] : null) : undefined) : undefined,
         status: s0 === 0 ? "joined" : s1 === 0 ? "left" : s1 > s0 ? "more" : "fewer",
         debut: !seen.has(athlete),
@@ -163,10 +187,9 @@ export function ledger(season: SeasonView, abbr: Abbr): LedgerRow[] {
     }).sort((a, b) => Math.abs(b.points) - Math.abs(a.points));
     if (g || change !== 0) {
       rows.push({
-        day, before: prevShown, after: shownNow, change, game, raw, players, held,
+        day, before: prevShown, after: shownNow, change, game, raw, players, seed,
+        box: held ? [] : boxed,
         others: others.sort((x, y) => Math.abs(y.points) - Math.abs(x.points)),
-        priors: { raw: priorMove },
-        own: held ? { team: 0, players: [] } : ownParts,
       });
     }
     for (const { game: dg } of games) for (const side of Object.values(box[dg.id] ?? {})) for (const l of side ?? []) if (l[1] > 0) seen.add(l[0]);
@@ -190,8 +213,8 @@ export type WalkLine =
 export type WalkPart = { key: WalkKey; label: string; whole: number; lines: WalkLine[] };
 
 /**
- * What an opened row draws: its rating from `from` to `to`, through each part whose whole figure isn't 0. `whole`
- * holds all three parts, for the row's columns. `tipped` marks a small move that rounding made a whole point.
+ * What an opened row draws: its rating from `from` to `to`, through the team's result on a game day and each other
+ * part whose whole figure isn't 0. `whole` holds all three parts, for the row's columns. `tipped` marks a small move that rounding made a whole point.
  */
 export type Walk = { from: number; to: number; whole: Record<WalkKey, number>; parts: WalkPart[]; tipped: boolean };
 
@@ -200,19 +223,20 @@ const byMagnitude = (a: { points: number }, b: { points: number }) => Math.abs(b
 
 /**
  * The team's result in a few words: where, and how it went against what the model expected. An upset says so
- * ("despite being favored", "despite being the underdog"); otherwise the margin did, joined as a player's phrase is:
- * "and by more" when the result and the expectation agree (a win better than expected, a loss worse), "but by
- * less" when they pull apart. A favourite can't lose better than expected, nor an underdog win worse, so these six
- * cases are all of them. The score itself is on the row.
+ * ("despite being favored", "despite being the underdog"); otherwise the score against the expected margin does,
+ * joined as a player's phrase is: "and by more" when the result and the expectation agree (a win better than
+ * expected, a loss worse), "but by less" when they pull apart. A favourite can't lose better than expected, nor an
+ * underdog win worse, so these six cases are all of them. The phrase reads the score, not the Result's points: the
+ * fit can move a team a point against a score a hair either side of what was expected.
  */
-function resultPhrase(season: SeasonView, g: LedgerGame, points: number): string {
+function resultPhrase(season: SeasonView, g: LedgerGame): string {
   const opp = team(season, g.opp);
   const place = opp.name.slice(0, opp.name.length - opp.short.length).trim() || opp.short;
   const where = g.venue === "home" ? "at home" : g.venue === "away" ? `at ${place}` : "on a neutral floor";
   const result = `${g.won ? "Won" : "Lost"} ${where}`;
   if (g.favored === true && !g.won) return `${result} despite being favored`;
   if (g.favored === false && g.won) return `${result} despite being the underdog`;
-  return `${result} ${g.won === points >= 0 ? "and by more" : "but by less"} than expected`;
+  return `${result} ${g.won === g.beat ? "and by more" : "but by less"} than expected`;
 }
 
 /** A team's side of a home chance: favoured above an even game, not below it, neither at exactly even or unknown. */
@@ -222,8 +246,8 @@ function favoredSide(p: number | undefined, home: boolean): boolean | null {
 }
 
 /**
- * A player's whole day in a few plain words, from two signals: how he played (the sign of his value change from the
- * game, left out under 0.1) and his minutes against what was expected (left out within 2 minutes). With both, "and"
+ * A player's whole day in a few plain words, from two signals: how he played (the sign of his value change from his
+ * box score, left out under 0.1) and his minutes against what was expected (left out within 2 minutes). With both, "and"
  * joins them when the two effects push the rating the same way, "but" when they pull against each other.
  */
 function playerPhrase(value: number, move: PlayerMove | undefined): string {
@@ -270,36 +294,34 @@ function partLines(items: WalkItem[], whole: number): WalkLine[] {
 
 /**
  * A row as the walk draws it, in three parts that never show a player twice: the team's own result, each player's
- * whole effect (his value change from the game plus his change in expected minutes), and other games. The whole
- * points are split again from those raw parts by the largest-remainder rule, so they still add up to the change.
+ * whole effect (his value change from his box score plus his change in expected minutes), and other games. The
+ * whole points are split again from those raw parts by the largest-remainder rule, so they still add up to the change.
  */
 export function walk(season: SeasonView, row: LedgerRow): Walk {
-  const raw: Record<WalkKey, number> = { result: row.own.team, players: row.raw.game - row.own.team + row.raw.rotation, others: row.raw.others };
-  const whole = apportion(raw, row.change);
+  const whole = apportion(row.raw, row.change);
   const short = (abbr: Abbr) => team(season, abbr).short;
 
-  const byAthlete = new Map<number, { name: string; own: number; move?: PlayerMove }>();
-  for (const p of row.own.players) byAthlete.set(p.athlete, { name: p.name, own: p.points });
-  for (const p of row.players) byAthlete.set(p.athlete, { name: p.name, own: byAthlete.get(p.athlete)?.own ?? 0, move: p });
-  const players = [...byAthlete.values()].map(({ name, own, move }): WalkItem => (
-    { kind: "player", name, points: own + (move?.points ?? 0), phrase: playerPhrase(own, move) }
+  const byAthlete = new Map<number, { name: string; box: number; move?: PlayerMove }>();
+  for (const p of row.box) byAthlete.set(p.athlete, { name: p.name, box: p.points });
+  for (const p of row.players) byAthlete.set(p.athlete, { name: p.name, box: byAthlete.get(p.athlete)?.box ?? 0, move: p });
+  const players = [...byAthlete.values()].map(({ name, box, move }): WalkItem => (
+    { kind: "player", name, points: box + (move?.points ?? 0), phrase: playerPhrase(box, move) }
   ));
   const others: WalkItem[] = [
     ...row.others.map((o): WalkItem => {
       const [w, l] = o.hs > o.as ? [o.home, o.away] : [o.away, o.home];
-      const known = new Set(o.met.map((m) => m.abbr)).size;
-      return { kind: "other", name: `${short(w)} beat the ${short(l)}`, points: o.points, phrase: known > 1 ? "Both past opponents" : known ? "One a past opponent" : "" };
+      return { kind: "other", name: `${short(w)} beat the ${short(l)}`, points: o.points, phrase: o.met.length > 1 ? "Both past opponents" : o.met.length ? "One a past opponent" : "" };
     }),
-    { kind: "seed", name: "Preseason estimate", points: row.priors.raw, phrase: "Fading a little, as it does each day" },
+    { kind: "seed", name: "Preseason estimate", points: row.seed, phrase: "Fading a little, as it does each day" },
   ];
   const items: Record<WalkKey, WalkItem[]> = {
-    result: row.game ? [{ kind: "team", name: LABELS.result, points: row.own.team, phrase: resultPhrase(season, row.game, row.own.team) }] : [],
+    result: row.game ? [{ kind: "team", name: LABELS.result, points: row.raw.result, phrase: resultPhrase(season, row.game) }] : [],
     players,
     others,
   };
 
   const parts = (Object.keys(LABELS) as WalkKey[])
-    .filter((key) => whole[key] !== 0)
+    .filter((key) => whole[key] !== 0 || (key === "result" && row.game !== null))
     .map((key): WalkPart => ({ key, label: LABELS[key], whole: whole[key], lines: partLines(items[key], whole[key]) }));
   const real = row.after - row.before;
   return {

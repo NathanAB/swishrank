@@ -193,9 +193,9 @@ export function fitSeason(data: SeasonData, rule: FitRule, inputs: SeasonInputs 
 export type FitSteps = FitDay & { priors: Fit; steps: { game: FinalGame; fit: Fit; result?: Fit }[] };
 
 /**
- * PROTOTYPE (team ledger): fitSeason() with each day's games added one at a time, `first`'s game before the rest,
- * keeping the fit after the day's priors move and after each game. The last step is the day's fit, so the steps'
- * differences add up exactly to the day's move.
+ * fitSeason() with each day's games added one at a time, `first`'s game before the rest, keeping the fit after the
+ * day's priors move and after each game. The last step is the day's fit, so the steps' differences add up exactly
+ * to the day's move. src/lib/ledger.ts reads it to split a team's move into its parts.
  */
 export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonInputs, first: Abbr): FitSteps[] {
   const abbrs = Object.keys(data.teams);
@@ -380,8 +380,9 @@ export const gap = (game: Game, r: Record<Abbr, number>, home: number) => r[game
 
 type Pair = { h: number; a: number };
 /**
- * One final game: the home side's pre-game chance; each side's rating before and after it, whose difference is
- * what the game did; and `shown`, each side's rating on the chart at the end of the game's day.
+ * One final game: the home side's pre-game chance; each side's rating on the chart at the end of the day before and
+ * at the end of the game's day, whose difference is the side's whole move that day (src/lib/ledger.ts splits it
+ * into the game's result, the players and the other games); and `shown`, the rating at the end of the game's day.
  */
 export type Result = { game: Game; day: string; p: number; pre: Pair; post: Pair; shown: Pair };
 export type Snapshot = { day: string; r: Record<Abbr, number> };
@@ -456,10 +457,10 @@ export function shownLineups(data: SeasonData, rotation: SeasonRotations | undef
  * (usualRotations() in src/lib/players.ts), on the Elo scale: 1000 plus the fitted margin units times
  * ELO_PER_SIGMA / SIGMA. Nothing re-centres the league, so only a team's own fit and players move it, and the
  * league's average floats. Until a team's first game is played it shows its seed alone; once it is, the days
- * before it count that game's rotation, if it has one. A game's `pre` and `post` hold the rotation the team had
- * before its day, so their difference is what the game did: a change of players shows on the chart and never in
- * the game's change. After a team's last game in the season's file, played or to come, its rating holds where
- * that game day left it.
+ * before it count that game's rotation, if it has one. A game's `pre` and `post` are the team's ratings on the
+ * chart at the end of the day before and of the game's day, so a game's change always matches the rating beside
+ * it, a change of players that day included. After a team's last game in the season's file, played or to come,
+ * its rating holds where that game day left it.
  */
 export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const abbrs = Object.keys(data.teams);
@@ -499,8 +500,6 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
     latest = after;
     for (const { pg: { game }, p } of priced) {
       const side = (ratings: Record<Abbr, number>) => ({ h: ratings[game.home], a: ratings[game.away] });
-      // PROTOTYPE (team ledger): a game's change is its team's whole move that day, from the rating it ended the
-      // day before with to the one it ends its day with, so a change always matches the rating beside it.
       const result: Result = { game, day, p, pre: side(prev), post: side(r), shown: side(r) };
       results.push(result);
       log[game.home].push({ result, side: "h" });

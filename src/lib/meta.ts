@@ -48,7 +48,7 @@ export function teamDescription(season: Pick<SeasonView, "model" | "current">, a
   const m = season.model;
   const [W, L] = standingsRecord(m, abbr);
   const name = `The ${m.data.teams[abbr].short}`;
-  const holds = season.current ? "Rating chart, game log and next games." : "Rating chart and game log.";
+  const holds = season.current ? "Rating chart, rating history and next games." : "Rating chart and rating history.";
   if (W + L === 0) return `${name} have not played yet, so they are rated on their preseason odds. ${holds}`;
   return `${name} ${season.current ? "are" : "finished"} ${place(m, abbr)} of ${m.abbrs.length} at ${rating(m.r[abbr])} with a ${record(W, L)} record. ${holds}`;
 }

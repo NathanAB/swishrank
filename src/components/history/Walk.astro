@@ -1,12 +1,13 @@
 ---
-// PROTOTYPE (team ledger): a day's walk, from the rating before to the rating after, on the day's own scale. The
-// axis on top holds the two ratings, with a faint line down from each; under it each part's heading carries its figure,
-// and each step is a bar from the running rating, its figure at the end it moved to, drops and rises in two colours.
+// A day's walk, from the rating before to the rating after, on the day's own scale. The axis on top holds the two
+// ratings, with a faint line down from each; under it each part's heading carries its figure, and each step is a bar
+// from the running rating, its figure at the end it moved to, drops and rises in two colours.
+// `id` names the walk on its page, so its drawers' ids are unique and the same on every build.
 import { MINUS, signed } from "../../lib/format.ts";
-import type { Walk, WalkLine, WalkPart } from "../../lib/ledger.prototype.ts";
+import type { Walk, WalkLine, WalkPart } from "../../lib/ledger.ts";
 
-interface Props { walk: Walk }
-const { walk: { from, to, parts, tipped } } = Astro.props;
+interface Props { walk: Walk; id: string }
+const { walk: { from, to, parts, tipped }, id } = Astro.props;
 
 // The day's own scale: from the lowest to the highest rating the walk passes through, 2 points at least.
 let at = from, lo = from, hi = from;
@@ -16,20 +17,23 @@ const place = (v: number) => ((v - lo) / (hi - lo)).toFixed(4);
 const share = (n: number) => (Math.abs(n) / (hi - lo)).toFixed(4);
 /** Which end of the scale a rating sits on, if either, so its label and figure can stay inside the chart. */
 const edge = (v: number) => (v === lo ? "at-lo" : v === hi ? "at-hi" : null);
-
+/**
+ * Whether the two ratings sit too near each other for both labels on one line. A label kept inside the chart can
+ * lean up to about 32px past its rating towards the other, and a phone's chart can be as narrow as about 150px.
+ */
+const close = from !== to && Math.abs(from - to) / (hi - lo) < 0.25;
 
 type Step =
   | { kind: "head"; part: WalkPart }
   | { kind: "line"; part: WalkPart; line: WalkLine; single: boolean; x: number; bar: number; drawer: string | null };
 let run = from;
 let bar = 0;
-const uid = Math.random().toString(36).slice(2, 10);
 const steps: Step[] = parts.flatMap((part): Step[] => {
   const single = part.lines.length === 1;
   const lines = part.lines.map((line): Step => {
     const x = run;
     run += line.whole;
-    const drawer = line.kind === "group" && line.items.length > 3 ? `walk-${uid}-${part.key}` : null;
+    const drawer = line.kind === "group" && line.items.length > 3 ? `${id}-${part.key}` : null;
     return { kind: "line", part, line, single, x, bar: line.whole !== 0 ? bar++ : 0, drawer };
   });
   return single ? lines : [{ kind: "head", part }, ...lines];
@@ -56,7 +60,7 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
 
 <div class="wrap"><div class="walk">
   <div class="gridlines" aria-hidden="true"><i style={`--p:${place(from)}`} /><i style={`--p:${place(to)}`} /></div>
-  <div class="step axis">
+  <div class:list={["step axis", { close }]}>
     <span class="s-label"></span>
     <span class="s-chart">
       {from === to ? (
@@ -64,8 +68,8 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
       ) : (
         <>
           {/* Each label points away from the other, the lower rating's to the left and the higher's to the right. */}
-          <span class:list={["tick num", from < to ? "to-left" : "to-right", edge(from)]} style={`--p:${place(from)}`}><span class="muted">From</span> {from}</span>
-          <span class:list={["tick num", from < to ? "to-right" : "to-left", edge(to)]} style={`--p:${place(to)}`}><span class="muted">To</span> {to}</span>
+          <span class:list={["tick num", from < to ? "to-left" : "to-right"]} style={`--p:${place(from)}`}><span class="t-in"><span class="muted">From</span> {from}</span></span>
+          <span class:list={["tick num to", from < to ? "to-right" : "to-left"]} style={`--p:${place(to)}`}><span class="t-in"><span class="muted">To</span> {to}</span></span>
         </>
       )}
     </span>
@@ -132,12 +136,22 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
 
   /* The axis: the two ratings, and a faint line down from each through the walk. */
   .step.axis .s-chart { min-height: 24px; }
-  .tick { position: absolute; top: 0; padding: 0 6px; white-space: nowrap; font-size: var(--fs-small); line-height: 16px; color: var(--text); left: calc(var(--in-l) + var(--p) * (100% - var(--in-l) - var(--in-r))); }
-  .tick.to-left { transform: translateX(-100%); }
-  .tick.to-mid { transform: translateX(-50%); }
+  .tick { --x: calc(var(--in-l) + var(--p) * (100% - var(--in-l) - var(--in-r))); position: absolute; top: 0; white-space: nowrap; font-size: var(--fs-small); line-height: 16px; color: var(--text); }
+  .t-in, .to-mid { padding: 0 6px; }
+  /* A label sits in a box from its rating to the chart's edge on its side and points that way, unless the box is
+     too short for it; then it keeps to the chart's edge and leans back past its rating (safe alignment). The box
+     to the right reads right to left, so its overflow, too, keeps to the chart's edge. */
+  .tick.to-left, .tick.to-right { display: flex; justify-content: safe flex-end; }
+  .tick.to-left { left: 0; width: var(--x); }
+  .tick.to-right { left: var(--x); right: 0; direction: rtl; }
+  .t-in { direction: ltr; }
+  /* Two ratings close together put the second label on a line of its own, so the two never meet. */
+  .axis.close .s-chart { min-height: 40px; }
+  .axis.close .tick.to { top: 16px; }
+  .tick.to-mid { left: var(--x); transform: translateX(-50%); }
   /* A rating at either end of the scale turns its label inward, so it never runs past the chart. */
-  .tick.at-lo { transform: none; }
-  .tick.at-hi { transform: translateX(-100%); }
+  .tick.to-mid.at-lo { transform: none; }
+  .tick.to-mid.at-hi { transform: translateX(-100%); }
   .gridlines { position: absolute; top: 16px; bottom: 8px; left: calc(var(--lw) + var(--cg)); right: 0; pointer-events: none; }
   .gridlines i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--grid); left: calc(var(--in-l) + var(--p) * (100% - var(--in-l) - var(--in-r))); }
 

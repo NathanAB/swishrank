@@ -12,7 +12,7 @@ export type Line = {
   score: number;
   /** Pre-game win chance, 0 to 1. */
   chance: number;
-  /** Rating change as displayed: the gap between the rounded ratings before and after the game. */
+  /** Rating change as displayed: the gap between the rounded ratings the team ended the day before and the game's day with. */
   change: number;
   /** The team's rating on the chart at the end of the game's day, unrounded. */
   rating: number;

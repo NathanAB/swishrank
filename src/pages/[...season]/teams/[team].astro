@@ -1,16 +1,15 @@
 ---
 // One team's season: its name and headline figures, how its rating moved against the other 29, the games it
-// has next and every game it played. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/ every other one.
-// In a season under way the next five games run down a side column as the games page shows them, with the chart
-// and the game log beside them; a finished season has nothing ahead, so the chart and the log take the width.
+// has next and every day its rating moved. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/ every other
+// one. In a season under way the next five games run down a side column as the games page shows them, with the
+// chart and the history beside them; a finished season has nothing ahead, so the chart and the history take the width.
 import Empty from "../../../components/Empty.astro";
 import FixtureList from "../../../components/FixtureList.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
-import TeamGames from "../../../components/TeamGames.astro";
 import TeamHeader from "../../../components/TeamHeader.astro";
-import LedgerLog from "../../../components/ledger-prototype/LedgerLog.astro";
-import { ledger } from "../../../lib/ledger.prototype.ts";
+import History from "../../../components/history/History.astro";
+import { ledger } from "../../../lib/ledger.ts";
 import Base from "../../../layouts/Base.astro";
 import type { Abbr } from "../../../lib/elo.ts";
 import { fixtureDays } from "../../../lib/fixtures.ts";
@@ -35,8 +34,7 @@ const m = season.model;
 const me = team(season, abbr);
 const paint = teamPaint(me);
 const log = teamGames(m, abbr).reverse();
-// PROTOTYPE (team ledger): in dev, the team log replaces the game log.
-const rows = import.meta.env.DEV ? ledger(season, abbr) : [];
+const rows = ledger(season, abbr);
 const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 ---
 
@@ -65,22 +63,9 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
       <Panel title="Rating this season">
         <RatingChart season={season} focus={[abbr]} paint={{ [abbr]: paint }} />
       </Panel>
-      {import.meta.env.DEV ? (
-        <Panel title="History"><LedgerLog season={season} rows={rows} games={log} aria-label={`Rating changes for the ${me.short}, newest first`} /></Panel>
-      ) : (
-      <Panel title="Game log">
-        {log.length === 0 ? (
-          <Empty />
-        ) : (
-          <Fragment>
-            <TeamGames season={season} games={log} rating aria-label={`Games played by the ${me.short}, newest first`} />
-            <p class="note">
-              Every rating is worked out again after each day of games, so it also moves on days off and the rows won't always add up.
-            </p>
-          </Fragment>
-        )}
+      <Panel title="History">
+        {rows.length === 0 ? <Empty /> : <History season={season} rows={rows} games={log} aria-label={`Rating changes for the ${me.short}, newest first`} />}
       </Panel>
-      )}
     </div>
   </div>
 </Base>

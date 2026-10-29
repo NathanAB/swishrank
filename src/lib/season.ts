@@ -94,7 +94,7 @@ let inputs: Map<string, ModelInputs> | undefined;
 const allInputs = () =>
   (inputs ??= modelInputs(ENTRIES.all.map(({ id }) => ({ data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id) }))));
 
-/** PROTOTYPE (team ledger): a season's model inputs. */
+/** A season's model inputs, as compute() read them. */
 export const seasonInputs = (id: string) => allInputs().get(id);
 
 function load(entry: Entry): SeasonView {

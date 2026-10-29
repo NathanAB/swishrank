@@ -1,13 +1,12 @@
 ---
 // A team's played games as a list of rows, each opening the game's page: the date, the opponent and any stage
-// (a playoff round, the play-in, the NBA Cup), W or L, the score and the rating change, and with `rating` the
-// rating it left the team at. A win's row is in ink and a loss's in grey. An upset carries the upset badge on
+// (a playoff round, the play-in, the NBA Cup), W or L, the score and the rating change. A win's row is in ink and a loss's in grey. An upset carries the upset badge on
 // either team's row, and the winner's rating gain is in the accent. Under the pointer or keyboard focus a row's
 // highlight reaches 8px past its columns, clear of the rule below it, and the row turns to ink. With `mirror` the
 // rows read from the right on a wide screen, as the home side of a game's page does. Each row lays itself out by
 // its own width, so the list fits a side column, half a card or a full one.
 import UpsetBadge from "./UpsetBadge.astro";
-import { pct, rating as shown, record, shortDay, signed, weekdayDay } from "../lib/format.ts";
+import { pct, record, shortDay, signed, weekdayDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import { team, type SeasonView } from "../lib/season.ts";
 import { venueWord, type TeamGame } from "../lib/teams.ts";
@@ -15,20 +14,18 @@ import { venueWord, type TeamGame } from "../lib/teams.ts";
 interface Props {
   season: SeasonView;
   games: readonly TeamGame[];
-  /** Show the rating each game left the team at. */
-  rating?: boolean;
   mirror?: boolean;
   "aria-label"?: string;
 }
 
-const { season, games, rating = false, mirror = false, "aria-label": label } = Astro.props;
+const { season, games, mirror = false, "aria-label": label } = Astro.props;
 ---
 
 <ol aria-label={label}>
   {games.map((g) => (
     <li>
       <a class:list={["row", { won: g.us.won, mirror }]} href={href({ kind: "game", season, game: g.result.game })}>
-        <span class:list={["in", { rated: rating }]}>
+        <span class="in">
           <span class="day" title={weekdayDay(g.result.day)}>{shortDay(g.result.day)}</span>
           <span class="opp">
             <span class="nm">{venueWord(g.venue)} {team(season, g.them.abbr).short}</span>
@@ -38,7 +35,6 @@ const { season, games, rating = false, mirror = false, "aria-label": label } = A
           <span class="wl">{g.us.won ? "W" : "L"}</span>
           <span class="num sc">{record(g.us.score, g.them.score)}</span>
           <span class:list={["num chg", { paid: g.upset && g.us.won }]}>{signed(g.us.change)}</span>
-          {rating && <span class="num rt">{shown(g.us.rating)}</span>}
         </span>
       </a>
     </li>
@@ -53,7 +49,6 @@ const { season, games, rating = false, mirror = false, "aria-label": label } = A
   .row:is(:hover, :focus-visible)::before { background: color-mix(in oklab, var(--text) 10%, var(--surface)); }
 
   .in { display: grid; grid-template-columns: 72px minmax(0, 1fr) 20px 96px 48px; align-items: center; column-gap: 16px; min-height: 48px; font-size: var(--fs-card); white-space: nowrap; }
-  .rated { grid-template-columns: 72px minmax(0, 1fr) 20px 96px 48px 56px; }
   .won .wl { font-weight: 600; }
   .day { color: var(--muted); }
   .num { text-align: right; }
@@ -70,14 +65,14 @@ const { season, games, rating = false, mirror = false, "aria-label": label } = A
     .mirror .in > .num { text-align: left; }
     .mirror .opp { justify-content: flex-end; }
   }
-  /* A phone's row: the rating gives way, as the page's header shows the latest one, and so does the stage. */
+  /* A phone's row: the stage gives way. */
   @container (max-width: 459px) {
-    .in, .rated { grid-template-columns: 46px minmax(0, 1fr) 14px 72px 30px; column-gap: 8px; min-height: 44px; font-size: 15px; }
-    .rt, .tag { display: none; }
+    .in { grid-template-columns: 46px minmax(0, 1fr) 14px 72px 30px; column-gap: 8px; min-height: 44px; font-size: 15px; }
+    .tag { display: none; }
   }
   /* In a side column the date gives way too, so the opponent keeps its room. */
   @container (max-width: 299px) {
-    .in, .rated { grid-template-columns: minmax(0, 1fr) 14px 72px 30px; }
+    .in { grid-template-columns: minmax(0, 1fr) 14px 72px 30px; }
     .day { display: none; }
   }
 </style>
