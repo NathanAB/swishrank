@@ -7,7 +7,7 @@ on:
     branches: [main]
   schedule:
     # A backup for the Cloudflare Worker in cron/, which starts this workflow at 08:17 UTC. GitHub can delay or
-    # drop scheduled runs, so this run comes four hours later (8:17 AM Eastern in winter, 9:17 AM in summer). A
+    # drop scheduled runs, so this run comes four hours later (7:17 AM Eastern in winter, 8:17 AM in summer). A
     # run with no new scores commits nothing.
     - cron: "17 12 * * *"
   workflow_dispatch:
@@ -48,6 +48,15 @@ jobs:
           git add src/data/games src/data/box src/data/injuries
           # A run that waited in the queue may be behind a push made since, which would reject its own.
           git diff --cached --quiet || { git commit -m "Update scores" && git pull --rebase && git push; }
+      # The fetch saves the injury report before the scores, and the day's first saved report stands, so it is kept
+      # even when the scores fail: a retry later in the day would otherwise save that afternoon's in its place.
+      - name: Commit the injury report alone
+        if: steps.fetch.outcome == 'failure'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/injuries
+          git diff --cached --quiet || { git commit -m "Update the injury report" && git pull --rebase --autostash && git push; }
       - name: Install, build, and upload the site
         uses: withastro/action@v6
 
