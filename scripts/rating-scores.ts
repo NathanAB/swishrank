@@ -2,7 +2,7 @@
 // games (docs/model-v2.md, What the reader sees). For every finished season it compares
 //   A  results only: the team fit with its seeds, no players;
 //   B  the usual rotation the site shows: minutes per team game over the last 10, with last season as one more
-//      game until the team has played 10;
+//      game, times the share of those games the player played in, until the team has played 10;
 //   C  expected minutes from the games-missed curve, the injury report left out (src/lib/rotation.ts).
 // `npm run ratings -- 2026-27` instead judges the injury report as docs/model-v2.md declares: D, which is C with
 // each player the report gives a return for counted for the share of the next 10 games on or after it, against

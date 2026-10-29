@@ -59,3 +59,17 @@ test("until a team has played 10 games, a player's minutes per game last season 
   assert.deepEqual(minutes(8), { 1: (240 * (19.8 / 37.8)).toFixed(6), 3: (240 * (18 / 37.8)).toFixed(6) }, "player 1 counts (9 * 18 + 36) / 10");
   assert.deepEqual(minutes(9), { 1: "120.000000", 3: "120.000000" }, "from A's 10th game, this season alone");
 });
+
+test("last season's minutes count only for the share of the team's games a player has played in", () => {
+  // Last season player 4 played 30 minutes a game for B. This season A's rookies 5 and 6 play 24 minutes in each
+  // of its four games, and player 4 plays 4 minutes in the fourth, so last season counts for a quarter of a game.
+  const at = (season: string, month: string, n: number) => Array.from({ length: n }, (_, i) => ({ ...game(`${season}${i + 1}`, 10 + i), t: `${month}-${10 + i}T23:00Z` }));
+  const before = at("w", "2025-10", 2), now = at("x", "2026-10", 4);
+  const seasons = [
+    { data: { season: "w", teams: { A: team("A"), B: team("B") }, games: before }, box: { season: "w", games: Object.fromEntries(before.map((g) => [g.id, { A: [line(9, 30)], B: [line(4, 30)] }])) } },
+    { data: { season: "x", teams: { A: team("A"), B: team("B") }, games: now }, box: { season: "x", games: Object.fromEntries(now.map((g, i) => [g.id, { A: [line(5, 24), line(6, 24), ...(i === 3 ? [line(4, 4)] : [])], B: [line(9, 30)] }])) } },
+  ];
+  const lineup = usualRotations(seasons).get("x")!.get("2026-10-13")!.A!;
+  const usual = (4 + 0.25 * 30) / 4.25;
+  assert.equal((lineup.find((p) => p.athlete === 4)!.share * 48).toFixed(6), ((240 * usual) / (48 + usual)).toFixed(6));
+});

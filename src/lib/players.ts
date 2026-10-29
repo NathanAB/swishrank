@@ -111,7 +111,10 @@ const RECENT = 10;
 const UNKNOWN = 15;
 /** A team's games its usual rotation reads. */
 const USUAL = 10;
-/** Games a player's minutes per game last season count for in his team's rotation until it has played USUAL games. */
+/**
+ * Games a player's minutes per game last season count for in his team's rotation until it has played USUAL games,
+ * times the share of the window's games he has played in.
+ */
 const PRIOR = 1;
 
 const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
@@ -169,7 +172,9 @@ type Minutes = ReadonlyMap<Athlete, number> | null;
  * has not played for another team since, each at his minutes per team game over those of them with box scores,
  * a game he missed counting 0. It is empty when none has one, and while fewer than half the team's games this
  * season have one: the fit then had few of its players to separate, so its team part already holds them. Until
- * the team has played 10, his minutes per game last season, on any team, count as one more game.
+ * the team has played 10, his minutes per game last season, on any team, count as one more game times the share
+ * of those games he played in, so a starter new to the team keeps his old role and a player with a few minutes in
+ * one game does not.
  */
 export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, SeasonRotations> {
   const out = new Map<string, SeasonRotations>();
@@ -187,7 +192,8 @@ export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, S
       return scaled([...new Set(games.flatMap((g) => [...g.keys()]))].map((athlete) => {
         const minutes = games.reduce((s, g) => s + (g.get(athlete) ?? 0), 0);
         const last = lastSeason.get(athlete);
-        return { athlete, min: last === undefined ? minutes / games.length : (minutes + prior * last) / (games.length + prior) };
+        const weight = (prior * games.filter((g) => g.has(athlete)).length) / games.length;
+        return { athlete, min: last === undefined ? minutes / games.length : (minutes + weight * last) / (games.length + weight) };
       }));
     };
     const season: SeasonRotations = new Map();
