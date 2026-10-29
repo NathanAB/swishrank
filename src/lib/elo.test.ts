@@ -28,9 +28,13 @@ test("a two-team toy season fits the least-squares answer, day by day", () => {
 });
 
 test("the re-fit moves a team that did not play when a past opponent's results change", () => {
+  // A has a game to come, so its season is not over and nothing holds its rating.
   const m = compute({
     season: "x", teams: teams("A", "B", "C"),
-    games: [game("1", "2026-10-20T23:00Z", "A", "B", 110, 100, true), game("2", "2026-10-21T23:00Z", "B", "C", 110, 100, true)],
+    games: [
+      game("1", "2026-10-20T23:00Z", "A", "B", 110, 100, true), game("2", "2026-10-21T23:00Z", "B", "C", 110, 100, true),
+      game("3", "2026-10-23T23:00Z", "A", "C", null, null, false),
+    ],
   });
   const [, dayOne, dayTwo] = m.series;
   assert.ok(dayTwo.r.A > dayOne.r.A, `A rose from ${dayOne.r.A} to ${dayTwo.r.A} without playing`);

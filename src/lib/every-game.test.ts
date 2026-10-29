@@ -24,21 +24,12 @@ const FIRST_GAME = 40;
 /** How far a shown change may run against the game's surprise. Version 2 runs one 7 at most; the next-game lineup ran one 178. */
 const AGAINST = 8;
 /**
- * How far a day's new rotation may move a team's shown rating, the fit and the shift held fixed. Weighting players
+ * How far a day's new rotation may move a team's shown rating, the fit held fixed. Weighting players
  * by minutes per team game moves one 36 at most from a team's own games, a star's first game of a season; by
  * minutes per appearance moved one 62. A player leaves his old team's rotation the day he plays for a new one, and
  * James Harden's first game for BKN took 57 off HOU on 2021-01-16.
  */
 const ROTATION = 60;
-
-test("every day of every season, the shown ratings average 1000", () => {
-  for (const { id, model } of seasons) {
-    for (const { day, r } of model.series) {
-      const mean = model.abbrs.reduce((s, a) => s + r[a], 0) / model.abbrs.length;
-      assert.ok(Math.abs(mean - 1000) <= 0.5, `${id} ${day}: ${mean}`);
-    }
-  }
-});
 
 test(`no team's first game of a finished season moves its shown rating by more than ${FIRST_GAME}`, () => {
   for (const { id, model } of finished) {
@@ -130,14 +121,13 @@ test("no player counts for two teams on the same day", () => {
   }
 });
 
-test("after a team's last game of the season, only the shift moves its rating", () => {
+test("after a team's last game of the season, its rating does not move", () => {
   for (const { id, data, model } of seasons) {
     const lastDay = new Map<Abbr, string>();
     for (const g of data.games) for (const a of [g.home, g.away]) if (dayKey(g.t) > (lastDay.get(a) ?? "")) lastDay.set(a, dayKey(g.t));
     for (let i = 1; i < model.series.length; i++) {
       const [was, now] = [model.series[i - 1], model.series[i]];
-      const moves = model.abbrs.filter((a) => was.day >= lastDay.get(a)!).map((a) => [a, now.r[a] - was.r[a]] as const);
-      for (const [a, move] of moves) assert.ok(Math.abs(move - moves[0][1]) < 1e-9, `${id} ${now.day}: ${a} moved ${move}, ${moves[0][0]} ${moves[0][1]}`);
+      for (const a of model.abbrs.filter((a) => was.day >= lastDay.get(a)!)) assert.equal(now.r[a], was.r[a], `${id} ${now.day}: ${a}`);
     }
   }
 });

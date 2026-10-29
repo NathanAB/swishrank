@@ -1,7 +1,8 @@
 // Elo-style ratings for NBA teams, worked out like SRS or Massey ratings: after every game day the season's
 // ratings are fitted again, by least squares, to the margins of every game so far, each team pulled toward a
-// preseason seed from sportsbooks' win totals and each player toward his box-score rating. 1000 is the league
-// average. docs/model.md and docs/model-v2.md hold the backtests behind every setting.
+// preseason seed from sportsbooks' win totals and each player toward his box-score rating. Ratings sit around
+// 1000, and nothing re-centres them, so the league's average floats. docs/model.md and docs/model-v2.md hold the
+// backtests behind every setting.
 import type { Athlete, BoxRatings, Lineup, Lineups, SeasonBox, SeasonRotations, Sides } from "./players.ts";
 
 export const START = 1000;
@@ -405,12 +406,13 @@ export function shownLineups(data: SeasonData, rotation: SeasonRotations | undef
 
 /**
  * The season as the site shows it. A team's shown rating is its team part plus the player part of its rotation
- * (usualRotations() in src/lib/players.ts), on the Elo scale: the fitted margin units times ELO_PER_SIGMA / SIGMA, shifted each day by
- * the same amount for every team so the league's mean is 1000. Until a team's first game is played it shows its
- * seed alone; once it is, the days before it count that game's rotation, if it has one. A game's `pre` and `post` hold the
- * rotation the team had before its day and the day's shift, so their difference is what the game did: a change
- * of players, or of the shift, shows on the chart and never in the game's change. After a team's last game in
- * the season's file, played or to come, its rating holds where that game day left it, and only the shift moves it.
+ * (usualRotations() in src/lib/players.ts), on the Elo scale: 1000 plus the fitted margin units times
+ * ELO_PER_SIGMA / SIGMA. Nothing re-centres the league, so only a team's own fit and players move it, and the
+ * league's average floats. Until a team's first game is played it shows its seed alone; once it is, the days
+ * before it count that game's rotation, if it has one. A game's `pre` and `post` hold the rotation the team had
+ * before its day, so their difference is what the game did: a change of players shows on the chart and never in
+ * the game's change. After a team's last game in the season's file, played or to come, its rating holds where
+ * that game day left it.
  */
 export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const abbrs = Object.keys(data.teams);
@@ -420,12 +422,9 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const next: Record<Abbr, Lineup> = Object.fromEntries(abbrs.map((a) => [a, []]));
   const shown = shownLineups(data, players?.rotation);
   let usual = shown.opening;
-  const rated = (fit: Fit, lineups: Record<Abbr, Lineup>) => Object.fromEntries(abbrs.map((a) => [a, (fit.r[a] + playerPart(fit, lineups[a])) * scale]));
-  const shiftTo1000 = (raw: Record<Abbr, number>) => START - abbrs.reduce((s, a) => s + raw[a], 0) / (abbrs.length || 1);
-  const shifted = (raw: Record<Abbr, number>, by: number) => Object.fromEntries(abbrs.map((a) => [a, raw[a] + by]));
+  const rated = (fit: Fit, lineups: Record<Abbr, Lineup>) => Object.fromEntries(abbrs.map((a) => [a, START + (fit.r[a] + playerPart(fit, lineups[a])) * scale]));
   const start = days[0]?.before ?? startFit(abbrs, PARAMS, centres);
-  const startRated = rated(start, usual);
-  const opening = shifted(startRated, shiftTo1000(startRated));
+  const opening = rated(start, usual);
   let r = opening;
   let latest = start;
   const log: Record<Abbr, TeamGame[]> = Object.fromEntries(abbrs.map((a) => [a, []]));
@@ -450,12 +449,11 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
       if (h !== undefined) now[a] = h;
       else if (lastDay.get(a) === day) held.set(a, now[a]);
     }
-    const by = shiftTo1000(now);
-    r = shifted(now, by);
+    r = now;
     latest = after;
     for (const { pg: { game }, p } of priced) {
-      const side = (ratings: Record<Abbr, number>, shift: number) => ({ h: ratings[game.home] + shift, a: ratings[game.away] + shift });
-      const result: Result = { game, day, p, pre: side(was, by), post: side(kept, by), shown: side(r, 0) };
+      const side = (ratings: Record<Abbr, number>) => ({ h: ratings[game.home], a: ratings[game.away] });
+      const result: Result = { game, day, p, pre: side(was), post: side(kept), shown: side(r) };
       results.push(result);
       log[game.home].push({ result, side: "h" });
       log[game.away].push({ result, side: "a" });

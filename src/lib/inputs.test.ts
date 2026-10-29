@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, EARLY, ELO_PER_SIGMA, expected, fitModel, fitSeason, PARAMS, phi, played, playerPart, secondNights, b2bTerm, type Game, type SeasonData } from "./elo.ts";
+import { compute, EARLY, ELO_PER_SIGMA, expected, fitModel, fitSeason, PARAMS, phi, played, playerPart, secondNights, shownLineups, START, b2bTerm, type Game, type SeasonData } from "./elo.ts";
 import { outcome } from "./facts.ts";
 import { fixture } from "./fixtures.ts";
 import { modelInputs } from "./inputs.ts";
@@ -87,7 +87,7 @@ test("a team's new player shows on the chart on his first day, never in the game
   assert.ok(day.r.A > second.result.post.a + 20, `A's chart that day, ${day.r.A}, counts player 99; the game's ${second.result.post.a} does not`);
 });
 
-test("a game's change is what the game did, on its day's shift, and its log shows the chart's rating that day", () => {
+test("a game's change is what the game did, and its log shows the chart's rating that day", () => {
   const inputs = seasonsWith(switchedBox).get(season)!;
   const { day, before, after } = fitModel(switched, inputs).find((d) => d.day === "2026-10-22")!;
   const { result } = withStar.log.A[1];
@@ -96,7 +96,7 @@ test("a game's change is what the game did, on its day's shift, and its log show
   near(result.post.a - result.pre.a, did, "A's change");
   const chart = withStar.series.find((d) => d.day === day)!.r;
   near(outcome(result).away.rating, chart.A, "A's rating in its log");
-  near(result.pre.a - result.shown.a, (before.r.A + playerPart(before, was) - after.r.A - playerPart(after, inputs.players!.rotation.get(day)!.A!)) * (ELO_PER_SIGMA / PARAMS.sigma), "A's pre-game rating, on the day's shift");
+  near(result.pre.a - result.shown.a, (before.r.A + playerPart(before, was) - after.r.A - playerPart(after, inputs.players!.rotation.get(day)!.A!)) * (ELO_PER_SIGMA / PARAMS.sigma), "A's pre-game rating");
 });
 
 test("a team's opening point counts the players of its first game once it is played, and its seed alone until then", () => {
@@ -110,10 +110,12 @@ test("a team's opening point counts the players of its first game once it is pla
   assert.ok(Math.abs(opening.A - opening.D - want) < 1e-9, `A ${opening.A}, D ${opening.D}, gap wanted ${want}`);
 });
 
-test("every day's shown ratings average 1000", () => {
-  for (const { day, r } of withStar.series) {
-    const mean = Object.values(r).reduce((s, x) => s + x, 0) / Object.keys(r).length;
-    assert.ok(Math.abs(mean - 1000) < 1e-9, `${day}: ${mean}`);
+test("a team's shown rating is 1000 plus its own team part and its rotation's player part, so no other team's move shifts it", () => {
+  const inputs = seasonsWith(switchedBox).get(season)!;
+  const shown = shownLineups(switched, inputs.players!.rotation);
+  for (const { day, after } of fitModel(switched, inputs)) {
+    const r = withStar.series.find((d) => d.day === day)!.r;
+    for (const a of Object.keys(r)) near(r[a], START + (after.r[a] + playerPart(after, shown.after.get(day)![a])) * (ELO_PER_SIGMA / PARAMS.sigma), `${day} ${a}`);
   }
 });
 
