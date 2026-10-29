@@ -58,6 +58,21 @@ test("a report fetched after its day's first tip-off is not read", () => {
   near(m[3], 0, "player 3, out for all of A's next 10 games");
 });
 
+test("a team counts no players while fewer than half its games have box scores", () => {
+  // Only A's game on the 10th has a box score, one of its four.
+  const sparse = { season: "x", games: { 10: box.games[10] } };
+  const lineup = rotations([{ data, box: sparse }], new Map([["x", curve]])).get("x")!.get("2026-10-13")!.A!;
+  assert.deepEqual(lineup, [], "A's rotation");
+});
+
+test("a player leaves his old team's rotation the day he plays for another", () => {
+  // Player 2 plays for A through the 12th, then for B on the 13th.
+  const moved = { season: "x", games: { ...box.games, 13: { A: [line(1, 30), line(3, 30)], B: [line(9, 30), line(2, 30)] } } };
+  const byDay = rotations([{ data, box: moved }], new Map([["x", curve]])).get("x")!.get("2026-10-13")!;
+  assert.ok(!byDay.A!.some((p) => p.athlete === 2), "A no longer counts player 2");
+  assert.ok(byDay.B!.some((p) => p.athlete === 2), "B counts him");
+});
+
 test("each season's curve is learned from the other seasons, leaving out a player who left his team", () => {
   // In season w, player 1 plays all 12 of A's games. Player 2 plays its first, then all of B's after; he left.
   // Player 4 plays A's first and is next seen for A in season x; he was out.
