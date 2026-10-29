@@ -21,5 +21,8 @@
     "astro": "^7.4.2",
     "satori": "^0.63.2",
     "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.155.0"
   }
 }
