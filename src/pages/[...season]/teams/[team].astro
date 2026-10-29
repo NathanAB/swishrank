@@ -13,7 +13,7 @@ import Base from "../../../layouts/Base.astro";
 import type { Abbr } from "../../../lib/elo.ts";
 import { fixtureDays } from "../../../lib/fixtures.ts";
 import { teamDescription } from "../../../lib/meta.ts";
-import { href, type Route } from "../../../lib/routes.ts";
+import type { Route } from "../../../lib/routes.ts";
 import { TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
 import { nextGames, teamGames } from "../../../lib/teams.ts";
 import { teamPaint } from "../../../lib/tint.ts";
@@ -68,7 +68,7 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
           <Fragment>
             <TeamGames season={season} games={log} rating aria-label={`Games played by the ${me.short}, newest first`} />
             <p class="note">
-              Every rating is worked out again after each day of games, so it also moves on days off and the rows won't always add up. <a href={href({ kind: "about" })}>How it works</a>
+              Every rating is worked out again after each day of games, so it also moves on days off and the rows won't always add up.
             </p>
           </Fragment>
         )}
@@ -92,5 +92,4 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
     .days { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px 8px; }
   }
 
-  .note a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
 </style>
