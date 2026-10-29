@@ -92,7 +92,7 @@ test("a summary's box line keeps made and attempted shots apart and skips player
   assert.deepEqual(lines, { BOS: [[4251, 31, 38, 12, 21, 7, 8, 0, 5, 3, 5, 0, 4, 2]] });
 });
 
-test("a summary names every player in its box score by athlete id, and skips an entry without an id or a name", () => {
+test("a summary names every player in its box score by athlete id, and skips an entry without an id or a text name", () => {
   const names = playerNames({
     boxscore: {
       players: [
@@ -100,6 +100,7 @@ test("a summary names every player in its box score by athlete id, and skips an 
           { athlete: { id: "4065648", displayName: "Jayson Tatum" }, stats: ["31"] },
           { athlete: { id: "9", displayName: "Bench Player" }, didNotPlay: true, stats: [] },
           { athlete: { displayName: "No Id" }, stats: ["4"] },
+          { athlete: { id: "8", displayName: 42 as unknown as string }, stats: ["2"] },
         ] }] },
         { team: { abbreviation: "DET" }, statistics: [{ athletes: [{ athlete: { id: "7" }, stats: [] }] }] },
       ],

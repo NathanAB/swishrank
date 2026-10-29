@@ -167,7 +167,8 @@ export function playerNames(summary: EspnSummary): Record<string, string> {
   for (const team of summary.boxscore?.players ?? []) {
     for (const { athlete } of team.statistics?.flatMap((s) => s.athletes ?? []) ?? []) {
       const id = athlete?.id, name = athlete?.displayName;
-      if (id && /^\d+$/.test(id) && name) names[id] = name;
+      // A name that isn't text would make src/data/players.json unreadable, and every deploy fail on it.
+      if (id && /^\d+$/.test(id) && typeof name === "string" && name) names[id] = name;
     }
   }
   return names;

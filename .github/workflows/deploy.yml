@@ -39,6 +39,9 @@ jobs:
       - name: Fetch this season's games, box scores and injury report from ESPN
         id: fetch
         continue-on-error: true
+        # A day's fetch takes minutes; ESPN failing with many names to look up could retry for hours and hold every
+        # deploy behind it, so a slow run fails here and the injury report is committed alone.
+        timeout-minutes: 30
         run: npm run fetch
       - name: Commit new scores
         if: steps.fetch.outcome == 'success'
