@@ -10,18 +10,21 @@ export const RETRY_WAITS = [5_000, 20_000, 60_000];
 export const fetchEvents = async (url: string, waits = RETRY_WAITS, get: typeof fetch = fetch): Promise<EspnEvent[]> =>
   ((await fetchJson(url, waits, get)) as { events?: EspnEvent[] }).events ?? [];
 
-/** JSON from `url`, tried again after each of `waits` when ESPN fails or sends no JSON. */
+/** JSON from `url`, tried again after each of `waits` when ESPN fails or sends no JSON, but not when it has no such page. */
 export async function fetchJson(url: string, waits = RETRY_WAITS, get: typeof fetch = fetch): Promise<unknown> {
   for (let i = 0; ; i++) {
+    let status = 0, failure: string;
     try {
       const res = await get(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
+      status = res.status;
+      if (res.ok) return await res.json();
+      failure = `HTTP ${status}`;
     } catch (err) {
-      if (i === waits.length) throw new Error(`ESPN ${url}: ${(err as Error).message}`);
-      console.warn(`ESPN ${url}: ${(err as Error).message}, trying again in ${waits[i] / 1000}s`);
-      await new Promise((r) => setTimeout(r, waits[i]));
+      failure = (err as Error).message;
     }
+    if (status === 404 || i === waits.length) throw new Error(`ESPN ${url}: ${failure}`);
+    console.warn(`ESPN ${url}: ${failure}, trying again in ${waits[i] / 1000}s`);
+    await new Promise((r) => setTimeout(r, waits[i]));
   }
 }
 

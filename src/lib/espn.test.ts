@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dayKey, type SeasonData } from "./elo.ts";
-import { boxLines, canonicalNote, fetchEvents, lostFinals, parse, type EspnEvent } from "./espn.ts";
+import { boxLines, canonicalNote, fetchEvents, fetchJson, lostFinals, parse, type EspnEvent } from "./espn.ts";
 import { stage } from "./teams.ts";
 
 const side = (homeAway: "home" | "away", id: string, abbreviation: string) => ({
@@ -64,6 +64,16 @@ test("a scoreboard request tries again when ESPN sends an empty body, and gives 
   const events = [{ id: "1" }];
   assert.deepEqual(await fetchEvents("u", [0, 0, 0], replies(["", "", "", JSON.stringify({ events })])), events);
   await assert.rejects(fetchEvents("u", [0, 0], replies(["", "", "", JSON.stringify({ events })])), /ESPN u: Unexpected end of JSON input/);
+});
+
+test("a request ESPN answers with 404 fails at once, since trying again cannot find the page", async () => {
+  let tries = 0;
+  const get = (async () => (tries++, new Response("", { status: tries === 1 ? 404 : 200 }))) as unknown as typeof fetch;
+  await assert.rejects(fetchJson("u", [0, 0, 0], get), /ESPN u: HTTP 404/);
+  assert.equal(tries, 1);
+  let served = 0;
+  const flaky = (async () => new Response(JSON.stringify({ ok: true }), { status: served++ ? 200 : 503 })) as unknown as typeof fetch;
+  assert.deepEqual(await fetchJson("u", [0], flaky), { ok: true }, "a 503 is tried again");
 });
 
 test("a summary's box line keeps made and attempted shots apart and skips players who did not play", () => {

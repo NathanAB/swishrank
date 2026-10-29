@@ -33,8 +33,9 @@ jobs:
           node-version: 24
       - name: Test the Elo math
         run: npm test
-      # A failed fetch writes nothing, so the site still builds and deploys on the scores already committed, and
-      # an outage at ESPN never holds back a change to the site. The fetch-failed job below then turns the run red.
+      # A failed fetch never holds back the deploy, so an outage at ESPN never holds back a change to the site. The
+      # build reads what is on disk: the scores already committed, or a games file the fetch wrote before it failed
+      # later, which the commit step skips. The fetch-failed job below then turns the run red.
       - name: Fetch this season's games and box scores from ESPN
         id: fetch
         continue-on-error: true
