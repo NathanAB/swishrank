@@ -1,7 +1,7 @@
-// ESPN's injury report, archived once a day by the fetch into src/data/injuries/<season>.json. Nothing on the site
-// reads it yet: it is kept for docs/model-v2.md's judgment of expected minutes (src/lib/rotation.ts) against the
-// usual rotation. Only the structured fields are kept: the report's comments are third-party prose, and the
-// repository is public.
+// ESPN's injury report, archived once a day by the fetch into src/data/injuries/<season>.json. A team's history
+// reads it to say a player who missed a game was out injured, and until when (src/lib/ledger.ts); it is also kept
+// for docs/model-v2.md's judgment of expected minutes (src/lib/rotation.ts) against the usual rotation. Only the
+// structured fields are kept: the report's comments are third-party prose, and the repository is public.
 import { dayKey, type Abbr, type Game } from "./elo.ts";
 import type { Athlete } from "./players.ts";
 

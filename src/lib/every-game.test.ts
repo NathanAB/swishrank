@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { compute, counted, dayKey, EARLY, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, phi, playerPart, shownChange, shownLineups, type Abbr, type SeasonData } from "./elo.ts";
+import { compute, dayKey, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, playerPart, shownChange, shownLineups, type Abbr, type SeasonData } from "./elo.ts";
 import { modelInputs } from "./inputs.ts";
 import type { Lineup } from "./players.ts";
 
@@ -21,8 +21,6 @@ const finished = seasons.filter((s) => s.finished);
 
 /** How far a team's first game may move its shown rating. Version 2 moves one 37 at most, NO's in 2018-19; showing the lineup a team took into its next game moved one 134. */
 const FIRST_GAME = 40;
-/** How far a shown change may run against the game's surprise. Version 2 runs one 7 at most; the next-game lineup ran one 178. */
-const AGAINST = 8;
 /**
  * How far a day's new rotation may move a team's shown rating, the fit held fixed. Weighting players
  * by minutes per team game moves one 36 at most from a team's own games, a star's first game of a season; by
@@ -39,34 +37,6 @@ test(`no team's first game of a finished season moves its shown rating by more t
       const { pre, post, game } = first.result;
       const change = shownChange(pre[first.side], post[first.side]);
       assert.ok(Math.abs(change) <= FIRST_GAME, `${id} ${game.id} ${abbr}: ${change}`);
-    }
-  }
-});
-
-/** The expected home margin, in counted units, that a home chance `p` came from. */
-const expectedMargin = (p: number, widen: number) => {
-  let lo = -20, hi = 20;
-  for (let i = 0; i < 100; i++) {
-    const mid = (lo + hi) / 2;
-    if (phi(mid) < p) lo = mid;
-    else hi = mid;
-  }
-  return ((lo + hi) / 2) * PARAMS.sigma * widen;
-};
-
-test(`no shown change in a finished season runs more than ${AGAINST} points against the game's surprise`, () => {
-  for (const { id, model } of finished) {
-    const played: Record<string, number> = Object.fromEntries(model.abbrs.map((a) => [a, 0]));
-    for (const { game, p, pre, post } of model.results) {
-      const widen = Math.min(played[game.home], played[game.away]) < EARLY.games ? EARLY.widen : 1;
-      const surprise = counted(game.hs! - game.as!, PARAMS.margin) - expectedMargin(p, widen);
-      for (const [side, sign] of [["h", 1], ["a", -1]] as const) {
-        const change = shownChange(pre[side], post[side]);
-        const better = sign * surprise > 0;
-        assert.ok(better ? change >= -AGAINST : change <= AGAINST, `${id} ${game.id} ${side}: did ${better ? "better" : "worse"} than expected, moved ${change}`);
-      }
-      played[game.home]++;
-      played[game.away]++;
     }
   }
 });

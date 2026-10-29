@@ -185,7 +185,54 @@ export function fitSeason(data: SeasonData, rule: FitRule, inputs: SeasonInputs 
   return out;
 }
 
-type Solver = { start: Fit; add: (p: Pregame) => void; fit: (day: string, strength: number) => Fit };
+/**
+ * One day of fitSeasonSteps(): the fit once the seed's pull fades to the day's strength, then after each of its
+ * games in turn, each bringing its players' box ratings up to the day; `after`, the day's fit, also ages the box
+ * ratings of everyone who did not play.
+ */
+export type FitSteps = FitDay & { priors: Fit; steps: { game: FinalGame; fit: Fit; result?: Fit }[] };
+
+/**
+ * fitSeason() with each day's games added one at a time, `first`'s game before the rest, keeping the fit after the
+ * day's priors move and after each game. The last step is the day's fit, so the steps' differences add up exactly
+ * to the day's move. src/lib/ledger.ts reads it to split a team's move into its parts.
+ */
+export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonInputs, first: Abbr): FitSteps[] {
+  const abbrs = Object.keys(data.teams);
+  const players = rule.players && inputs.players ? { rule: rule.players, ...inputs.players } : null;
+  const second = secondNights(data);
+  const days = finalDays(data);
+  const start = days.length ? Date.parse(days[0].day) : 0;
+  const strength = (day: string) => (rule.seed ? rule.n0 * Math.exp(-Math.round((Date.parse(day) - start) / 86_400_000) / rule.seed.fade) : rule.n0);
+  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
+  const solver = players ? playerSolver(abbrs, rule, inputs.centres, players) : teamSolver(abbrs, rule, inputs.centres);
+  const ratings = players?.ratings;
+  const index = new Map(ratings?.athletes.map((a, j) => [a, j]) ?? []);
+  let previous = ratings?.start;
+  let fit = solver.start;
+  const out: FitSteps[] = [];
+  for (const { day, games } of days) {
+    const pre = games.map(pregame);
+    const order = [...pre].sort((x, y) => Number(y.game.home === first || y.game.away === first) - Number(x.game.home === first || x.game.away === first));
+    const today = ratings?.after.get(day);
+    const mix = previous && Float64Array.from(previous);
+    const before = fit;
+    const priors = solver.fit(day, strength(day), mix);
+    const steps = order.map((p, i) => {
+      solver.add(p);
+      // `first`'s own game is also fitted before its players' box ratings move, to split the result from the box score.
+      const result = i === 0 && (p.game.home === first || p.game.away === first) ? solver.fit(day, strength(day), mix) : undefined;
+      if (mix && today) for (const lines of Object.values(players!.box.games[p.game.id] ?? {})) for (const l of lines ?? []) { const j = index.get(l[0]); if (j !== undefined) mix[j] = today[j]; }
+      return { game: p.game, fit: solver.fit(day, strength(day), mix), result };
+    });
+    fit = solver.fit(day, strength(day));
+    out.push({ day, games: pre, before, after: fit, priors, steps });
+    previous = today;
+  }
+  return out;
+}
+
+type Solver = { start: Fit; add: (p: Pregame) => void; fit: (day: string, strength: number, rating?: Float64Array) => Fit };
 
 /** Teams only: the normal equations are 30 or 31 wide, so they are solved exactly each day. */
 function teamSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number> | undefined): Solver {
@@ -269,8 +316,8 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
       for (const [c, v] of cols) { idx.push(c); val.push(v); diag[c] += v * v; xty[c] += v * y; }
       offs.push(idx.length);
     },
-    fit(day, strength) {
-      setPlayerCentres(players.ratings.after.get(day)!);
+    fit(day, strength, rating) {
+      setPlayerCentres(rating ?? players.ratings.after.get(day)!);
       for (let k = 0; k < dim; k++) {
         D[k] = k < n ? strength : k < p0 && fitted ? home.weight : players.rule.np;
         b[k] = xty[k] + D[k] * centre[k];
@@ -333,8 +380,9 @@ export const gap = (game: Game, r: Record<Abbr, number>, home: number) => r[game
 
 type Pair = { h: number; a: number };
 /**
- * One final game: the home side's pre-game chance; each side's rating before and after it, whose difference is
- * what the game did; and `shown`, each side's rating on the chart at the end of the game's day.
+ * One final game: the home side's pre-game chance; each side's rating on the chart at the end of the day before and
+ * at the end of the game's day, whose difference is the side's whole move that day (src/lib/ledger.ts splits it
+ * into the game's result, the players and the other games); and `shown`, the rating at the end of the game's day.
  */
 export type Result = { game: Game; day: string; p: number; pre: Pair; post: Pair; shown: Pair };
 export type Snapshot = { day: string; r: Record<Abbr, number> };
@@ -409,10 +457,10 @@ export function shownLineups(data: SeasonData, rotation: SeasonRotations | undef
  * (usualRotations() in src/lib/players.ts), on the Elo scale: 1000 plus the fitted margin units times
  * ELO_PER_SIGMA / SIGMA. Nothing re-centres the league, so only a team's own fit and players move it, and the
  * league's average floats. Until a team's first game is played it shows its seed alone; once it is, the days
- * before it count that game's rotation, if it has one. A game's `pre` and `post` hold the rotation the team had
- * before its day, so their difference is what the game did: a change of players shows on the chart and never in
- * the game's change. After a team's last game in the season's file, played or to come, its rating holds where
- * that game day left it.
+ * before it count that game's rotation, if it has one. A game's `pre` and `post` are the team's ratings on the
+ * chart at the end of the day before and of the game's day, so a game's change always matches the rating beside
+ * it, a change of players that day included. After a team's last game in the season's file, played or to come,
+ * its rating holds where that game day left it.
  */
 export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const abbrs = Object.keys(data.teams);
@@ -439,8 +487,6 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
       pg,
       p: phi(expected(before, pg) / (PARAMS.sigma * (played(log, pg.game) < EARLY.games ? EARLY.widen : 1))),
     }));
-    const was = rated(before, usual);
-    const kept = rated(after, usual);
     Object.assign(next, players?.lineups.next.get(day));
     usual = shown.after.get(day)!;
     const now = rated(after, usual);
@@ -449,11 +495,12 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
       if (h !== undefined) now[a] = h;
       else if (lastDay.get(a) === day) held.set(a, now[a]);
     }
+    const prev = r;
     r = now;
     latest = after;
     for (const { pg: { game }, p } of priced) {
       const side = (ratings: Record<Abbr, number>) => ({ h: ratings[game.home], a: ratings[game.away] });
-      const result: Result = { game, day, p, pre: side(was), post: side(kept), shown: side(r) };
+      const result: Result = { game, day, p, pre: side(prev), post: side(r), shown: side(r) };
       results.push(result);
       log[game.home].push({ result, side: "h" });
       log[game.away].push({ result, side: "a" });

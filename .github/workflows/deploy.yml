@@ -39,13 +39,16 @@ jobs:
       - name: Fetch this season's games, box scores and injury report from ESPN
         id: fetch
         continue-on-error: true
+        # A day's fetch takes minutes; ESPN failing with many names to look up could retry for hours and hold every
+        # deploy behind it, so a slow run fails here and the injury report is committed alone.
+        timeout-minutes: 30
         run: npm run fetch
       - name: Commit new scores
         if: steps.fetch.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/games src/data/box src/data/injuries
+          git add src/data/games src/data/box src/data/injuries src/data/players.json
           # A run that waited in the queue may be behind a push made since, which would reject its own.
           git diff --cached --quiet || { git commit -m "Update scores" && git pull --rebase && git push; }
       # The fetch saves the injury report before the scores, and the day's first saved report stands, so it is kept

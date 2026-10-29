@@ -79,24 +79,19 @@ const switchedBox = { season, games: { 1: { A: roster(10, 24), B: roster(20, 20)
 const seasonsWith = (box: unknown) => modelInputs([{ data: lastSeason, box: lastBox, preseason: { ...preseason, season: "2025-26", totals: { A: 41, E: 41 } } }, { data: switched, box, preseason }]);
 const withStar = compute(switched, seasonsWith(switchedBox).get(season));
 
-test("a team's new player shows on the chart on his first day, never in the game's change", () => {
-  const second = withStar.log.A[1];
-  assert.equal(second.result.game.id, "2");
-  assert.ok(second.result.post.a < second.result.pre.a, `A lost by 35 and went from ${second.result.pre.a} to ${second.result.post.a}`);
-  const day = withStar.series.find((d) => d.day === second.result.day)!;
-  assert.ok(day.r.A > second.result.post.a + 20, `A's chart that day, ${day.r.A}, counts player 99; the game's ${second.result.post.a} does not`);
-});
-
-test("a game's change is what the game did, and its log shows the chart's rating that day", () => {
-  const inputs = seasonsWith(switchedBox).get(season)!;
-  const { day, before, after } = fitModel(switched, inputs).find((d) => d.day === "2026-10-22")!;
+test("a game's change is its team's whole move that day, from the chart the day before to the chart that day, a new player's first minutes included", () => {
   const { result } = withStar.log.A[1];
+  assert.equal(result.game.id, "2");
+  const chart = (day: string) => withStar.series.find((d) => d.day === day)!.r.A;
+  near(result.pre.a, chart("2026-10-21"), "A's rating before the game");
+  near(result.post.a, chart(result.day), "A's rating after the game");
+  near(outcome(result).away.rating, chart(result.day), "A's rating in its log");
+  const inputs = seasonsWith(switchedBox).get(season)!;
+  const { before, after } = fitModel(switched, inputs).find((d) => d.day === result.day)!;
   const was = inputs.players!.rotation.get("2026-10-21")!.A!;
-  const did = (after.r.A - before.r.A + playerPart(after, was) - playerPart(before, was)) * (ELO_PER_SIGMA / PARAMS.sigma);
-  near(result.post.a - result.pre.a, did, "A's change");
-  const chart = withStar.series.find((d) => d.day === day)!.r;
-  near(outcome(result).away.rating, chart.A, "A's rating in its log");
-  near(result.pre.a - result.shown.a, (before.r.A + playerPart(before, was) - after.r.A - playerPart(after, inputs.players!.rotation.get(day)!.A!)) * (ELO_PER_SIGMA / PARAMS.sigma), "A's pre-game rating");
+  const fit = (after.r.A - before.r.A + playerPart(after, was) - playerPart(before, was)) * (ELO_PER_SIGMA / PARAMS.sigma);
+  assert.ok(fit < 0, `A lost by 35 and the fit alone moved it ${fit}`);
+  assert.ok(result.post.a - result.pre.a > fit + 20, `A's change, ${result.post.a - result.pre.a}, counts player 99; the fit alone moved it ${fit}`);
 });
 
 test("a team's opening point counts the players of its first game once it is played, and its seed alone until then", () => {
