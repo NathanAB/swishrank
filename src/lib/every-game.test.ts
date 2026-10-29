@@ -19,10 +19,10 @@ const seasons = files.map(({ data }) => ({ id: data.season, data, finished: list
 // in progress could fail on a new game and stop the scores updating.
 const finished = seasons.filter((s) => s.finished);
 
-/** How far a team's first game may move its shown rating. Version 2 moves one 36 at most; showing the lineup a team took into its next game moved one 134. */
-const FIRST_GAME = 50;
-/** How far a shown change may run against the game's surprise. Version 2 runs one 8 at most; the next-game lineup ran one 178. */
-const AGAINST = 10;
+/** How far a team's first game may move its shown rating. Version 2 moves one 37 at most, NO's in 2018-19; showing the lineup a team took into its next game moved one 134. */
+const FIRST_GAME = 40;
+/** How far a shown change may run against the game's surprise. Version 2 runs one 7 at most; the next-game lineup ran one 178. */
+const AGAINST = 8;
 /**
  * How far a day's new rotation may move a team's shown rating, the fit and the shift held fixed. Weighting players
  * by minutes per team game moves one 36 at most from a team's own games, a star's first game of a season; by
