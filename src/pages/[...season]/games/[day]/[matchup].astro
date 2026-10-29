@@ -1,7 +1,7 @@
 ---
 // One game's page, played or to come: the matchup and when it is, centred, over the two teams' blocks with the
-// score or the win chances (TeamBlock), both teams' ratings through the season with the game's day marked, and
-// each team's last five games before it. /games/<day>/<away>-at-<home>/ is the current season's,
+// score or the win chances (TeamBlock), both teams' ratings through the season with the game's day marked, once
+// it is played how each team's rating moved that day (GameBreakdown), and each team's last five games before it. /games/<day>/<away>-at-<home>/ is the current season's,
 // /<id>/games/... every other season's; a game at a neutral site reads <away>-vs-<home>.
 import Base from "../../../../layouts/Base.astro";
 import LocalTime from "../../../../components/LocalTime.astro";
@@ -9,6 +9,7 @@ import Panel from "../../../../components/Panel.astro";
 import PreviousGames from "../../../../components/PreviousGames.astro";
 import RatingChart from "../../../../components/RatingChart.astro";
 import TeamBlock from "../../../../components/TeamBlock.astro";
+import GameBreakdown from "../../../../components/history/GameBreakdown.astro";
 import type { Game } from "../../../../lib/elo.ts";
 import { dayWithYear, longDay, matchup } from "../../../../lib/format.ts";
 import { gameView } from "../../../../lib/game.ts";
@@ -49,6 +50,7 @@ const meta = [view.stage.label, view.series].filter(Boolean).join(" · ");
     <Panel title="Rating this season" meta="Point at the chart for any day's ratings">
       <RatingChart season={season} focus={[game.away, game.home]} paint={paint} mark={view.played ? { day: view.day, label: "This game" } : undefined} />
     </Panel>
+    {view.played && <GameBreakdown season={season} game={game} paint={paint} />}
     <PreviousGames season={season} view={view} paint={paint} />
   </div>
 </Base>

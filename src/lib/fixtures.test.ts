@@ -32,7 +32,7 @@ test("the week ahead is the game days among the seven US Eastern days from today
 });
 
 test("the favourite is the side at 50% or more, home court counted", () => {
-  const model = { r: { STRONG: 1150, EVEN: 1000, WEAK: 1000 }, home: 100, log: { STRONG: [], EVEN: [], WEAK: [] } };
+  const model = { pricing: { STRONG: 1150, EVEN: 1000, WEAK: 1000 }, home: 100, log: { STRONG: [], EVEN: [], WEAK: [] }, b2b: { 1: 0, 2: 0 } };
   const fav = (g: Game) => {
     const f = fixture(g, model);
     return f.lines.find((l) => l.side === f.fav)?.abbr;
@@ -47,8 +47,23 @@ test("a game between teams with few games behind them gets a chance nearer even,
   const g = game("1", "2026-10-25T23:00Z", "B", "A");
   const chance = (games: number) => {
     const log = { A: Array(games).fill(null), B: Array(games + 1).fill(null) };
-    return fixture(g, { r: { A: 1100, B: 1000 }, home: 0, log }).lines[1].chance;
+    return fixture(g, { pricing: { A: 1100, B: 1000 }, home: 0, log, b2b: { 1: 0 } }).lines[1].chance;
   };
-  assert.ok(chance(4) < chance(5) - 0.04, `${chance(4)} vs ${chance(5)}`);
+  assert.ok(chance(4) < chance(5) - 0.01, `${chance(4)} vs ${chance(5)}`);
   assert.equal(chance(5), chance(40));
+});
+
+test("a side on the second night of a back-to-back is given less of a chance", () => {
+  // A and B meet on the 24th; C then hosts A on the 25th, A's second night, and again on the 27th, with both rested.
+  const model = compute({
+    season: "2026-27",
+    teams: Object.fromEntries(["A", "B", "C"].map((a) => [a, { name: a, short: a, color: "000000", alternateColor: "ffffff" }])),
+    games: [
+      game("played", "2026-10-24T23:00Z", "A", "B", { hs: 101, as: 100, final: true, neutral: true }),
+      game("tired", "2026-10-25T23:00Z", "A", "C"),
+      game("rested", "2026-10-27T23:00Z", "A", "C"),
+    ],
+  });
+  const [tired, rested] = ["tired", "rested"].map((id) => fixture(model.upcoming.find((g) => g.id === id)!, model).lines[0].chance);
+  assert.ok(tired < rested, `A on its second night ${tired}, rested ${rested}`);
 });

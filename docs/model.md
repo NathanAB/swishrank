@@ -319,12 +319,12 @@ Too young to judge; shown so the season's start can be compared later.
 
 ### Check
 
-src/lib/elo.ts PARAMS match the choice, `{"n0":12,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"sigma":2.866}`. PROVISIONAL matches table 8 (26).
+Version 1's settings, frozen as V1 in scripts/evaluate.ts, match the choice, `{"n0":12,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"sigma":2.866}`. Its provisional threshold matches table 8 (26).
 <!-- results:end -->
 
 ## Settings and their evidence
 
-Written after the results. Each setting lives in `src/lib/elo.ts` (`PARAMS`, `PROVISIONAL`, `ELO_PER_SIGMA`), and `npm run backtest` fails if they drift from what the tables choose.
+Written after the results. Each setting lived in `src/lib/elo.ts` (`PARAMS`, `PROVISIONAL`, `ELO_PER_SIGMA`) until the site moved to version 2 (`docs/model-v2.md`) on 2026-10-28. `npm run backtest` fails if the copy frozen as `V1` in `scripts/evaluate.ts` drifts from what the tables choose, so this record stays checkable.
 
 - **Prior strength, `n0` = 12 games.** Lowest tuning log loss among the eligible candidates (table 1). The next step down, 8, ties it (table 7). Log loss falls steadily from 2 to 12 for every margin rule (table 1), so the pull toward average earns its keep. 12 is the edge of the grid. A check outside the plan, not used to choose, found 16 within 0.0001 of 12 and 20, 30 and 50 worse, so the edge hides no better setting.
 - **Margins, `(|m| + 3)^0.5`.** The only rule in the grid within the owner's limit: a 43-point win counts 3.4 times a 1-point win (table 1). The power 0.6 rule just misses the limit at 4.3x.

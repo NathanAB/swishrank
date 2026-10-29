@@ -1,13 +1,13 @@
 // npm run backtest: runs docs/model.md's pre-registered plan end to end. It scores every candidate on the
 // tuning seasons, chooses the site's model by the plan's rules, confirms it on the held-out seasons, prints
-// every table and rewrites the Results part of docs/model.md. It exits non-zero when src/lib/elo.ts's PARAMS
-// or PROVISIONAL differ from what the plan chose, or when the pre-registration's text has changed.
+// every table and rewrites the Results part of docs/model.md. It exits non-zero when version 1's settings, frozen
+// as V1 in scripts/evaluate.ts, differ from what the plan chose, or when the pre-registration's text has changed.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { counted, ELO_PER_SIGMA, fitSeason, PARAMS, phi, PROVISIONAL, START, type FitRule, type HomeRule, type MarginRule, type SeasonData } from "../src/lib/elo.ts";
+import { counted, ELO_PER_SIGMA, fitSeason, phi, START, type FitRule, type HomeRule, type MarginRule, type SeasonData } from "../src/lib/elo.ts";
 import {
   accuracy, brier, compare, eloScored, fitSigma, HELD_OUT, inSeasons, LOG_ONLY, loadSeason, logLoss, loss, mean, modelRows,
-  price, TUNING, windows, worse, worseJudged, type Diff, type Row, type Scored,
+  price, TUNING, V1, windows, worse, worseJudged, type Diff, type Row, type Scored,
 } from "./evaluate.ts";
 
 const started = performance.now();
@@ -268,11 +268,12 @@ if (!site || !best) {
 
   const r3 = (x: number) => Math.round(x * 1000) / 1000;
   const want = { n0: site.c.n0, margin: site.c.rule.margin, home: site.c.mode === "fixed" ? { kind: "fixed", value: r3(site.c.h0) } : { kind: "fitted", centre: r3(site.c.h0), weight: HOME_WEIGHT }, sigma: r3(site.c.sigma) };
-  const have = { ...PARAMS, home: PARAMS.home.kind === "fixed" ? { kind: "fixed", value: r3(PARAMS.home.value) } : { kind: "fitted", centre: r3(PARAMS.home.centre), weight: PARAMS.home.weight }, sigma: r3(PARAMS.sigma) };
+  const v1 = V1.params;
+  const have = { ...v1, home: { kind: "fixed", value: r3(v1.home.value) }, sigma: r3(v1.sigma) };
   const paramsMatch = JSON.stringify(want) === JSON.stringify(have) && shipsJudged;
-  const provisionalMatch = threshold === PROVISIONAL;
+  const provisionalMatch = threshold === V1.provisional;
   out.push(
-    `### Check\n\nsrc/lib/elo.ts PARAMS ${paramsMatch ? "match" : "DO NOT match"} the choice, \`${JSON.stringify(want)}\`. PROVISIONAL ${provisionalMatch ? "matches" : "DOES NOT match"} table 8 (${threshold}).`,
+    `### Check\n\nVersion 1's settings, frozen as V1 in scripts/evaluate.ts, ${paramsMatch ? "match" : "DO NOT match"} the choice, \`${JSON.stringify(want)}\`. Its provisional threshold ${provisionalMatch ? "matches" : "DOES NOT match"} table 8 (${threshold}).`,
   );
   if (!paramsMatch || !provisionalMatch) process.exitCode = 1;
 }

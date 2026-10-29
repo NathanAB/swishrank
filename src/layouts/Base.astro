@@ -28,13 +28,12 @@ interface Props {
   ownHeading?: boolean;
 }
 
-const { title, docTitle = title, description = "Season-only Elo ratings for all 30 NBA teams. Every team starts the season at 1000.", route, ownHeading = false } = Astro.props;
+const { title, docTitle = title, description = "Elo ratings for all 30 NBA teams. Every team starts the season from its preseason odds.", route, ownHeading = false } = Astro.props;
 
 const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
   { label: "Games", kinds: ["games", "game"], to: (s) => ({ kind: "games", season: s }) },
-  { label: "How it works", kinds: ["about"], to: () => ({ kind: "about" }) },
 ];
 const home = href({ kind: "home", season: currentSeason() });
 

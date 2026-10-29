@@ -1,5 +1,5 @@
 ---
-// A season's daily ratings from the 1000 every team starts at, on the scale every drawing of a season shares
+// A season's daily ratings from each team's preseason seed, on the scale every drawing of a season shares
 // (lib/chart.ts seasonPlot), with the regular season's end marked once the postseason has a game, and each line
 // dotted past the end of its team's run. The plot stretches with the card, the whole season at any width; the
 // tick lane and the label lane keep a fixed size, and the height is fixed too, so the label layout worked out
@@ -18,7 +18,7 @@
 // a game's day, takes the season end's place.
 import Empty from "./Empty.astro";
 import { dateTicks, PLOT, runAndTrail, seasonEndMark, seasonPlot } from "../lib/chart.ts";
-import { START, type Abbr } from "../lib/elo.ts";
+import type { Abbr } from "../lib/elo.ts";
 import { shortDay } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
 import { href, withBase } from "../lib/routes.ts";
@@ -100,7 +100,7 @@ for (const c of clusters) c.list.forEach((l, k) => (l.ly = c.top + k * PITCH));
 const whose = focused
   ? `the ${focus.map((a) => m.data.teams[a].short).join(" and ")} among all ${m.abbrs.length} teams`
   : `${teams.length === m.abbrs.length ? "all " : ""}${teams.length} teams`;
-const label = `Daily rating of ${whose}${n ? `, ${shortDay(ser[0].day)} to ${shortDay(ser[n - 1].day)}` : ""}, each starting at ${START}`;
+const label = `Daily rating of ${whose}${n ? `, ${shortDay(ser[0].day)} to ${shortDay(ser[n - 1].day)}` : ""}, each starting from its preseason odds`;
 ---
 
 {n < 2 ? (

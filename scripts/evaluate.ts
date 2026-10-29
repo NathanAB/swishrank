@@ -1,15 +1,26 @@
 // Scoring for the backtest and its guard test: every game's pre-game chance from a model, log loss, the
 // weekly block bootstrap and the maximum-likelihood SIGMA. docs/model.md's pre-registration defines each.
 import { readFileSync } from "node:fs";
-import { fitSeason, phi, type FitRule, type SeasonData } from "../src/lib/elo.ts";
+import { EARLY, expected, fitSeason, phi, type FitRule, type Params, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
+import { parseBox, type SeasonBox } from "../src/lib/players.ts";
+import { parsePreseason, type Preseason } from "../src/lib/preseason.ts";
 import { eloChances } from "./elo538.ts";
 
 export const TUNING = ["2015-16", "2016-17", "2017-18", "2018-19", "2019-20", "2020-21", "2021-22", "2022-23"];
 export const HELD_OUT = ["2023-24", "2024-25", "2025-26"];
 export const LOG_ONLY = ["2026-27"];
 
-export const loadSeason = (id: string): SeasonData =>
-  JSON.parse(readFileSync(new URL(`../src/data/games/${id}.json`, import.meta.url), "utf8"));
+/** Version 1 as shipped at commit 3a88d0b, kept here so its backtest stays checkable after src/lib/elo.ts moves on. */
+export const V1 = {
+  params: { n0: 12, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 }, sigma: 2.866 } satisfies Params,
+  provisional: 26,
+  early: { games: 5, widen: 1.55 },
+};
+
+const read = (path: string): unknown => JSON.parse(readFileSync(new URL(`../src/data/${path}`, import.meta.url), "utf8"));
+export const loadSeason = (id: string) => read(`games/${id}.json`) as SeasonData;
+export const loadBox = (id: string): SeasonBox => parseBox(read(`box/${id}.json`), id);
+export const loadPreseason = (data: SeasonData): Preseason => parsePreseason(read(`preseason/${data.season}.json`), data.season);
 
 /**
  * One final game as a model saw it. `day` counts from the season's first game day; `e` is the model's
@@ -22,26 +33,26 @@ export type Scored = { id: string; season: string; day: number; y: 0 | 1; p: num
 
 const dayIndex = (first: string) => (day: string) => Math.round((Date.parse(day) - Date.parse(first)) / 86_400_000);
 
-export function modelRows(data: SeasonData, rule: FitRule): Row[] {
-  const days = fitSeason(data, rule);
+export function modelRows(data: SeasonData, rule: FitRule, inputs: SeasonInputs = {}): Row[] {
+  const days = fitSeason(data, rule, inputs);
   if (!days.length) return [];
   const last = days[days.length - 1].after;
   const index = dayIndex(days[0].day);
   const played: Record<string, number> = Object.fromEntries(Object.keys(data.teams).map((a) => [a, 0]));
-  const expected = (g: (typeof days)[number]["games"][number], f: (typeof days)[number]["before"]) =>
-    f.r[g.home] - f.r[g.away] + (g.neutral ? 0 : f.home);
   const rows: Row[] = [];
   for (const { day, games, before } of days) {
-    for (const g of games) {
-      rows.push({ id: g.id, season: data.season, day: index(day), y: g.hs > g.as ? 1 : 0, e: expected(g, before), hind: expected(g, last), k: Math.min(played[g.home], played[g.away]) });
+    for (const pg of games) {
+      const g = pg.game;
+      rows.push({ id: g.id, season: data.season, day: index(day), y: g.hs > g.as ? 1 : 0, e: expected(before, pg), hind: expected(last, pg), k: Math.min(played[g.home], played[g.away]) });
     }
-    for (const g of games) { played[g.home]++; played[g.away]++; }
+    for (const { game: g } of games) { played[g.home]++; played[g.away]++; }
   }
   return rows;
 }
 
-export const price = (rows: Row[], sigma: number): Scored[] =>
-  rows.map(({ e, hind, ...rest }) => ({ ...rest, p: phi(e / sigma), ph: phi(hind / sigma) }));
+/** Each row's chance: Phi(e / sigma), with sigma `widen` times wider while either side has played fewer than EARLY.games. */
+export const price = (rows: Row[], sigma: number, widen = 1): Scored[] =>
+  rows.map(({ e, hind, ...rest }) => ({ ...rest, p: phi(e / (sigma * (rest.k < EARLY.games ? widen : 1))), ph: phi(hind / sigma) }));
 
 /** The baseline Elo's chances on the same games, in the same order as modelRows. */
 export function eloScored(data: SeasonData, like: Row[]): Scored[] {
@@ -57,9 +68,15 @@ export const brier = (s: Scored[]) => mean(s.map((x) => (x.p - x.y) ** 2));
 export const accuracy = (s: Scored[]) => mean(s.map((x) => ((x.p >= 0.5) === (x.y === 1) ? 1 : 0)));
 
 /** SIGMA by maximum likelihood: golden-section search on log SIGMA, where the log loss is unimodal. */
-export function fitSigma(rows: Row[]): number {
+export const fitSigma = (rows: Row[]): number => scaleByLikelihood(rows, 1);
+
+/** The early widening by maximum likelihood on the games where either side had played fewer than EARLY.games. */
+export const fitWiden = (rows: Row[], sigma: number): number => scaleByLikelihood(rows.filter((r) => r.k < EARLY.games), sigma);
+
+/** The s that minimises the log loss of Phi(e / (unit * s)) over `rows`. */
+function scaleByLikelihood(rows: Row[], unit: number): number {
   const f = (ls: number) => {
-    const s = Math.exp(ls);
+    const s = unit * Math.exp(ls);
     let t = 0;
     for (const r of rows) t += loss(phi(r.e / s), r.y);
     return t;
@@ -95,19 +112,29 @@ export type Diff = { n: number; blocks: number; a: number; b: number; d: number;
  * its 95% interval from resampling whole (season, week) blocks.
  */
 export function compare(a: Scored[], b: Scored[], keep: (s: Scored) => boolean = () => true): Diff {
-  const blocks = new Map<string, { sum: number; n: number }>();
-  let la = 0, lb = 0, n = 0;
+  const paired: Paired[] = [];
   a.forEach((x, i) => {
     const y = b[i];
     if (x.id !== y.id) throw new Error(`compare: game ${x.id} lines up with ${y.id}`);
-    if (!keep(x)) return;
-    const da = loss(x.p, x.y), db = loss(y.p, y.y);
+    if (keep(x)) paired.push({ season: x.season, day: x.day, a: loss(x.p, x.y), b: loss(y.p, y.y) });
+  });
+  return blockBootstrap(paired);
+}
+
+/** One item two models are scored on: its season, its day counted from the season's first game day, and each model's loss. */
+export type Paired = { season: string; day: number; a: number; b: number };
+
+/** Each model's mean loss over `paired`, the mean difference a - b, and its 95% interval from resampling whole (season, week) blocks. */
+export function blockBootstrap(paired: Paired[]): Diff {
+  const blocks = new Map<string, { sum: number; n: number }>();
+  let la = 0, lb = 0, n = 0;
+  for (const { season, day, a: da, b: db } of paired) {
     la += da; lb += db; n++;
-    const key = `${x.season}:${Math.floor(x.day / 7)}`;
+    const key = `${season}:${Math.floor(day / 7)}`;
     const blk = blocks.get(key) ?? { sum: 0, n: 0 };
     blk.sum += da - db; blk.n++;
     blocks.set(key, blk);
-  });
+  }
   const list = [...blocks.values()];
   const rnd = mulberry32(BOOTSTRAP.seed);
   const means: number[] = [];
@@ -137,5 +164,11 @@ export const worse = (d: Diff) => d.lo > 0;
  * zero-width interval, which is no 95% interval, so it is not judged.
  */
 export const worseJudged = (d: Diff) => worse(d) && d.blocks > 1;
+
+/**
+ * Version 2's declared deviation (docs/model-v2.md): a window of two blocks has an interval that runs from one
+ * block's mean to the other's, no more a 95% interval than one block's, so only windows of three or more are judged.
+ */
+export const worseJudgedV2 = (d: Diff) => worse(d) && d.blocks > 2;
 
 export const inSeasons = (ids: string[]) => (s: Scored) => ids.includes(s.season);

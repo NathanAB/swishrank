@@ -1,7 +1,7 @@
 ---
-// How it works, step 1: every team's daily rating on the season's scale (lib/chart.ts seasonPlot), all level at
-// 1000 on the eve of opening night and spread apart since, each line dotted past the end of its team's run, as on
-// the rating charts. Every line is grey but the top- and bottom-rated teams', which are in their colours and
+// How it works, step 1: every team's daily rating on the season's scale (lib/chart.ts seasonPlot), each at its
+// preseason seed on the eve of opening night and moving with its games since, each line dotted past the end of its
+// team's run, as on the rating charts. Every line is grey but the top- and bottom-rated teams', which are in their colours and
 // labelled at their ends.
 //
 // Scrolled into view, the lines draw from opening night to the latest day in one sweep behind a thin cursor that
@@ -54,7 +54,6 @@ const fan = n > 1 && (() => {
 
   return {
     ticks: plot.ticks.map((t) => ({ t, y: plot.y(t) })),
-    start: plot.y(START),
     scale: scaleAttr({ hi: plot.hi, yHi: plot.y(plot.hi), lo: plot.lo, yLo: plot.y(plot.lo) }),
     drawn: [...m.order.slice(1, -1).map((a) => line(a, false)), line(top, true), line(bottom, true)],
     ends: [{ ...ends[0], ly: topLy }, { ...ends[1], ly: bottomLy }],
@@ -62,7 +61,7 @@ const fan = n > 1 && (() => {
     dates,
     at: (i: number) => `${((plot.x(i) / W) * 100).toFixed(2)}%`,
     label:
-      `Every team's rating each day from opening night, ${shortDay(days[1])}. All ${m.abbrs.length} start at ${START}, ` +
+      `Every team's rating each day from opening night, ${shortDay(days[1])}. Each starts from its preseason odds, ` +
       `and by ${shortDay(days[n - 1])} they run from ${ends[1].text}, the lowest, to ${ends[0].text}, the highest.`,
   };
 })();
@@ -89,7 +88,6 @@ const fan = n > 1 && (() => {
             ))}
           </g>
         </svg>
-        <span class="dot start" style={`top: ${fan.start}px`}></span>
         {fan.ends.map((e) => <span class="dot end" data-abbr={e.abbr} style={`${e.tint}; top: ${e.y}px`}></span>)}
         <span class="dot here" data-here hidden></span>
       </div>
@@ -319,7 +317,6 @@ const fan = n > 1 && (() => {
     position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
     box-shadow: 0 0 0 2px var(--surface); pointer-events: none;
   }
-  .start { left: 0; background: var(--accent); }
   .end { left: 100%; background: var(--tint); }
   .here { background: var(--tint); }
   .label {

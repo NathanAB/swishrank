@@ -1,0 +1,131 @@
+---
+// A team's history: TeamGames.astro's rows and layout, with the ledger's parts as three more columns that add up
+// to the change and a muted row for each day off that moved the rating. Each row is one button that opens where
+// its points came from; a game's opened row ends with a link to its page.
+import UpsetBadge from "../UpsetBadge.astro";
+import { pct, rating as shown, record, shortDay, signed, weekdayDay } from "../../lib/format.ts";
+import { walk, type LedgerRow } from "../../lib/ledger.ts";
+import { href } from "../../lib/routes.ts";
+import { team, type SeasonView } from "../../lib/season.ts";
+import { venueWord, type TeamGame } from "../../lib/teams.ts";
+import Walk from "./Walk.astro";
+
+interface Props { season: SeasonView; rows: LedgerRow[]; games: readonly TeamGame[]; "aria-label"?: string }
+const { season, rows, games, "aria-label": label } = Astro.props;
+const byId = new Map(games.map((g) => [g.result.game.id, g]));
+const newest = [...rows].reverse();
+const z = (n: number) => (n === 0 ? "·" : signed(n));
+---
+
+<div class="headwrap"><div class="line head" aria-hidden="true">
+  <span></span><span></span><span></span><span></span>
+  <span class="num part">Result</span><span class="num part">Players</span><span class="num part">Other games</span><span class="num">Change</span><span class="num rt">Rating</span><span></span>
+</div></div>
+<ol aria-label={label}>
+  {newest.map((r, i) => {
+    const g = r.game ? byId.get(r.game.id) : undefined;
+    const id = `ledger-${i}`;
+    const w = walk(season, r);
+    const said = g ? `${venueWord(g.venue)} ${team(season, g.them.abbr).short}, ${g.us.won ? "won" : "lost"} ${record(g.us.score, g.them.score)}` : "no game";
+    return (
+      <li class:list={{ off: !g }}>
+        <div class="line">
+          <button
+            type="button" class:list={["row", { won: g?.us.won }]} aria-expanded="false" aria-controls={id}
+            aria-label={`${shortDay(r.day)}, ${said}, rating ${signed(r.change)}: where it came from`}
+          >
+            <span class="day" title={weekdayDay(r.day)}>{shortDay(r.day)}</span>
+            {g ? (
+              <>
+                <span class="opp">
+                  <span class="nm">{venueWord(g.venue)} {team(season, g.them.abbr).short}</span>
+                  {g.upset && <UpsetBadge class="up" title={`${g.us.won ? "Won" : "Lost"} with a ${pct(g.us.chance)} chance`} compact />}
+                  {g.stage.label && <span class="tag">{g.stage.label}</span>}
+                </span>
+                <span class="wl">{g.us.won ? "W" : "L"}</span>
+                <span class="num sc">{record(g.us.score, g.them.score)}</span>
+              </>
+            ) : (
+              <><span class="opp"><span class="rest">No game</span></span><span></span><span></span></>
+            )}
+            <span class="num part">{z(w.whole.result)}</span>
+            <span class="num part">{z(w.whole.players)}</span>
+            <span class="num part">{z(w.whole.others)}</span>
+            <span class="num chg">{signed(r.change)}</span>
+            <span class="num rt">{shown(r.after)}</span>
+            <span class="chev"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" /></svg></span>
+          </button>
+        </div>
+        <div class="more" id={id} inert><div class="inner"><div class="box">
+          <Walk walk={w} id={`walk-${r.day}`} />
+          {g && <a class="go" href={href({ kind: "game", season, game: g.result.game })}>See game details<svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" /></svg></a>}
+        </div></div></div>
+      </li>
+    );
+  })}
+</ol>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("button.row").forEach((b) =>
+    b.addEventListener("click", () => {
+      const open = b.getAttribute("aria-expanded") !== "true";
+      b.setAttribute("aria-expanded", String(open));
+      const more = document.getElementById(b.getAttribute("aria-controls")!)!;
+      more.classList.toggle("shown", open);
+      more.inert = !open;
+    }),
+  );
+</script>
+
+<style>
+  /* The whole row, game and figures and the chevron in a ring, is one button that opens the breakdown. */
+  li, .headwrap { container-type: inline-size; }
+  /* The row's columns. */
+  .line { --cols: 72px minmax(0, 1fr) 20px 96px 48px 56px 84px 56px 48px 28px; --log-gap: 16px; }
+  li + li { border-top: 1px solid var(--rule); }
+  .line { display: grid; grid-template-columns: var(--cols); align-items: center; column-gap: var(--log-gap); }
+  .row { all: unset; box-sizing: border-box; cursor: pointer; grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; position: relative; isolation: isolate; min-height: 48px; font-size: var(--fs-card); white-space: nowrap; color: var(--muted); }
+  /* all: unset takes the site's focus ring too, so the row puts it back. */
+  .row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  .row::before { content: ""; position: absolute; inset: 0 -8px 1px; z-index: -1; border-radius: 4px; transition: background-color 120ms ease; }
+  .won, .row:is(:hover, :focus-visible) { color: var(--text); }
+  .row:is(:hover, :focus-visible)::before { background: color-mix(in oklab, var(--text) 10%, var(--surface)); }
+  .head { min-height: 24px; font-size: var(--fs-small); color: var(--muted); }
+  .won .wl { font-weight: 600; }
+  .day { color: var(--muted); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .part { color: var(--muted); }
+  .opp { display: flex; align-items: center; min-width: 0; }
+  .nm { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .up { margin: 0 6px; }
+  /* A day off reads as no game at a glance: grey italic in the opponent's place. */
+  .rest { color: var(--muted); font-style: italic; }
+  .tag { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; margin-left: 8px; font-size: var(--fs-small); color: var(--muted); }
+  .chev { justify-self: end; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--control); color: var(--text); transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease; }
+  .row:hover .chev { background: var(--seg-pill); }
+  .row[aria-expanded="true"] .chev { transform: rotate(90deg); background: var(--seg-pill); }
+  /* The breakdown slides open: its row grows from 0fr to 1fr while it fades in. */
+  .more { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 240ms cubic-bezier(0.2, 0, 0, 1), opacity 180ms ease; }
+  .more.shown { grid-template-rows: 1fr; opacity: 1; }
+  .inner { min-height: 0; overflow: hidden; }
+  /* The walk runs the row's full width, on the card itself, and the link to the game's page closes it. */
+  .box { display: grid; row-gap: 12px; padding: 4px 0 20px; }
+  /* The way on to the game's page, drawn as the rows' chevron ring is: an outline that fills on hover. */
+  .go { justify-self: end; display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 16px; border: 1px solid var(--control); border-radius: 999px; font-size: var(--fs-body); line-height: 20px; font-weight: 500; color: var(--text); transition: background-color 120ms ease; }
+  .go:is(:hover, :focus-visible) { background: var(--seg-pill); }
+  @media (prefers-reduced-motion: reduce) { .more, .inner, .chev { transition: none; } }
+  /* Half a page: tighter columns, and the rating gives way as TeamGames.astro's does on a phone. */
+  @container (max-width: 760px) {
+    .line { --cols: 52px minmax(0, 1fr) 16px 76px 44px 52px 76px 48px 28px; --log-gap: 10px; }
+    .rt, .tag { display: none; }
+  }
+  /* A phone's row keeps TeamGames.astro's columns; the parts move into the opened row. */
+  @container (max-width: 459px) {
+    .line { --cols: 46px minmax(0, 1fr) 14px 72px 34px 28px; --log-gap: 8px; }
+    .row { min-height: 44px; font-size: 15px; }
+    .part, .rt, .tag { display: none; }
+  }
+  @media (max-width: 640px) {
+    .head { display: none; }
+  }
+</style>

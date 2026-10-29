@@ -1,7 +1,7 @@
 // What a page says about itself to a search engine or a link preview: the site's name, and each page's title
 // and description, built from the season model the page shows. Ranks, records and ratings come from the
 // helpers the tables use, so a description never disagrees with the page under it.
-import { START, type Abbr } from "./elo.ts";
+import type { Abbr } from "./elo.ts";
 import { longDay, matchup, pct, rating, record } from "./format.ts";
 import type { GameView } from "./game.ts";
 import type { SeasonView } from "./season.ts";
@@ -25,7 +25,7 @@ export const homeTitle = (season: Pick<SeasonView, "label">, conference?: Confer
 /** Who tops the league's table, or one conference's: "The Timberwolves lead at 1606." */
 export function leaders(season: Shown, conference?: Conference): string {
   const m = season.model;
-  if (m.results.length === 0) return `Every team starts at ${START}.`;
+  if (m.results.length === 0) return "Every team starts from its preseason odds.";
   const { order, rank } = standings(m, conference);
   const top = order.filter((a) => rank[a] === 1);
   const names = list(top.map((a) => `the ${m.data.teams[a].short}`));
@@ -48,8 +48,8 @@ export function teamDescription(season: Pick<SeasonView, "model" | "current">, a
   const m = season.model;
   const [W, L] = standingsRecord(m, abbr);
   const name = `The ${m.data.teams[abbr].short}`;
-  const holds = season.current ? "Rating chart, game log and next games." : "Rating chart and game log.";
-  if (W + L === 0) return `${name} have not played yet; every team starts at ${START}. ${holds}`;
+  const holds = season.current ? "Rating chart, rating history and next games." : "Rating chart and rating history.";
+  if (W + L === 0) return `${name} have not played yet, so they are rated on their preseason odds. ${holds}`;
   return `${name} ${season.current ? "are" : "finished"} ${place(m, abbr)} of ${m.abbrs.length} at ${rating(m.r[abbr])} with a ${record(W, L)} record. ${holds}`;
 }
 

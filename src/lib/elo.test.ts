@@ -28,18 +28,23 @@ test("a two-team toy season fits the least-squares answer, day by day", () => {
 });
 
 test("the re-fit moves a team that did not play when a past opponent's results change", () => {
+  // A has a game to come, so its season is not over and nothing holds its rating.
   const m = compute({
     season: "x", teams: teams("A", "B", "C"),
-    games: [game("1", "2026-10-20T23:00Z", "A", "B", 110, 100, true), game("2", "2026-10-21T23:00Z", "B", "C", 110, 100, true)],
+    games: [
+      game("1", "2026-10-20T23:00Z", "A", "B", 110, 100, true), game("2", "2026-10-21T23:00Z", "B", "C", 110, 100, true),
+      game("3", "2026-10-23T23:00Z", "A", "C", null, null, false),
+    ],
   });
   const [, dayOne, dayTwo] = m.series;
   assert.ok(dayTwo.r.A > dayOne.r.A, `A rose from ${dayOne.r.A} to ${dayTwo.r.A} without playing`);
 });
 
 test("a game's ratings before and after are the team's ratings at the end of the day before and of its day", () => {
+  // B and D have a game to come, so neither season is over and nothing holds a rating.
   const m = compute({
     season: "x", teams: teams("A", "B", "C", "D"),
-    games: [game("1", "2026-10-20T23:00Z", "A", "B", 120, 100), game("2", "2026-10-21T23:00Z", "C", "A", 101, 100)],
+    games: [game("1", "2026-10-20T23:00Z", "A", "B", 120, 100), game("2", "2026-10-21T23:00Z", "C", "A", 101, 100), game("3", "2026-10-23T23:00Z", "D", "B", null, null)],
   });
   const second = m.results[1];
   const [, dayOne, dayTwo] = m.series;
@@ -65,7 +70,7 @@ test("the win chance shown for a rating gap is the model's own chance for that g
   const m = compute(data);
   const fit = fitSeason(data, PARAMS).at(-1)!.after;
   const next = m.upcoming[0];
-  near(winProb(gap(next, m.r, m.home)), phi((fit.r.A - fit.r.C + fit.home) / PARAMS.sigma), "A's chance against C");
+  near(winProb(gap(next, m.pricing, m.home)), phi((fit.r.A - fit.r.C + fit.home) / PARAMS.sigma), "A's chance against C");
 });
 
 test("a 43-point win counts at most four times a 1-point win, and a loss counts as the same win negated", () => {

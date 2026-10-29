@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { dayKey, TZ, type SeasonData } from "./elo.ts";
-import { canonicalNote, fetchEvents, lostFinals, parse, type EspnEvent } from "./espn.ts";
+import { boxLines, canonicalNote, fetchEvents, fetchJson, lostFinals, parse, playerNames, type EspnEvent } from "./espn.ts";
 import { stage } from "./teams.ts";
 
 const side = (homeAway: "home" | "away", id: string, abbreviation: string) => ({
@@ -93,4 +93,47 @@ test("a scoreboard request tries again when ESPN sends an empty body, and gives 
   const events = [{ id: "1" }];
   assert.deepEqual(await fetchEvents("u", [0, 0, 0], replies(["", "", "", JSON.stringify({ events })])), events);
   await assert.rejects(fetchEvents("u", [0, 0], replies(["", "", "", JSON.stringify({ events })])), /ESPN u: Unexpected end of JSON input/);
+});
+
+test("a request ESPN answers with 404 fails at once, since trying again cannot find the page", async () => {
+  let tries = 0;
+  const get = (async () => (tries++, new Response("", { status: tries === 1 ? 404 : 200 }))) as unknown as typeof fetch;
+  await assert.rejects(fetchJson("u", [0, 0, 0], get), /ESPN u: HTTP 404/);
+  assert.equal(tries, 1);
+  let served = 0;
+  const flaky = (async () => new Response(JSON.stringify({ ok: true }), { status: served++ ? 200 : 503 })) as unknown as typeof fetch;
+  assert.deepEqual(await fetchJson("u", [0], flaky), { ok: true }, "a 503 is tried again");
+});
+
+test("a summary's box line keeps made and attempted shots apart and skips players who did not play", () => {
+  const labels = ["MIN", "PTS", "FG", "3PT", "FT", "REB", "AST", "TO", "STL", "BLK", "OREB", "DREB", "PF", "+/-"];
+  const lines = boxLines({
+    boxscore: {
+      players: [
+        { team: { abbreviation: "BOS" }, statistics: [{ labels, athletes: [
+          { athlete: { id: "4251" }, stats: ["31", "38", "12-21", "7-12", "7-8", "5", "3", "4", "5", "0", "0", "5", "2", "+3"] },
+          { athlete: { id: "9" }, didNotPlay: true, stats: [] },
+        ] }] },
+        { team: { abbreviation: "DET" }, statistics: [{ labels: [], athletes: [{ athlete: { id: "7" }, stats: [] }] }] },
+      ],
+    },
+  });
+  assert.deepEqual(lines, { BOS: [[4251, 31, 38, 12, 21, 7, 8, 0, 5, 3, 5, 0, 4, 2]] });
+});
+
+test("a summary names every player in its box score by athlete id, and skips an entry without an id or a text name", () => {
+  const names = playerNames({
+    boxscore: {
+      players: [
+        { team: { abbreviation: "BOS" }, statistics: [{ athletes: [
+          { athlete: { id: "4065648", displayName: "Jayson Tatum" }, stats: ["31"] },
+          { athlete: { id: "9", displayName: "Bench Player" }, didNotPlay: true, stats: [] },
+          { athlete: { displayName: "No Id" }, stats: ["4"] },
+          { athlete: { id: "8", displayName: 42 as unknown as string }, stats: ["2"] },
+        ] }] },
+        { team: { abbreviation: "DET" }, statistics: [{ athletes: [{ athlete: { id: "7" }, stats: [] }] }] },
+      ],
+    },
+  });
+  assert.deepEqual(names, { "4065648": "Jayson Tatum", "9": "Bench Player" });
 });

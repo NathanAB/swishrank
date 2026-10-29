@@ -2,9 +2,10 @@
 // How it works, step 5: a game's chance worked out as a sum in large figures, the home team's rating less the
 // visitor's plus home court, giving the gap; under it, each side's chance on the games page's bar. The reader picks
 // one of the next few games; a season with no games ahead shows its last game, as the ratings stood before it.
+// Games on a back-to-back are left out, as the sum has no term for one.
 // Without script it shows the first game.
 import ChanceBar from "../ChanceBar.astro";
-import type { Abbr } from "../../lib/elo.ts";
+import type { Abbr, Game } from "../../lib/elo.ts";
 import { ahead, before, told, worked } from "../../lib/explain/matchup.ts";
 import { nextDays, priced, WEEK } from "../../lib/fixtures.ts";
 import { between, figure, matchup, MINUS, pct } from "../../lib/format.ts";
@@ -20,8 +21,9 @@ const CHOICES = 4;
 const { season } = Astro.props;
 const model = season.model;
 const name = (a: Abbr) => team(season, a).short;
-const fixtures = nextDays(model, TODAY, WEEK).flatMap((d) => d.fixtures).slice(0, CHOICES);
-const last = model.results.at(-1);
+const rested = (g: Game) => model.b2b[g.id] === 0;
+const fixtures = nextDays(model, TODAY, WEEK).flatMap((d) => d.fixtures).filter((f) => rested(f.game)).slice(0, CHOICES);
+const last = model.results.findLast((r) => rested(r.game));
 const games = fixtures.map((f) => ahead(f, model));
 const pairings = games.length ? games : last ? [before(last, model)] : [];
 const first = fixtures[0] ?? (last && priced(last.game, last.p));

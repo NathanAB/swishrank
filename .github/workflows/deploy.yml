@@ -8,7 +8,7 @@ on:
     branches: [main]
   schedule:
     # A backup for the Cloudflare Worker in cron/, which starts this workflow at 08:17 UTC. GitHub can delay or
-    # drop scheduled runs, so this run comes four hours later (8:17 AM Eastern in winter, 9:17 AM in summer). A
+    # drop scheduled runs, so this run comes four hours later (7:17 AM Eastern in winter, 8:17 AM in summer). A
     # run with no new scores commits nothing.
     - cron: "17 12 * * *"
   workflow_dispatch:
@@ -33,20 +33,33 @@ jobs:
           cache: npm
       - name: Test the Elo math
         run: npm test
-      # A failed fetch writes nothing, so the site still builds and deploys on the scores already committed, and
-      # an outage at ESPN never holds back a change to the site. The fetch-failed job below then turns the run red.
-      - name: Fetch this season's games from ESPN
+      # A failed fetch never holds back the deploy, so an outage at ESPN never holds back a change to the site. The
+      # build reads what is on disk: the scores already committed, or a games file the fetch wrote before it failed
+      # later, which the commit step skips. The fetch-failed job below then turns the run red.
+      - name: Fetch this season's games, box scores and injury report from ESPN
         id: fetch
         continue-on-error: true
+        # A day's fetch takes minutes; ESPN failing with many names to look up could retry for hours and hold every
+        # deploy behind it, so a slow run fails here and the injury report is committed alone.
+        timeout-minutes: 30
         run: npm run fetch
       - name: Commit new scores
         if: steps.fetch.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/games
+          git add src/data/games src/data/box src/data/injuries src/data/players.json
           # A run that waited in the queue may be behind a push made since, which would reject its own.
           git diff --cached --quiet || { git commit -m "Update scores" && git pull --rebase && git push; }
+      # The fetch saves the injury report before the scores, and the day's first saved report stands, so it is kept
+      # even when the scores fail: a retry later in the day would otherwise save that afternoon's in its place.
+      - name: Commit the injury report alone
+        if: steps.fetch.outcome == 'failure'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/injuries
+          git diff --cached --quiet || { git commit -m "Update the injury report" && git pull --rebase --autostash && git push; }
       - run: npm ci
       - run: npm run build
       - name: Deploy to Cloudflare

@@ -1,8 +1,8 @@
 # SwishRank
 
-Season-only Elo ratings for the 30 NBA teams: https://swishrank.com/
+Elo ratings for the 30 NBA teams: https://swishrank.com/
 
-Every team starts each season at 1000, the league average, and nothing carries over from last year. Each morning the ratings are fitted again to every game so far by least squares, like SRS or Massey ratings: margins count with diminishing returns, home court is worth a fixed edge measured over past seasons, and each team is pulled toward average until its games say otherwise. [docs/model.md](docs/model.md) holds the pre-registered backtest that chose every setting. The site has the league table with every team's rating by day drawn into it, for the whole league or one conference (`/east/`, `/west/`), a games page with every result and the week ahead's win chances, a page per game with both teams' ratings and last five games, a page per team, and the same views for last season.
+Teams sit around 1000, and only the gap between two ratings matters. Every team starts each season from a seed set by sportsbooks' preseason win totals. Each morning the ratings are fitted again to every game so far by least squares, like SRS or Massey ratings: margins count with diminishing returns, home court is worth a fixed edge measured over past seasons, a team on the second night of a back-to-back gives up a fixed edge, and each team is pulled toward its seed, less as the season goes on. Every player has a value too, pulled toward his box-score record over past seasons, and a team's rating counts its usual rotation, the players from its last 10 games. [docs/model.md](docs/model.md) and [docs/model-v2.md](docs/model-v2.md) hold the pre-registered backtests that chose every setting. The site has the league table with every team's rating by day drawn into it, for the whole league or one conference (`/east/`, `/west/`), a games page with every result and the week ahead's win chances, a page per game with both teams' ratings and last five games, a page per team, and the same views for last season.
 
 ## How it updates
 
@@ -13,8 +13,9 @@ A GitHub Action ([deploy.yml](.github/workflows/deploy.yml)) runs once a day at 
 ```sh
 npm install
 npm run fetch   # pull the current season from ESPN
-npm test        # the model, its guard against the old Elo, and page logic
+npm test        # the model, its settings against docs/model-v2.md's choice, and page logic
 npm run backtest  # rerun the backtest and rewrite docs/model.md's results
+npm run backtest:v2  # the same for version 2 and docs/model-v2.md
 npm run dev     # http://localhost:4321/
 ```
 
@@ -32,5 +33,6 @@ npm run dev     # http://localhost:4321/
 ## Each new season
 
 1. Give the finished season an `end` date in `src/data/seasons.json` and add the new season with its opening-night `start` date at the top.
-2. Run `npm run fetch` and push.
-3. GitHub pauses scheduled workflows in a public repo after 60 days without activity, which can happen over the summer. If the morning refresh has stopped, turn it back on with `gh workflow enable deploy.yml`.
+2. Before opening night, enter each team's preseason win total in `src/data/preseason/<season>.json`. Without it, a team starts from 0.7 times its rating at the end of the season before.
+3. Run `npm run fetch` and push.
+4. GitHub pauses scheduled workflows in a public repo after 60 days without activity, which can happen over the summer. If the morning refresh has stopped, turn it back on with `gh workflow enable deploy.yml`.

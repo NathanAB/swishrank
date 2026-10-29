@@ -10,14 +10,16 @@ const game = (id: string, day: number, home: string, away: string, hs: number | 
   id, t: `2026-01-${String(day).padStart(2, "0")}T23:00Z`, home, away, hs, as, final: hs !== null, neutral: false, note: null,
 });
 
-// On days 1 to 6 OKC beats BOS and BOS beats IND, then IND beats OKC on day 10; OKC hosts IND again on day 20.
+// OKC is seeded best and IND worst. On days 1 to 6 OKC beats BOS and BOS beats IND, then IND beats OKC on day
+// 10; OKC hosts IND again on day 20.
+const centres = { OKC: 3, BOS: 0, IND: -3 };
 const games = [
   ...[1, 2, 3, 4, 5, 6].map((d) => game(`b${d}`, d, "OKC", "BOS", 120, 100)),
   ...[1, 2, 3, 4, 5, 6].map((d) => game(`i${d}`, d, "BOS", "IND", 115, 100)),
   game("upset", 10, "OKC", "IND", 100, 112),
   game("next", 20, "OKC", "IND", null, null),
 ];
-const model = compute({ season: "2025-26", teams, games });
+const model = compute({ season: "2025-26", teams, games }, { centres });
 
 test("a game lists each team's last five games before it, oldest first, an upset marked on both sides, and the record it left", () => {
   const view = gameView(model, games.find((g) => g.id === "upset")!);
@@ -61,7 +63,7 @@ test("a playoff game names the series' leader and its score after the game, or a
     ...game(id, day, home, away, hs, as), note: `West 1st Round - Game ${n}`,
   });
   const series = [...games.filter((g) => g.final), round("p1", 21, "OKC", "IND", 110, 100, 1), round("p2", 23, "OKC", "IND", 99, 104, 2), round("p3", 25, "IND", "OKC", 95, 120, 3)];
-  const m = compute({ season: "2025-26", teams, games: series });
+  const m = compute({ season: "2025-26", teams, games: series }, { centres });
   const at = (id: string) => gameView(m, series.find((g) => g.id === id)!).series;
   assert.deepEqual([at("p1"), at("p2"), at("p3"), at("upset")], ["OKC lead 1–0", "Series tied 1–1", "OKC lead 2–1", null]);
   assert.deepEqual(gameView(m, series.find((g) => g.id === "p3")!).home.record, [1, 2]);

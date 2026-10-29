@@ -2,7 +2,7 @@
 // How the ratings work, for a fan who has never heard of Elo: a three-line summary, five steps that each pair a
 // sentence or two with a drawing of real games the reader can play with (components/explain/), then the fine
 // print. Every figure is worked out from the season's games by lib/, so the page cannot disagree with the ratings,
-// and docs/model.md holds the backtest behind each setting.
+// and docs/model.md and docs/model-v2.md hold the backtests behind each setting.
 import DayOff from "../components/explain/DayOff.astro";
 import GapAnswer from "../components/explain/GapAnswer.astro";
 import GapCurve from "../components/explain/GapCurve.astro";
@@ -13,7 +13,7 @@ import WinValue from "../components/explain/WinValue.astro";
 import Panel from "../components/Panel.astro";
 import UpsetBadge from "../components/UpsetBadge.astro";
 import Base from "../layouts/Base.astro";
-import { EARLY, START, winProb } from "../lib/elo.ts";
+import { EARLY, ELO_PER_SIGMA, PARAMS, START, winProb } from "../lib/elo.ts";
 import { UPSET } from "../lib/facts.ts";
 import { int, pct, signed, weekdayDay } from "../lib/format.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
@@ -25,6 +25,7 @@ const { opener, contrasts } = examples(model?.results ?? []);
 const name = (abbr: string) => (season ? team(season, abbr).short : abbr);
 
 const edge = Math.round(model?.home ?? 0);
+const tired = Math.round((PARAMS.b2b * ELO_PER_SIGMA) / PARAMS.sigma);
 const GAP_ANSWER = "gap-answer";
 
 const gain = (kind: ContrastKind) => contrasts.find((c) => c.kind === kind)?.game.winner.change ?? 0;
@@ -49,23 +50,23 @@ const game = opener && {
 
 <Base
   title="How the ratings work"
-  description={`Every NBA team starts the season at ${START}, the league average, and every rating is worked out again after each day of games.`}
+  description="Every NBA team starts the season from its preseason odds, and every rating is worked out again after each day of games."
   route={{ kind: "about" }}
 >
-  <Fragment slot="lede">A rating says how well a team has played this season.</Fragment>
+  <Fragment slot="lede">A rating says how strong a team is, from how it has played this season and who is playing for it.</Fragment>
 
   <section slot="aside" class="short" aria-labelledby="h-in-short">
     <h2 id="h-in-short">In short</h2>
     <ul>
-      <li><b>{START} is average.</b> Higher is better.</li>
+      <li><b>Teams sit around {START}.</b> Higher is better.</li>
       <li><b>The gap sets the odds.</b> A team rated 100 points higher wins about {pct(winProb(100))} of the time.</li>
       <li><b>Wins move ratings.</b> Beating a good team, or winning big, counts more.</li>
     </ul>
   </section>
 
   <ol class="steps">
-    <li><Panel title={`Everyone starts at ${START}`}>
-      <p class="say">Last season doesn't count, because rosters change too much over a summer.</p>
+    <li><Panel title="Everyone starts from the preseason odds">
+      <p class="say">Before opening night, each team is rated from sportsbooks' win totals, which already count the summer's trades and signings. That head start fades as the team's own games come in.</p>
       <Fragment slot="side">{season && <SeasonFan season={season} />}</Fragment>
     </Panel></li>
 
@@ -105,7 +106,7 @@ const game = opener && {
     </Panel></li>
 
     <li><Panel title="Each game's chance, worked out">
-      <p class="say">Take the home team's rating, subtract the visitor's and add home court. The curve in step 2 turns that gap into each team's chance.</p>
+      <p class="say">Take the home team's rating, subtract the visitor's and add home court. The curve in step 2 turns that gap into each team's chance. A team playing the second night of a back-to-back gives up another {int(tired)} points.</p>
       <Fragment slot="side">{season && <Matchup season={season} />}</Fragment>
     </Panel></li>
   </ol>
@@ -115,12 +116,16 @@ const game = opener && {
     <dl class="notes">
       <dt>Scale</dt>
       <dd>Borrowed from chess's Elo ratings. Unlike Elo, which moves a rating after each game, these are refitted to the whole season every day.</dd>
+      <dt>Players</dt>
+      <dd>Each player has a value, measured from his box scores over past seasons and his team's results this season. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
       <dt>Chances</dt>
       <dd>They follow how often past favorites won at each gap, within one percentage point of Elo's formula, 1 / (1 + 10^(−gap / 400)).</dd>
       <dt>Later games</dt>
       <dd>Each one moves a rating less, because it's one result among many.</dd>
       <dt>Early games</dt>
       <dd>Until both teams have played {EARLY.games}, the chances stay closer to 50%, because a few games say little about a team.</dd>
+      <dt>Back-to-backs</dt>
+      <dd>A tired team's chance drops, but its rating doesn't.</dd>
       <dt>Upsets</dt>
       <dd>A win by a team given under {UPSET}% is marked as an <UpsetBadge /></dd>
     </dl>
