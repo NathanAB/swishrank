@@ -109,10 +109,14 @@ export const playerPart = (fit: Fit, lineup: Lineup) => lineup.reduce((s, p) => 
 export const expected = (fit: Fit, { game, b2b, lineup }: Pregame) =>
   fit.r[game.home] - fit.r[game.away] + (game.neutral ? 0 : fit.home) + b2b + playerPart(fit, lineup.home) - playerPart(fit, lineup.away);
 
-/** Team prior centres from preseason win totals set for `games` games, shifted to sum to 0. */
-export function seedCentres(rule: SeedRule, abbrs: Abbr[], from: { totals: Record<Abbr, number>; games: number } | { last: Record<Abbr, number> }): Record<Abbr, number> {
-  const raw = abbrs.map((a) => ("totals" in from ? rule.scale * (from.totals[a] / from.games - 0.5) : rule.carry * from.last[a]));
-  const mean = raw.reduce((s, x) => s + x, 0) / raw.length;
+/**
+ * Team prior centres, shifted to sum to 0: from each team's preseason win total set for `games` games, or, for a
+ * team without one, `carry` times its `last` fitted team part of the season before, and 0 for a team new to the league.
+ */
+export function seedCentres(rule: SeedRule, abbrs: Abbr[], from: { preseason: { totals: Record<Abbr, number>; games: number } | null; last: Record<Abbr, number> }): Record<Abbr, number> {
+  const { preseason, last } = from;
+  const raw = abbrs.map((a) => (preseason && a in preseason.totals ? rule.scale * (preseason.totals[a] / preseason.games - 0.5) : rule.carry * (last[a] ?? 0)));
+  const mean = raw.length ? raw.reduce((s, x) => s + x, 0) / raw.length : 0;
   return Object.fromEntries(abbrs.map((a, i) => [a, raw[i] - mean]));
 }
 
@@ -360,6 +364,10 @@ export type Season = {
 /** What compute() reads beyond a season's games: each team's seed, and its players' lines, box ratings and lineups. */
 export type ModelInputs = { centres?: Record<Abbr, number>; players?: { box: SeasonBox; ratings: BoxRatings; lineups: Lineups } };
 
+/** The site's model fitted to a season: each game predicted with the lineup of the team's previous game. */
+export const fitModel = (data: SeasonData, { centres, players }: ModelInputs): FitDay[] =>
+  fitSeason(data, PARAMS, { centres, players: players && { ...players, lineups: players.lineups.previous } });
+
 /** Standard competition ranks on displayed (rounded) ratings: equal ratings share a rank, the next rank skips. */
 export function ranksOf(ratings: Record<Abbr, number>) {
   const vals = Object.entries(ratings).map(([a, v]) => [a, Math.round(v)] as const);
@@ -382,7 +390,7 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const abbrs = Object.keys(data.teams);
   const { centres, players } = inputs;
   const scale = ELO_PER_SIGMA / PARAMS.sigma;
-  const days = fitSeason(data, PARAMS, { centres, players: players && { ...players, lineups: players.lineups.previous } });
+  const days = fitModel(data, inputs);
   const next: Record<Abbr, Lineup> = Object.fromEntries(abbrs.map((a) => [a, []]));
   const usual: Record<Abbr, Lineup> = { ...next };
   // Each team's rotation after its first game, so the latest day's is applied first and the earliest last.

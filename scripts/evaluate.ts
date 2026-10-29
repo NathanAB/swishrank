@@ -20,7 +20,7 @@ export const V1 = {
 const read = (path: string): unknown => JSON.parse(readFileSync(new URL(`../src/data/${path}`, import.meta.url), "utf8"));
 export const loadSeason = (id: string) => read(`games/${id}.json`) as SeasonData;
 export const loadBox = (id: string): SeasonBox => parseBox(read(`box/${id}.json`), id);
-export const loadPreseason = (data: SeasonData): Preseason => parsePreseason(read(`preseason/${data.season}.json`), data.season, Object.keys(data.teams));
+export const loadPreseason = (data: SeasonData): Preseason => parsePreseason(read(`preseason/${data.season}.json`), data.season);
 
 /**
  * One final game as a model saw it. `day` counts from the season's first game day; `e` is the model's

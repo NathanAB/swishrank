@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, EARLY, ELO_PER_SIGMA, expected, fitSeason, PARAMS, phi, played, playerPart, secondNights, b2bTerm, type Game, type SeasonData } from "./elo.ts";
+import { compute, EARLY, ELO_PER_SIGMA, expected, fitModel, fitSeason, PARAMS, phi, played, playerPart, secondNights, b2bTerm, type Game, type SeasonData } from "./elo.ts";
 import { fixture } from "./fixtures.ts";
 import { modelInputs } from "./inputs.ts";
 import type { BoxLine, Lineup } from "./players.ts";
@@ -101,4 +101,39 @@ test("every day's shown ratings average 1000", () => {
     const mean = Object.values(r).reduce((s, x) => s + x, 0) / Object.keys(r).length;
     assert.ok(Math.abs(mean - 1000) < 1e-9, `${day}: ${mean}`);
   }
+});
+
+// Next season: A, B and C have totals, D has none, and Z, a total for a team with no games, is ignored.
+const nextSeason = (teams: string[], nextTotals: unknown) => {
+  const nextData: SeasonData = { season: "2027-28", teams: Object.fromEntries(teams.map((a) => [a, team(a)])), games: [] };
+  return modelInputs([{ data, box, preseason }, { data: nextData, box: { season: "2027-28", games: {} }, preseason: nextTotals }]);
+};
+const near = (actual: number, want: number, what: string) => assert.ok(Math.abs(actual - want) < 1e-9, `${what}: ${actual}, wanted ${want}`);
+const lastParts = () => fitModel(data, modelInputs([{ data, box, preseason }]).get(season)!).at(-1)!.after.r;
+
+test("a season without preseason totals seeds each team at 0.7 times its last team rating of the season before, centred", () => {
+  const centres = nextSeason(["A", "B", "C", "D"], undefined).get("2027-28")!.centres!;
+  const last = lastParts();
+  const mean = (last.A + last.B + last.C + last.D) / 4;
+  for (const a of ["A", "B", "C", "D"]) near(centres[a], PARAMS.seed.carry * (last[a] - mean), a);
+});
+
+test("a team without a total is seeded from the season before, a team new to the league at the average, and a total for a team with no games is ignored", () => {
+  const totals = { A: 50, B: 40, C: 30, Z: 60 };
+  const centres = nextSeason(["A", "B", "C", "D", "N"], { season: "2027-28", games: 82, totals, source: "test" }).get("2027-28")!.centres!;
+  const raw = { ...Object.fromEntries(Object.entries(totals).map(([a, w]) => [a, PARAMS.seed.scale * (w / 82 - 0.5)])), D: PARAMS.seed.carry * lastParts().D, N: 0 };
+  const mean = (raw.A + raw.B + raw.C + raw.D + raw.N) / 5;
+  assert.deepEqual(Object.keys(centres), ["A", "B", "C", "D", "N"]);
+  for (const a of Object.keys(centres)) near(centres[a], raw[a as keyof typeof raw] - mean, a);
+});
+
+test("a season added before opening night, with no teams or some of them, and a season without box scores still rate", () => {
+  for (const teams of [[], ["A", "B", "C"]]) {
+    const inputs = nextSeason(teams, { season: "2027-28", games: 82, totals: { A: 50, B: 40, C: 30, D: 20 }, source: "test" }).get("2027-28");
+    const model = compute({ season: "2027-28", teams: Object.fromEntries(teams.map((a) => [a, team(a)])), games: [] }, inputs);
+    assert.deepEqual([model.series, model.results, model.order], [[], [], teams.length ? ["A", "B", "C"] : []]);
+  }
+  const noBox = modelInputs([{ data, box: undefined, preseason }]).get(season)!;
+  const teamsAlone = compute(data, { centres: noBox.centres });
+  compute(data, noBox).results.forEach((r, i) => near(r.p, teamsAlone.results[i].p, `game ${r.game.id} without box scores`));
 });

@@ -7,8 +7,8 @@ export type Preseason = { season: string; games: number; totals: Record<Abbr, nu
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** `raw` as `id`'s totals, which must name every one of `abbrs` and nothing else. */
-export function parsePreseason(raw: unknown, id: string, abbrs: readonly Abbr[]): Preseason {
+/** `raw` as `id`'s totals. They need not name every team: a team without one is seeded from the season before. */
+export function parsePreseason(raw: unknown, id: string): Preseason {
   const where = `src/data/preseason/${id}.json`;
   if (!isRecord(raw) || raw.season !== id || typeof raw.games !== "number" || !isRecord(raw.totals) || typeof raw.source !== "string") {
     throw new Error(`${where}: expected { season: "${id}", games, totals, source }`);
@@ -18,7 +18,5 @@ export function parsePreseason(raw: unknown, id: string, abbrs: readonly Abbr[])
     if (typeof w !== "number" || w <= 0 || w >= raw.games) throw new Error(`${where}: ${abbr}'s total ${String(w)} is not a win count`);
     totals[abbr] = w;
   }
-  const named = Object.keys(totals).sort().join(), teams = [...abbrs].sort().join();
-  if (named !== teams) throw new Error(`${where}: totals name ${named}, the season's teams are ${teams}`);
   return { season: id, games: raw.games, totals, source: raw.source };
 }

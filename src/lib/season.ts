@@ -81,13 +81,15 @@ function parseList(raw: readonly { id: string; start: string; end?: string; note
 const ENTRIES = parseList(list);
 const cache = new Map<string, SeasonView>();
 
-const file = (files: Record<string, unknown>, dir: string, id: string) => {
-  const raw = files[`../data/${dir}/${id}.json`];
-  if (raw === undefined) throw new Error(`src/data/${dir}/${id}.json is missing for season ${id}`);
-  return raw;
+/** A season's file from `dir`, or undefined when it has none. */
+const file = (files: Record<string, unknown>, dir: string, id: string): unknown => files[`../data/${dir}/${id}.json`];
+const seasonData = (id: string) => {
+  const raw = file(GAME_FILES, "games", id);
+  if (raw === undefined) throw new Error(`src/data/games/${id}.json is missing for season ${id}`);
+  return parseSeasonData(raw, id);
 };
-const seasonData = (id: string) => parseSeasonData(file(GAME_FILES, "games", id), id);
 
+// A season without box scores rates its teams alone, and one without preseason totals seeds them from the season before.
 let inputs: Map<string, ModelInputs> | undefined;
 const allInputs = () =>
   (inputs ??= modelInputs(ENTRIES.all.map(({ id }) => ({ data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id) }))));

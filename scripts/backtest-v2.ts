@@ -27,7 +27,7 @@ const SEED = { scale: 5, fade: 120, carry: 0.7 };
 const seasons: Loaded[] = ALL.map((id) => {
   const data = loadSeason(id);
   const p = loadPreseason(data);
-  return { data, box: loadBox(id), centres: seedCentres(SEED, Object.keys(data.teams), p) };
+  return { data, box: loadBox(id), centres: seedCentres(SEED, Object.keys(data.teams), { preseason: p, last: {} }) };
 });
 const vegas: Record<string, number> = Object.assign({}, ...ALL.map((id) => loadVegas(id).chances));
 const lineupsBySeason = lineups(seasons);

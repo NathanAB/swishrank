@@ -33,6 +33,6 @@ npm run dev     # http://localhost:4321/
 ## Each new season
 
 1. Give the finished season an `end` date in `src/data/seasons.json` and add the new season with its opening-night `start` date at the top.
-2. Before opening night, enter each team's preseason win total in `src/data/preseason/<season>.json`. The build fails without it.
+2. Before opening night, enter each team's preseason win total in `src/data/preseason/<season>.json`. Without it, a team starts from 0.7 times its rating at the end of the season before.
 3. Run `npm run fetch` and push.
 4. GitHub pauses scheduled workflows in a public repo after 60 days without activity, which can happen over the summer. If the morning refresh has stopped, turn it back on with `gh workflow enable deploy.yml`.
