@@ -12,9 +12,9 @@ export type Line = {
   score: number;
   /** Pre-game win chance, 0 to 1. */
   chance: number;
-  /** Rating change as displayed: the gap between the rounded ratings before and after. */
+  /** Rating change as displayed: the gap between the rounded ratings before and after the game. */
   change: number;
-  /** Rating after the game, unrounded. */
+  /** The team's rating on the chart at the end of the game's day, unrounded. */
   rating: number;
   won: boolean;
 };
@@ -22,7 +22,7 @@ export type Line = {
 export type Outcome = { result: Result; home: Line; away: Line; winner: Line; loser: Line };
 
 export function outcome(result: Result): Outcome {
-  const { game, p, pre, post } = result;
+  const { game, p, pre, post, shown } = result;
   const homeScore = game.hs;
   const awayScore = game.as;
   // compute() only makes results from scored finals; elo.ts's Game type cannot say so.
@@ -34,7 +34,7 @@ export function outcome(result: Result): Outcome {
     score: side === "h" ? homeScore : awayScore,
     chance: side === "h" ? p : 1 - p,
     change: shownChange(pre[side], post[side]),
-    rating: post[side],
+    rating: shown[side],
     won: side === "h" ? homeWon : !homeWon,
   });
   const home = line("h");

@@ -28,7 +28,7 @@ export function modelInputs(seasons: readonly SeasonFiles[]): Map<string, ModelI
     const last = before && !everyTotal ? lastTeamParts(before.data, before.inputs) : {};
     const inputs: ModelInputs = {
       centres: seedCentres(PARAMS.seed, abbrs, { preseason: totals, last }),
-      players: { box, ratings: ratings.get(data.season)!, lineups: rotations.get(data.season)! },
+      players: { box, ratings: ratings.get(data.season)!, lineups: rotations.get(data.season)!, rotation: rotations.get(data.season)!.rotation },
     };
     out.set(data.season, inputs);
     before = { data, inputs };

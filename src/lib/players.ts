@@ -13,6 +13,8 @@ export type SeasonBox = { season: string; games: Record<string, Partial<Record<A
 export type Slot = { athlete: Athlete; share: number };
 export type Lineup = Slot[];
 export type Sides<T> = { home: T; away: T };
+/** Each team's rotation, the lineup its shown rating counts, after each game day from its first game on. */
+export type SeasonRotations = Map<string, Partial<Record<Abbr, Lineup>>>;
 /** One season's games and box scores, the unit the walks below go through in order. */
 export type SeasonPlayers = { data: SeasonData; box: SeasonBox };
 
@@ -100,7 +102,7 @@ export type Lineups = {
   previous: Map<string, Sides<Lineup>>;
   atTip: Map<string, Sides<Lineup>>;
   next: Map<string, Partial<Record<Abbr, Lineup>>>;
-  rotation: Map<string, Partial<Record<Abbr, Lineup>>>;
+  rotation: SeasonRotations;
 };
 
 /** A lineup's minutes: everyone's expected minutes scaled so the team's total is 240. */

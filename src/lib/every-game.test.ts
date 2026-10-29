@@ -80,7 +80,7 @@ test(`no day's new rotation in a finished season moves a team's shown rating by 
     const season = inputs.get(id)!;
     const usual: Partial<Record<Abbr, Lineup>> = {};
     for (const { day, after } of fitModel(data, season)) {
-      for (const [abbr, lineup] of Object.entries(season.players!.lineups.rotation.get(day) ?? {})) {
+      for (const [abbr, lineup] of Object.entries(season.players!.rotation.get(day) ?? {})) {
         const was = usual[abbr];
         const move = was && lineup ? (playerPart(after, lineup) - playerPart(after, was)) * scale : 0;
         assert.ok(Math.abs(move) <= ROTATION, `${id} ${day} ${abbr}: ${move}`);

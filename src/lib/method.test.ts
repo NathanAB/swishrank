@@ -9,7 +9,7 @@ const game = (id: string, away: string, home: string, as: number, hs: number, ne
 const results = (games: Game[]): Result[] =>
   games.map((g) => ({
     game: g, day: "2026-10-20", p: g.neutral ? 0.5 : 0.6,
-    pre: { h: 1000, a: 1000 }, post: { h: 1000, a: 1000 },
+    pre: { h: 1000, a: 1000 }, post: { h: 1000, a: 1000 }, shown: { h: 1000, a: 1000 },
   }));
 
 test("with no margin in common, picks the favourite's narrowest win, the underdog's narrowest and the favourite's widest, earliest first on a tie", () => {

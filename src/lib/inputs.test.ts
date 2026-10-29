@@ -1,11 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compute, EARLY, ELO_PER_SIGMA, expected, fitModel, fitSeason, PARAMS, phi, played, playerPart, secondNights, b2bTerm, type Game, type SeasonData } from "./elo.ts";
+import { outcome } from "./facts.ts";
 import { fixture } from "./fixtures.ts";
 import { modelInputs } from "./inputs.ts";
 import type { BoxLine, Lineup } from "./players.ts";
 
 const season = "2026-27";
+const near = (actual: number, want: number, what: string) => assert.ok(Math.abs(actual - want) < 1e-9, `${what}: ${actual}, wanted ${want}`);
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
 const game = (id: string, day: number, away: string, home: string, as: number | null = null, hs: number | null = null): Game => ({
   id, t: `2026-10-${day}T23:00Z`, home, away, hs, as, final: hs !== null, neutral: false, note: null,
@@ -85,10 +87,22 @@ test("a team's new player shows on the chart on his first day, never in the game
   assert.ok(day.r.A > second.result.post.a + 20, `A's chart that day, ${day.r.A}, counts player 99; the game's ${second.result.post.a} does not`);
 });
 
+test("a game's change is what the game did, on its day's shift, and its log shows the chart's rating that day", () => {
+  const inputs = seasonsWith(switchedBox).get(season)!;
+  const { day, before, after } = fitModel(switched, inputs).find((d) => d.day === "2026-10-22")!;
+  const { result } = withStar.log.A[1];
+  const was = inputs.players!.rotation.get("2026-10-21")!.A!;
+  const did = (after.r.A - before.r.A + playerPart(after, was) - playerPart(before, was)) * (ELO_PER_SIGMA / PARAMS.sigma);
+  near(result.post.a - result.pre.a, did, "A's change");
+  const chart = withStar.series.find((d) => d.day === day)!.r;
+  near(outcome(result).away.rating, chart.A, "A's rating in its log");
+  near(result.pre.a - result.shown.a, (before.r.A + playerPart(before, was) - after.r.A - playerPart(after, inputs.players!.rotation.get(day)!.A!)) * (ELO_PER_SIGMA / PARAMS.sigma), "A's pre-game rating, on the day's shift");
+});
+
 test("a team's opening point counts the players of its first game once it is played, and its seed alone until then", () => {
   const inputs = seasonsWith(switchedBox).get(season)!;
   const start = fitSeason(switched, PARAMS, { centres: inputs.centres, players: { ...inputs.players!, lineups: inputs.players!.lineups.previous } })[0].before;
-  const firstGame = playerPart(start, inputs.players!.lineups.rotation.get("2026-10-21")!.A!);
+  const firstGame = playerPart(start, inputs.players!.rotation.get("2026-10-21")!.A!);
   assert.ok(Math.abs(firstGame) > 0.05, `A's first game's players are worth ${firstGame}`);
   const opening = withStar.series[0].r;
   const seedGap = PARAMS.seed.scale * ((preseason.totals.A - preseason.totals.D) / preseason.games);
@@ -108,7 +122,6 @@ const nextSeason = (teams: string[], nextTotals: unknown) => {
   const nextData: SeasonData = { season: "2027-28", teams: Object.fromEntries(teams.map((a) => [a, team(a)])), games: [] };
   return modelInputs([{ data, box, preseason }, { data: nextData, box: { season: "2027-28", games: {} }, preseason: nextTotals }]);
 };
-const near = (actual: number, want: number, what: string) => assert.ok(Math.abs(actual - want) < 1e-9, `${what}: ${actual}, wanted ${want}`);
 const lastParts = () => fitModel(data, modelInputs([{ data, box, preseason }]).get(season)!).at(-1)!.after.r;
 
 test("a season without preseason totals seeds each team at 0.7 times its last team rating of the season before, centred", () => {
