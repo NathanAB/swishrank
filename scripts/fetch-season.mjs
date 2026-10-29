@@ -1,5 +1,6 @@
-// Fetch a season's NBA games from ESPN's public scoreboard into src/data/games/<season>.json, and the box score
-// of every final game src/data/box/<season>.json lacks from ESPN's game summary.
+// Fetch a season's NBA games from ESPN's public scoreboard into src/data/games/<season>.json, the box score of
+// every final game src/data/box/<season>.json lacks from ESPN's game summary, and the day's injury report into
+// src/data/injuries/<season>.json.
 //
 //   node scripts/fetch-season.mjs            seasons still in progress (no "end" in seasons.json)
 //   node scripts/fetch-season.mjs 2025-26    one season by id
@@ -7,11 +8,15 @@
 // ESPN's scoreboard takes one date per request (date ranges return 400), so this walks the season day by day.
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { dayKey } from "../src/lib/elo.ts";
 import { boxLines, fetchEvents, fetchJson, lostFinals, parse } from "../src/lib/espn.ts";
+import { parseArchive, parseFeed, withReport } from "../src/lib/injuries.ts";
 
 const SEASONS = JSON.parse(await readFile(new URL("../src/data/seasons.json", import.meta.url), "utf8"));
 const OUT_DIR = new URL("../src/data/games/", import.meta.url);
 const BOX_DIR = new URL("../src/data/box/", import.meta.url);
+const INJURY_DIR = new URL("../src/data/injuries/", import.meta.url);
+const INJURIES = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries";
 const SUMMARY = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
 const URL_FOR = (ymd) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${ymd}`;
 // Two weeks of games ahead, so a team's page can always show its next five.
@@ -69,7 +74,32 @@ async function fetchBox(id, finals) {
   console.log(`${id}: box scores for ${added} more games, ${finals.length - Object.keys(box.games).length} final games without one`);
 }
 
+// The report only weighs who is expected to play in each team's shown rating, so a failed, empty or
+// unreadable one is a warning and never fails the run.
+async function fetchInjuries(id) {
+  try {
+    const { season, injuries, dropped } = parseFeed(await fetchJson(INJURIES));
+    if (season !== id) return console.warn(`${id}: the injury report is for ${season ?? "no season"}, so none is saved`);
+    if (!injuries.length) return console.warn(`${id}: the injury report is empty, so none is saved`);
+    const file = new URL(`${id}.json`, INJURY_DIR);
+    const archive = await readFile(file, "utf8").then((text) => parseArchive(JSON.parse(text), id), (err) => {
+      if (err.code === "ENOENT") return { season: id, days: {} };
+      throw err;
+    });
+    const day = dayKey(new Date().toISOString());
+    if (day in archive.days) return console.log(`${id}: the injury report for ${day} is already saved`);
+    await mkdir(INJURY_DIR, { recursive: true });
+    await writeFile(file, JSON.stringify(withReport(archive, day, injuries)) + "\n");
+    console.log(`${id}: injury report for ${day}, ${injuries.length} players, ${dropped} malformed entries dropped`);
+  } catch (err) {
+    console.warn(`${id}: no injury report this time: ${err.message}`);
+  }
+}
+
 const ids = process.argv.slice(2);
 const targets = ids.length ? SEASONS.filter((s) => ids.includes(s.id)) : SEASONS.filter((s) => !s.end);
 if (ids.length && targets.length !== ids.length) throw new Error(`Unknown season in ${ids.join(", ")}`);
-for (const season of targets) await fetchSeason(season);
+for (const season of targets) {
+  if (!season.end) await fetchInjuries(season.id);
+  await fetchSeason(season);
+}
