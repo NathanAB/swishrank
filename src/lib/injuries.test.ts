@@ -34,10 +34,12 @@ test("a malformed entry is dropped and counted, and the rest are kept", () => {
 });
 
 test("a day's first saved report stands, and the archive reads back as it was written", () => {
-  const first = parseFeed(feed(entry(1))).injuries, later = parseFeed(feed(entry(2))).injuries;
+  const first = { fetched: "2026-10-29T08:17:00.000Z", injuries: parseFeed(feed(entry(1))).injuries };
+  const later = { fetched: "2026-10-29T12:17:00.000Z", injuries: parseFeed(feed(entry(2))).injuries };
   const archive = withReport(withReport(withReport({ season: "2026-27", days: {} }, "2026-10-29", first), "2026-10-28", later), "2026-10-29", later);
   assert.deepEqual(Object.keys(archive.days), ["2026-10-28", "2026-10-29"]);
   assert.deepEqual(archive.days["2026-10-29"], first);
   assert.deepEqual(parseArchive(JSON.parse(JSON.stringify(archive)), "2026-27"), archive);
-  assert.throws(() => parseArchive({ season: "2026-27", days: { "2026-10-28": [{ athlete: "x" }] } }, "2026-27"), /malformed injury/);
+  assert.throws(() => parseArchive({ season: "2026-27", days: { "2026-10-28": { fetched: first.fetched, injuries: [{ athlete: "x" }] } } }, "2026-27"), /malformed injury/);
+  assert.throws(() => parseArchive({ season: "2026-27", days: { "2026-10-28": first.injuries } }, "2026-27"), /time it was fetched/);
 });

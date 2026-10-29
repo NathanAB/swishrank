@@ -14,7 +14,7 @@
 // the 10 opponents, all as they stood that day. Lower root mean square is better.
 import { readFileSync, existsSync } from "node:fs";
 import { b2bTerm, compute, counted, EARLY, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, phi, playerPart, secondNights, shownChange, type Abbr, type ModelInputs, type Season, type SeasonData } from "../src/lib/elo.ts";
-import { parseArchive } from "../src/lib/injuries.ts";
+import { beforeTip, parseArchive } from "../src/lib/injuries.ts";
 import { modelInputs } from "../src/lib/inputs.ts";
 import { scaled, type Athlete, type Lineup, type SeasonRotations } from "../src/lib/players.ts";
 import { missedCurves, rotations, type SeasonFiles } from "../src/lib/rotation.ts";
@@ -172,7 +172,8 @@ if (judged) {
   const [mb, md] = [b, d].map((model) => misses(model, from, to ?? undefined));
   console.log(`${id}, game days ${from} to ${to ?? "today (the regular season is still on)"}, teams with 10 games still to play`);
   if (!mb.length) {
-    console.log(`Too few report days to judge: ${reportDays.length} archived, ${from} to ${reportDays.at(-1)}, and no team has played 10 games since the first.`);
+    const usable = Object.keys(beforeTip(archive, data.games).days).length;
+    console.log(`Too few report days to judge: ${reportDays.length} archived from ${from} to ${reportDays.at(-1)}, ${usable} of them fetched before the day's first tip-off, and no team has played 10 games since ${from}.`);
   } else {
     const first = Date.parse(b.results[0].day);
     const diff = blockBootstrap(mb.map((x, i) => {

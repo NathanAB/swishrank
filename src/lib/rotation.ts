@@ -4,7 +4,7 @@
 // comes from the day's archived injury report when it gives his return, and otherwise from the games he has
 // missed in a row. A player out for the season fades to nothing; one who missed a game keeps most of his weight.
 import { finalDays, dayKey, addDays, type Abbr, type SeasonData } from "./elo.ts";
-import type { InjuryArchive } from "./injuries.ts";
+import { beforeTip, type InjuryArchive } from "./injuries.ts";
 import { scaled, type Athlete, type SeasonPlayers, type SeasonRotations } from "./players.ts";
 
 /** The team games a rating looks ahead over, and back over for a player's usual minutes. */
@@ -93,8 +93,8 @@ function schedules(data: SeasonData): Map<Abbr, string[]> {
  * the day's games, or, until that morning comes, the one saved on the day.
  */
 function returns(archive: InjuryArchive | undefined, day: string): Map<Athlete, string> {
-  const report = archive?.days[addDays(day, 1)] ?? archive?.days[day] ?? [];
-  return new Map(report.flatMap((i) => (i.returnDate ? [[i.athlete, i.returnDate] as const] : [])));
+  const report = archive?.days[addDays(day, 1)] ?? archive?.days[day];
+  return new Map((report?.injuries ?? []).flatMap((i) => (i.returnDate ? [[i.athlete, i.returnDate] as const] : [])));
 }
 
 /**
@@ -110,6 +110,7 @@ export function rotations(seasons: readonly SeasonFiles[], curves: ReadonlyMap<s
   for (const season of seasons) {
     const curve = curves.get(season.data.season)!;
     const schedule = schedules(season.data);
+    const reports = season.injuries && beforeTip(season.injuries, season.data.games);
     const windows = new Map<Abbr, TeamGame[]>();
     const thisSeason = new Map<Athlete, { minutes: number; games: number }>();
     const byDay: SeasonRotations = new Map();
@@ -122,7 +123,7 @@ export function rotations(seasons: readonly SeasonFiles[], curves: ReadonlyMap<s
           thisSeason.set(l[0], { minutes: so.minutes + l[1], games: so.games + 1 });
         }
       }
-      const back = returns(season.injuries, day);
+      const back = returns(reports, day);
       byDay.set(day, Object.fromEntries([...windows].map(([abbr, window]) => {
         const ahead = (schedule.get(abbr) ?? []).filter((d) => d > day).slice(0, GAMES);
         return [abbr, scaled([...missedInRow(window)].map(([athlete, k]) => {

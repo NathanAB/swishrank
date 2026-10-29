@@ -1,7 +1,7 @@
 // ESPN's injury report, archived once a day by the fetch into src/data/injuries/<season>.json, for the expected
 // minutes behind each team's shown rating (src/lib/rotation.ts). Only the structured fields are kept: the
 // report's comments are third-party prose, and the repository is public.
-import type { Abbr } from "./elo.ts";
+import { dayKey, type Abbr, type Game } from "./elo.ts";
 import type { Athlete } from "./players.ts";
 
 /** One player on the report. `returnDate` is ESPN's projected return, a US Eastern day. */
@@ -16,8 +16,10 @@ export type Injury = {
   detail?: string;
   side?: string;
 };
+/** One day's report: when the fetch saved it, as an ISO time, and its entries. */
+export type Report = { fetched: string; injuries: Injury[] };
 /** A season's archive: the report as the first fetch of each US Eastern day saw it, by that day. */
-export type InjuryArchive = { season: string; days: Record<string, Injury[]> };
+export type InjuryArchive = { season: string; days: Record<string, Report> };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -84,19 +86,35 @@ export function parseArchive(raw: unknown, id: string): InjuryArchive {
   const where = `src/data/injuries/${id}.json`;
   if (!isRecord(raw) || raw.season !== id || !isRecord(raw.days)) throw new Error(`${where}: expected { season: "${id}", days }`);
   const days: InjuryArchive["days"] = {};
-  for (const [day, entries] of Object.entries(raw.days)) {
-    if (!isDay(day) || !Array.isArray(entries)) throw new Error(`${where}: ${day} is not a day with a list of injuries`);
-    days[day] = entries.map((e) => {
-      const parsed = isRecord(e) ? injury(e) : null;
-      if (!parsed) throw new Error(`${where}: ${day} has a malformed injury ${JSON.stringify(e).slice(0, 120)}`);
-      return parsed;
-    });
+  for (const [day, report] of Object.entries(raw.days)) {
+    const fetched = isRecord(report) ? text(report.fetched) : undefined;
+    if (!isDay(day) || !isRecord(report) || !fetched || Number.isNaN(Date.parse(fetched)) || !Array.isArray(report.injuries)) {
+      throw new Error(`${where}: ${day} is not a day with the time it was fetched and a list of injuries`);
+    }
+    days[day] = {
+      fetched,
+      injuries: report.injuries.map((e) => {
+        const parsed = isRecord(e) ? injury(e) : null;
+        if (!parsed) throw new Error(`${where}: ${day} has a malformed injury ${JSON.stringify(e).slice(0, 120)}`);
+        return parsed;
+      }),
+    };
   }
   return { season: id, days };
 }
 
-/** The archive with `injuries` as `day`'s report, unless the day already has one: the day's first fetch stands. */
-export const withReport = (archive: InjuryArchive, day: string, injuries: Injury[]): InjuryArchive =>
+/** The archive with `report` as `day`'s, unless the day already has one: the day's first fetch stands. */
+export const withReport = (archive: InjuryArchive, day: string, report: Report): InjuryArchive =>
   day in archive.days
     ? archive
-    : { season: archive.season, days: Object.fromEntries(Object.entries({ ...archive.days, [day]: injuries }).sort(([x], [y]) => x.localeCompare(y))) };
+    : { season: archive.season, days: Object.fromEntries(Object.entries({ ...archive.days, [day]: report }).sort(([x], [y]) => x.localeCompare(y))) };
+
+/**
+ * The archive's reports fetched before their day's first tip-off, the only ones that say what was known before
+ * its games. A report fetched later, by a retry or a run by hand, is left out. A day without games keeps its report.
+ */
+export function beforeTip(archive: InjuryArchive, games: readonly Pick<Game, "t">[]): InjuryArchive {
+  const tip = new Map<string, number>();
+  for (const { t } of games) tip.set(dayKey(t), Math.min(Date.parse(t), tip.get(dayKey(t)) ?? Infinity));
+  return { season: archive.season, days: Object.fromEntries(Object.entries(archive.days).filter(([day, r]) => Date.parse(r.fetched) < (tip.get(day) ?? Infinity))) };
+}

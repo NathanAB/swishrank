@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Game, SeasonData } from "./elo.ts";
 import type { BoxLine } from "./players.ts";
+import type { InjuryArchive } from "./injuries.ts";
 import { missedCurves, rotations, type Curve } from "./rotation.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
@@ -22,7 +23,7 @@ const box = {
   season: "x",
   games: Object.fromEntries([10, 11, 12, 13].map((day) => [String(day), { A: [line(1, 30), line(3, 30), ...(day < 13 ? [line(2, 30)] : [])], B: [line(9, 30)] }])),
 };
-const minutes = (injuries?: { season: string; days: Record<string, { athlete: number; team: string; status: string; date: string; returnDate?: string }[]> }) => {
+const minutes = (injuries?: InjuryArchive) => {
   const lineup = rotations([{ data, box, injuries }], new Map([["x", curve]])).get("x")!.get("2026-10-13")!.A!;
   return Object.fromEntries(lineup.map((p) => [p.athlete, p.share * 48]));
 };
@@ -38,9 +39,23 @@ test("a player the injury report does not give a return for counts at the curve 
 test("a player the report gives a return for counts for the share of the team's next 10 games on or after it", () => {
   // The report saved the morning after the 13th expects player 3 back on the 20th, for 4 of A's next 10 games.
   const report = { athlete: 3, team: "A", status: "Out", date: "2026-10-14T01:00Z", returnDate: "2026-10-20" };
-  const m = minutes({ season: "x", days: { "2026-10-13": [{ ...report, returnDate: "2026-11-30" }], "2026-10-14": [report] } });
+  const m = minutes({ season: "x", days: {
+    "2026-10-13": { fetched: "2026-10-13T08:17:00.000Z", injuries: [{ ...report, returnDate: "2026-11-30" }] },
+    "2026-10-14": { fetched: "2026-10-14T08:17:00.000Z", injuries: [report] },
+  } });
   near(m[3] / m[1], 0.4, "player 3 against player 1, who is not on the report");
   near(m[2] / m[1], ((90 / 3.25) * curve[1]) / ((120 / 4.25) * curve[0]), "player 2 still counts at the curve");
+});
+
+test("a report fetched after its day's first tip-off is not read", () => {
+  // The 14th's report was fetched after A's game tipped off at 23:00Z, so the 13th's, which has player 3 out past
+  // A's next 10 games, stands.
+  const report = { athlete: 3, team: "A", status: "Out", date: "2026-10-13T01:00Z", returnDate: "2026-11-30" };
+  const m = minutes({ season: "x", days: {
+    "2026-10-13": { fetched: "2026-10-13T08:17:00.000Z", injuries: [report] },
+    "2026-10-14": { fetched: "2026-10-14T23:30:00.000Z", injuries: [{ ...report, returnDate: "2026-10-20" }] },
+  } });
+  near(m[3], 0, "player 3, out for all of A's next 10 games");
 });
 
 test("each season's curve is learned from the other seasons, leaving out a player who left his team", () => {

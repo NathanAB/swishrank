@@ -86,10 +86,11 @@ async function fetchInjuries(id) {
       if (err.code === "ENOENT") return { season: id, days: {} };
       throw err;
     });
-    const day = dayKey(new Date().toISOString());
+    const fetched = new Date().toISOString();
+    const day = dayKey(fetched);
     if (day in archive.days) return console.log(`${id}: the injury report for ${day} is already saved`);
     await mkdir(INJURY_DIR, { recursive: true });
-    await writeFile(file, JSON.stringify(withReport(archive, day, injuries)) + "\n");
+    await writeFile(file, JSON.stringify(withReport(archive, day, { fetched, injuries })) + "\n");
     console.log(`${id}: injury report for ${day}, ${injuries.length} players, ${dropped} malformed entries dropped`);
   } catch (err) {
     console.warn(`${id}: no injury report this time: ${err.message}`);

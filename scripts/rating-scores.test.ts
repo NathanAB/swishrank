@@ -17,7 +17,8 @@ after(() => rmSync(dir, { recursive: true, force: true }));
 
 const judge = (day: string) => {
   const injury = { athlete: 1, team: "CHI", status: "Out", date: `${day}T12:00Z`, returnDate: "2025-11-30" };
-  writeFileSync(join(dir, "src/data/injuries/2025-26.json"), JSON.stringify({ season: "2025-26", days: { [day]: [injury] } }));
+  const report = { fetched: `${day}T12:00:00.000Z`, injuries: [injury] };
+  writeFileSync(join(dir, "src/data/injuries/2025-26.json"), JSON.stringify({ season: "2025-26", days: { [day]: report } }));
   const run = spawnSync(process.execPath, [join(dir, "scripts/rating-scores.ts"), "2025-26"], { encoding: "utf8" });
   assert.equal(run.status, 0, run.stderr);
   return run.stdout;
