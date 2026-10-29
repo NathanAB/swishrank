@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { compute, counted, EARLY, ELO_PER_SIGMA, fitModel, PARAMS, phi, playerPart, shownChange, type Abbr, type SeasonData } from "./elo.ts";
+import { compute, counted, EARLY, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, phi, playerPart, shownChange, shownLineups, type Abbr, type SeasonData } from "./elo.ts";
 import { modelInputs } from "./inputs.ts";
 import type { Lineup } from "./players.ts";
 
@@ -89,6 +89,27 @@ test(`no day's new rotation in a finished season moves a team's shown rating by 
         const move = was && lineup ? (playerPart(after, lineup) - playerPart(after, was)) * scale : 0;
         assert.ok(Math.abs(move) <= ROTATION, `${id} ${day} ${abbr}: ${move}`);
         usual[abbr] = lineup;
+      }
+    }
+  }
+});
+
+test("no team's shown rating counts players while none of its last 10 games has a box score", () => {
+  for (const { id, data } of seasons) {
+    const { box, rotation } = inputs.get(id)!.players!;
+    const shown = shownLineups(data, rotation);
+    const boxed: Record<Abbr, boolean[]> = Object.fromEntries(Object.keys(data.teams).map((a) => [a, []]));
+    const days = finalDays(data);
+    const first = new Map<Abbr, string>();
+    for (const { games } of days) for (const g of games) for (const a of [g.home, g.away]) if (!first.has(a)) first.set(a, g.id);
+    for (const [a, lineup] of Object.entries(shown.opening)) {
+      assert.ok(!lineup.length || box.games[first.get(a)!]?.[a], `${id} ${a} opens with the players of a first game without a box score`);
+    }
+    for (const { day, games } of days) {
+      for (const g of games) for (const a of [g.home, g.away]) boxed[a].push(box.games[g.id]?.[a] !== undefined);
+      for (const [a, lineup] of Object.entries(shown.after.get(day)!)) {
+        if (!boxed[a].length) continue;
+        assert.ok(boxed[a].slice(-10).some((b) => b) || !lineup.length, `${id} ${day} ${a} counts ${lineup.length} players`);
       }
     }
   }

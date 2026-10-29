@@ -385,11 +385,29 @@ const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric",
 export const dayKey = (iso: string) => dayFmt.format(new Date(iso));
 export const addDays = (key: string, n: number) => new Date(Date.parse(key + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
+/** The lineup each team's shown rating counts on opening night, and after each game day. */
+export type ShownLineups = { opening: Record<Abbr, Lineup>; after: Map<string, Record<Abbr, Lineup>> };
+
+/**
+ * The lineup each team's shown rating counts: on opening night the rotation of its first game, when that game
+ * has one, and after each game day the latest rotation it has had.
+ */
+export function shownLineups(data: SeasonData, rotation: SeasonRotations | undefined): ShownLineups {
+  const days = finalDays(data);
+  const first = new Map<Abbr, string>();
+  for (const { day, games } of days) for (const g of games) for (const abbr of [g.home, g.away]) if (!first.has(abbr)) first.set(abbr, day);
+  const opening: Record<Abbr, Lineup> = Object.fromEntries(Object.keys(data.teams).map((abbr) => [abbr, rotation?.get(first.get(abbr) ?? "")?.[abbr] ?? []]));
+  const after = new Map<string, Record<Abbr, Lineup>>();
+  let usual = opening;
+  for (const { day } of days) after.set(day, (usual = Object.assign({}, usual, rotation?.get(day))));
+  return { opening, after };
+}
+
 /**
  * The season as the site shows it. A team's shown rating is its team part plus the player part of its rotation
- * (lineups() in src/lib/players.ts), on the Elo scale: the fitted margin units times ELO_PER_SIGMA / SIGMA, shifted each day by
+ * (usualRotations() in src/lib/players.ts), on the Elo scale: the fitted margin units times ELO_PER_SIGMA / SIGMA, shifted each day by
  * the same amount for every team so the league's mean is 1000. Until a team's first game is played it shows its
- * seed alone; once it is, the days before it count that game's rotation. A game's `pre` and `post` hold the
+ * seed alone; once it is, the days before it count that game's rotation, if it has one. A game's `pre` and `post` hold the
  * rotation the team had before its day and the day's shift, so their difference is what the game did: a change
  * of players, or of the shift, shows on the chart and never in the game's change.
  */
@@ -399,9 +417,8 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const scale = ELO_PER_SIGMA / PARAMS.sigma;
   const days = fitModel(data, inputs);
   const next: Record<Abbr, Lineup> = Object.fromEntries(abbrs.map((a) => [a, []]));
-  const usual: Record<Abbr, Lineup> = { ...next };
-  // Each team's rotation after its first game, so the latest day's is applied first and the earliest last.
-  for (const byTeam of [...(players?.rotation.values() ?? [])].reverse()) Object.assign(usual, byTeam);
+  const shown = shownLineups(data, players?.rotation);
+  let usual = shown.opening;
   const rated = (fit: Fit, lineups: Record<Abbr, Lineup>) => Object.fromEntries(abbrs.map((a) => [a, (fit.r[a] + playerPart(fit, lineups[a])) * scale]));
   const shiftTo1000 = (raw: Record<Abbr, number>) => START - abbrs.reduce((s, a) => s + raw[a], 0) / (abbrs.length || 1);
   const shifted = (raw: Record<Abbr, number>, by: number) => Object.fromEntries(abbrs.map((a) => [a, raw[a] + by]));
@@ -422,7 +439,7 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
     const was = rated(before, usual);
     const kept = rated(after, usual);
     Object.assign(next, players?.lineups.next.get(day));
-    Object.assign(usual, players?.rotation.get(day));
+    usual = shown.after.get(day)!;
     const now = rated(after, usual);
     const by = shiftTo1000(now);
     r = shifted(now, by);

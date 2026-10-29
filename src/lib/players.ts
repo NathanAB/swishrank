@@ -160,22 +160,29 @@ export function lineups(seasons: readonly SeasonPlayers[]): Map<string, Lineups>
   return out;
 }
 
+/** One of a team's games in its usual rotation's window: each player's minutes, or null when ESPN has no box score for its side. */
+type Minutes = ReadonlyMap<Athlete, number> | null;
+
 /**
- * Every season's usual rotations, the lineups the site shows each team's rating with. A team's rotation is
- * everyone who played in any of its last 10 games this season with lines, each at his minutes per team game over
- * those games, a game he missed counting 0. Until the team has played 10, his minutes per game last season, on
- * any team, count as one more game.
+ * Every season's usual rotations, the lineups the site shows each team's rating with, for each team after each
+ * day it plays. A team's rotation is everyone who played in its last 10 games this season, each at his minutes
+ * per team game over those of them with box scores, a game he missed counting 0. It is empty when none has one,
+ * and while fewer than half the team's games this season have one: the fit then had few of its players to
+ * separate, so its team part already holds them. Until the team has played 10, his minutes per game last season,
+ * on any team, count as one more game.
  */
 export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, SeasonRotations> {
   const out = new Map<string, SeasonRotations>();
   let lastSeason = new Map<Athlete, number>();
   for (const { data, box } of seasons) {
-    const usual = new Map<Abbr, Map<Athlete, number>[]>();
+    const windows = new Map<Abbr, Minutes[]>();
+    const played = new Map<Abbr, number>();
+    const boxed = new Map<Abbr, number>();
     const thisSeason = new Map<Athlete, { minutes: number; games: number }>();
-    const rotation = (abbr: Abbr, lines: readonly BoxLine[]): Lineup => {
-      const games = [...(usual.get(abbr) ?? []), new Map(lines.map((l) => [l[0], l[1]]))].slice(-USUAL);
-      usual.set(abbr, games);
-      const prior = games.length < USUAL ? PRIOR : 0;
+    const rotation = (abbr: Abbr): Lineup => {
+      if (2 * (boxed.get(abbr) ?? 0) < played.get(abbr)!) return [];
+      const games = windows.get(abbr)!.filter((g) => g !== null);
+      const prior = played.get(abbr)! < USUAL ? PRIOR : 0;
       return scaled([...new Set(games.flatMap((g) => [...g.keys()]))].map((athlete) => {
         const minutes = games.reduce((s, g) => s + (g.get(athlete) ?? 0), 0);
         const last = lastSeason.get(athlete);
@@ -184,16 +191,19 @@ export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, S
     };
     const season: SeasonRotations = new Map();
     for (const { day, games } of finalDays(data)) {
-      const rotations: Partial<Record<Abbr, Lineup>> = {};
-      for (const g of games) for (const [abbr, lines] of Object.entries(box.games[g.id] ?? {})) {
-        if (!lines) continue;
-        rotations[abbr] = rotation(abbr, lines);
-        for (const l of lines) {
+      const teams: Abbr[] = [];
+      for (const g of games) for (const abbr of [g.home, g.away]) {
+        const lines = box.games[g.id]?.[abbr];
+        windows.set(abbr, [...(windows.get(abbr) ?? []), lines ? new Map(lines.map((l) => [l[0], l[1]])) : null].slice(-USUAL));
+        played.set(abbr, (played.get(abbr) ?? 0) + 1);
+        if (lines) boxed.set(abbr, (boxed.get(abbr) ?? 0) + 1);
+        teams.push(abbr);
+        for (const l of lines ?? []) {
           const so = thisSeason.get(l[0]) ?? { minutes: 0, games: 0 };
           thisSeason.set(l[0], { minutes: so.minutes + l[1], games: so.games + 1 });
         }
       }
-      season.set(day, rotations);
+      season.set(day, Object.fromEntries(teams.map((abbr) => [abbr, rotation(abbr)])));
     }
     out.set(data.season, season);
     lastSeason = new Map([...thisSeason].map(([athlete, { minutes, games }]) => [athlete, minutes / games]));
