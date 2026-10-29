@@ -9,6 +9,8 @@ import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
 import TeamGames from "../../../components/TeamGames.astro";
 import TeamHeader from "../../../components/TeamHeader.astro";
+import LedgerLog from "../../../components/ledger-prototype/LedgerLog.astro";
+import { ledger } from "../../../lib/ledger.prototype.ts";
 import Base from "../../../layouts/Base.astro";
 import type { Abbr } from "../../../lib/elo.ts";
 import { fixtureDays } from "../../../lib/fixtures.ts";
@@ -33,6 +35,8 @@ const m = season.model;
 const me = team(season, abbr);
 const paint = teamPaint(me);
 const log = teamGames(m, abbr).reverse();
+// PROTOTYPE (team ledger): in dev, the team log replaces the game log.
+const rows = import.meta.env.DEV ? ledger(season, abbr) : [];
 const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 ---
 
@@ -61,6 +65,9 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
       <Panel title="Rating this season">
         <RatingChart season={season} focus={[abbr]} paint={{ [abbr]: paint }} />
       </Panel>
+      {import.meta.env.DEV ? (
+        <Panel title="History"><LedgerLog season={season} rows={rows} games={log} aria-label={`Rating changes for the ${me.short}, newest first`} /></Panel>
+      ) : (
       <Panel title="Game log">
         {log.length === 0 ? (
           <Empty />
@@ -73,6 +80,7 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
           </Fragment>
         )}
       </Panel>
+      )}
     </div>
   </div>
 </Base>

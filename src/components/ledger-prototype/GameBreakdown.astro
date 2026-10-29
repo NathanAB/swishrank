@@ -1,0 +1,76 @@
+---
+// PROTOTYPE (team ledger): a played game's page, where each team's rating moved that day, in one card laid out as
+// PreviousGames.astro's: the away team's walk on the left, the home team's on the right, each as the team log's
+// opened row draws it, each team's colour down its edge. Side by side the away team's is mirrored, so both charts
+// sit on the outside and both sets of labels by the rule; the rating still rises to the right on both. Below
+// 1024px they stack and both read from the left.
+import { signed } from "../../lib/format.ts";
+import type { Game } from "../../lib/elo.ts";
+import { ledger, walk } from "../../lib/ledger.prototype.ts";
+import { team, type SeasonView } from "../../lib/season.ts";
+import Walk from "./Walk.astro";
+
+interface Props { season: SeasonView; game: Game; paint: Record<string, string> }
+const { season, game, paint } = Astro.props;
+const sides = [game.away, game.home].flatMap((abbr) => {
+  const row = ledger(season, abbr).find((r) => r.game?.id === game.id);
+  return row ? [{ abbr, row, walk: walk(season, row) }] : [];
+});
+---
+
+{sides.length === 2 && (
+  <section class="card" aria-labelledby="h-moved">
+    {sides.map(({ abbr }, i) => <span class:list={["edge", i ? "home" : "away"]} style={paint[abbr]} aria-hidden="true" />)}
+    <h2 id="h-moved">How the ratings moved</h2>
+    <div class="cols">
+    {sides.map(({ abbr, row, walk: w }, i) => (
+      <div class:list={["side", i ? "home" : "away"]}>
+        <p class="head">
+          <b>{team(season, abbr).short}</b>
+          <span class="num chg">{signed(row.change)}</span>
+        </p>
+        {w.parts.length > 0 && <Walk walk={w} />}
+      </div>
+    ))}
+    </div>
+  </section>
+)}
+
+<style>
+  .card { position: relative; overflow: hidden; padding: var(--card-pad) calc(var(--card-pad) + 4px); background: var(--surface); border: var(--panel-edge); border-radius: var(--radius-card); }
+  .edge { position: absolute; top: 0; bottom: 0; width: 4px; background: var(--tint); }
+  .edge.away { left: 0; }
+  .edge.home { right: 0; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 32px; }
+  h2 { font-size: 20px; line-height: 28px; font-weight: 700; text-align: center; margin-bottom: 16px; }
+  .side { position: relative; min-width: 0; }
+  .head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid var(--border); font-size: 20px; line-height: 28px; color: var(--muted); }
+  .head b { color: var(--text); font-weight: 600; }
+  .num { font-variant-numeric: tabular-nums; }
+  .chg { margin-left: auto; color: var(--text); font-weight: 600; }
+  @media (min-width: 1024px) {
+    .cols { --half: 28px; position: relative; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: calc(2 * var(--half)); }
+    /* The rule runs the full height, between the two changes in the headings and on through the walks; the headings'
+       underlines reach into the gap and meet as one line across it. */
+    .cols::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--border); }
+    .away .head { margin-right: calc(-1 * var(--half)); padding-right: var(--half); }
+    .home .head { margin-left: calc(-1 * var(--half)); padding-left: var(--half); }
+    .home .head { flex-direction: row-reverse; }
+    .home .chg { margin-left: 0; margin-right: auto; }
+    /* The away team's walk is mirrored: its chart on the outside, its labels by the rule. */
+    /* Each chart runs to the card's padding on its outer side; a bar that ends there puts its figure inside it. */
+    .away :global(.walk) { --in-l: 0px; }
+    .home :global(.walk) { --in-r: 0px; }
+    .away :global(.bar.down.at-lo .fig) { right: auto; left: 100%; margin: 0 0 0 6px; }
+    .home :global(.bar.up.at-hi .fig) { left: auto; right: 100%; margin: 0 6px 0 0; }
+    .away :global(.step) { grid-template-columns: minmax(0, 1fr) var(--lw); }
+    .away :global(.s-label), .away :global(.s-more) { grid-column: 2; text-align: right; }
+    .away :global(.s-chart) { grid-column: 1; }
+    .away :global(.s-name) { justify-content: flex-end; }
+    .away :global(.drawer-btn) { text-align: right; }
+    .away :global(.gridlines) { left: 0; right: calc(var(--lw) + var(--cg)); }
+    .away :global(.drawer) { padding: 0 12px 0 0; border-left: 0; border-right: 1px solid var(--rule); }
+    .away :global(.drawer li) { grid-template-columns: auto minmax(0, 1fr); }
+    .away :global(.drawer li .num) { order: -1; text-align: left; }
+  }
+</style>

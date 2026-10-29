@@ -19,6 +19,9 @@
   --grid: #2a2a2a;
   --line-other: #646464;
   --bar: #737373;
+  /* A diverging pair for a walk's drops and rises (components/ledger-prototype/Walk.astro). */
+  --drop: #d9722a;
+  --rise: #3987e5;
   /* How much of a team's colour its line carries at rest, mixed into the grey of an ordinary line. A previewed
      team draws in its full colour. */
   --tint-mix: 50%;

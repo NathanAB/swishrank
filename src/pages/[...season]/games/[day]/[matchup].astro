@@ -9,6 +9,7 @@ import Panel from "../../../../components/Panel.astro";
 import PreviousGames from "../../../../components/PreviousGames.astro";
 import RatingChart from "../../../../components/RatingChart.astro";
 import TeamBlock from "../../../../components/TeamBlock.astro";
+import GameBreakdown from "../../../../components/ledger-prototype/GameBreakdown.astro";
 import type { Game } from "../../../../lib/elo.ts";
 import { dayWithYear, longDay, matchup } from "../../../../lib/format.ts";
 import { gameView } from "../../../../lib/game.ts";
@@ -49,6 +50,7 @@ const meta = [view.stage.label, view.series].filter(Boolean).join(" · ");
     <Panel title="Rating this season" meta="Point at the chart for any day's ratings">
       <RatingChart season={season} focus={[game.away, game.home]} paint={paint} mark={view.played ? { day: view.day, label: "This game" } : undefined} />
     </Panel>
+    {import.meta.env.DEV && view.played && <GameBreakdown season={season} game={game} paint={paint} />}
     <PreviousGames season={season} view={view} paint={paint} />
   </div>
 </Base>

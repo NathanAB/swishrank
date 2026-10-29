@@ -2,8 +2,8 @@
 // One line that says what a rating means, for a reader who has never met Elo. The page places it with its own
 // class; other attributes land on the paragraph too.
 import type { HTMLAttributes } from "astro/types";
-import { START, winProb } from "../lib/elo.ts";
-import { pct, rating } from "../lib/format.ts";
+import { START } from "../lib/elo.ts";
+import { rating } from "../lib/format.ts";
 
 type Props = HTMLAttributes<"p">;
 
@@ -11,7 +11,7 @@ const { class: cls, ...rest } = Astro.props;
 ---
 
 <p {...rest} class:list={["key", cls]}>
-  The ratings use the Elo points scale from chess. Teams sit around {rating(START)}. A team rated 100 points higher wins about {pct(winProb(100))} of the time.<slot />
+  Ratings are loosely based on the Elo points scale from chess. A {rating(START)} rating is roughly average.<slot />
 </p>
 
 <style>
