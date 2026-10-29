@@ -31,6 +31,8 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      # The tests load the History ledger through Vite, so the packages go in before them.
+      - run: npm ci
       - name: Test the Elo math
         run: npm test
       # A failed fetch never holds back the deploy, so an outage at ESPN never holds back a change to the site. The
@@ -60,7 +62,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/data/injuries
           git diff --cached --quiet || { git commit -m "Update the injury report" && git pull --rebase --autostash && git push; }
-      - run: npm ci
       - run: npm run build
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v4
