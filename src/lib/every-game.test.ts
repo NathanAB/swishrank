@@ -1,0 +1,69 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { compute, counted, EARLY, PARAMS, phi, shownChange, type SeasonData } from "./elo.ts";
+import { modelInputs } from "./inputs.ts";
+
+// Every season the site shows, read and rated as src/lib/season.ts does.
+const read = (path: string): unknown => JSON.parse(readFileSync(new URL(`../data/${path}`, import.meta.url), "utf8"));
+const list = read("seasons.json") as { id: string; end?: string }[];
+const files = list.map(({ id }) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`) }));
+const inputs = modelInputs(files);
+const seasons = files.map(({ data }) => ({ id: data.season, finished: list.find((s) => s.id === data.season)!.end !== undefined, model: compute(data, inputs.get(data.season)) }));
+// The two caps read finished seasons only. The deploy runs this suite before it fetches, so a cap on the season
+// in progress could fail on a new game and stop the scores updating.
+const finished = seasons.filter((s) => s.finished);
+
+/** How far a team's first game may move its shown rating. Version 2 moves one 36 at most; showing the lineup a team took into its next game moved one 134. */
+const FIRST_GAME = 50;
+/** How far a shown change may run against the game's surprise. Version 2 runs one 8 at most; the next-game lineup ran one 178. */
+const AGAINST = 10;
+
+test("every day of every season, the shown ratings average 1000", () => {
+  for (const { id, model } of seasons) {
+    for (const { day, r } of model.series) {
+      const mean = model.abbrs.reduce((s, a) => s + r[a], 0) / model.abbrs.length;
+      assert.ok(Math.abs(mean - 1000) <= 0.5, `${id} ${day}: ${mean}`);
+    }
+  }
+});
+
+test(`no team's first game of a finished season moves its shown rating by more than ${FIRST_GAME}`, () => {
+  for (const { id, model } of finished) {
+    for (const abbr of model.abbrs) {
+      const first = model.log[abbr][0];
+      if (!first) continue;
+      const { pre, post, game } = first.result;
+      const change = shownChange(pre[first.side], post[first.side]);
+      assert.ok(Math.abs(change) <= FIRST_GAME, `${id} ${game.id} ${abbr}: ${change}`);
+    }
+  }
+});
+
+/** The expected home margin, in counted units, that a home chance `p` came from. */
+const expectedMargin = (p: number, widen: number) => {
+  let lo = -20, hi = 20;
+  for (let i = 0; i < 100; i++) {
+    const mid = (lo + hi) / 2;
+    if (phi(mid) < p) lo = mid;
+    else hi = mid;
+  }
+  return ((lo + hi) / 2) * PARAMS.sigma * widen;
+};
+
+test(`no shown change in a finished season runs more than ${AGAINST} points against the game's surprise`, () => {
+  for (const { id, model } of finished) {
+    const played: Record<string, number> = Object.fromEntries(model.abbrs.map((a) => [a, 0]));
+    for (const { game, p, pre, post } of model.results) {
+      const widen = Math.min(played[game.home], played[game.away]) < EARLY.games ? EARLY.widen : 1;
+      const surprise = counted(game.hs! - game.as!, PARAMS.margin) - expectedMargin(p, widen);
+      for (const [side, sign] of [["h", 1], ["a", -1]] as const) {
+        const change = shownChange(pre[side], post[side]);
+        const better = sign * surprise > 0;
+        assert.ok(better ? change >= -AGAINST : change <= AGAINST, `${id} ${game.id} ${side}: did ${better ? "better" : "worse"} than expected, moved ${change}`);
+      }
+      played[game.home]++;
+      played[game.away]++;
+    }
+  }
+});
