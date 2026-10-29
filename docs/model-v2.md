@@ -332,6 +332,16 @@ The choice failed as written, on two windows, and the site switches to version 2
 - The owner accepted the deviation on 2026-10-28, after seeing the result.
 - The 2026-27 confirmation runs under the same rule: a window is judged only when its games sit in more than two blocks. Its verdict stays binding. If version 2's pooled 2026-27 log loss is not below version 1's, or it is worse in a judged window, the site returns to version 1, frozen as `V1` in `scripts/evaluate.ts`.
 
+## How the injury report will be judged
+
+Written on 2026-10-28, before any archived injury report is scored. It decides only the shown rating, never a game's chance, and is not part of the pre-registration.
+
+- The shown rating counts each team's usual rotation, definition B in `npm run ratings`. On the finished seasons B predicts a team's next 10 games about as well as expected minutes from a games-missed curve, definition C: a root mean square miss of 1.2494 against 1.2504, with C better in 6 of 11 seasons. A rating from results alone, definition A, misses by 1.2890. The site keeps B, the simpler of the two.
+- From 2026-10-28, `npm run fetch` saves ESPN's injury report once a day to `src/data/injuries/<season>.json`. For each listed player it gives a projected return date, which the curve cannot know.
+- After the 2026-27 regular season ends, the owner adds definition D to `scripts/rating-scores.ts` and runs `npm run ratings`. D is C, except that a player on that morning's report is available for the share of his team's next 10 games on or after his projected return. B and D are scored on the same metric over the team-days from 2026-10-28 to the last day of the regular season.
+- D replaces B only if its miss is lower and the 95% interval of D minus B, from version 1's weekly block bootstrap, lies wholly below 0. Otherwise the site keeps B, and the archive keeps running.
+- Showing D on the site needs each team's next 10 games on file, so `scripts/fetch-season.mjs` would fetch fixtures 28 days ahead.
+
 ## Before the build
 
 These choices change what the reader sees, not the score. They were applied as defaults on 2026-10-28, outside this plan, for the owner to review.
