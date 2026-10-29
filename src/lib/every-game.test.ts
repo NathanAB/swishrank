@@ -1,16 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { compute, counted, EARLY, PARAMS, phi, shownChange, type SeasonData } from "./elo.ts";
+import { compute, counted, EARLY, ELO_PER_SIGMA, fitModel, PARAMS, phi, playerPart, shownChange, type Abbr, type SeasonData } from "./elo.ts";
 import { modelInputs } from "./inputs.ts";
+import type { Lineup } from "./players.ts";
 
 // Every season the site shows, read and rated as src/lib/season.ts does.
 const read = (path: string): unknown => JSON.parse(readFileSync(new URL(`../data/${path}`, import.meta.url), "utf8"));
 const list = read("seasons.json") as { id: string; end?: string }[];
 const files = list.map(({ id }) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`) }));
 const inputs = modelInputs(files);
-const seasons = files.map(({ data }) => ({ id: data.season, finished: list.find((s) => s.id === data.season)!.end !== undefined, model: compute(data, inputs.get(data.season)) }));
-// The two caps read finished seasons only. The deploy runs this suite before it fetches, so a cap on the season
+const seasons = files.map(({ data }) => ({ id: data.season, data, finished: list.find((s) => s.id === data.season)!.end !== undefined, model: compute(data, inputs.get(data.season)) }));
+// The caps read finished seasons only. The deploy runs this suite before it fetches, so a cap on the season
 // in progress could fail on a new game and stop the scores updating.
 const finished = seasons.filter((s) => s.finished);
 
@@ -18,6 +19,11 @@ const finished = seasons.filter((s) => s.finished);
 const FIRST_GAME = 50;
 /** How far a shown change may run against the game's surprise. Version 2 runs one 8 at most; the next-game lineup ran one 178. */
 const AGAINST = 10;
+/**
+ * How far a day's new rotation may move a team's shown rating, the fit and the shift held fixed. Weighting players
+ * by minutes per team game moves one 36 at most, a star's first game of a season; by minutes per appearance moved one 62.
+ */
+const ROTATION = 40;
 
 test("every day of every season, the shown ratings average 1000", () => {
   for (const { id, model } of seasons) {
@@ -64,6 +70,22 @@ test(`no shown change in a finished season runs more than ${AGAINST} points agai
       }
       played[game.home]++;
       played[game.away]++;
+    }
+  }
+});
+
+test(`no day's new rotation in a finished season moves a team's shown rating by more than ${ROTATION}`, () => {
+  const scale = ELO_PER_SIGMA / PARAMS.sigma;
+  for (const { id, data } of finished) {
+    const season = inputs.get(id)!;
+    const usual: Partial<Record<Abbr, Lineup>> = {};
+    for (const { day, after } of fitModel(data, season)) {
+      for (const [abbr, lineup] of Object.entries(season.players!.lineups.rotation.get(day) ?? {})) {
+        const was = usual[abbr];
+        const move = was && lineup ? (playerPart(after, lineup) - playerPart(after, was)) * scale : 0;
+        assert.ok(Math.abs(move) <= ROTATION, `${id} ${day} ${abbr}: ${move}`);
+        usual[abbr] = lineup;
+      }
     }
   }
 });
