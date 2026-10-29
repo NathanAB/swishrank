@@ -1,12 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { compute, counted, EARLY, ELO_PER_SIGMA, fitModel, PARAMS, phi, playerPart, shownChange, type Abbr, type SeasonData } from "./elo.ts";
 import { modelInputs } from "./inputs.ts";
 import type { Lineup } from "./players.ts";
 
-// Every season the site shows, read and rated as src/lib/season.ts does.
-const read = (path: string): unknown => JSON.parse(readFileSync(new URL(`../data/${path}`, import.meta.url), "utf8"));
+// Every season the site shows, read and rated as src/lib/season.ts does: a new season has no box scores or
+// preseason totals until they are fetched or entered.
+const read = (path: string): unknown => {
+  const url = new URL(`../data/${path}`, import.meta.url);
+  return existsSync(url) ? JSON.parse(readFileSync(url, "utf8")) : undefined;
+};
 const list = read("seasons.json") as { id: string; end?: string }[];
 const files = list.map(({ id }) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`) }));
 const inputs = modelInputs(files);
