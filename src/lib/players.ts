@@ -113,7 +113,7 @@ const UNKNOWN = 15;
 const USUAL = 10;
 /**
  * Games a player's minutes per game last season count for in his team's rotation until it has played USUAL games,
- * times the share of the window's games he has played in.
+ * times the share of the window's games he has played in, at no more than his most minutes in one of them.
  */
 const PRIOR = 1;
 
@@ -173,8 +173,8 @@ type Minutes = ReadonlyMap<Athlete, number> | null;
  * a game he missed counting 0. It is empty when none has one, and while fewer than half the team's games this
  * season have one: the fit then had few of its players to separate, so its team part already holds them. Until
  * the team has played 10, his minutes per game last season, on any team, count as one more game times the share
- * of those games he played in, so a starter new to the team keeps his old role and a player with a few minutes in
- * one game does not.
+ * of those games he played in, at no more than his most minutes in one of them, so a starter new to the team keeps
+ * his old role and a player with a few minutes in one game does not.
  */
 export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, SeasonRotations> {
   const out = new Map<string, SeasonRotations>();
@@ -191,9 +191,11 @@ export function usualRotations(seasons: readonly SeasonPlayers[]): Map<string, S
       const prior = played.get(abbr)! < USUAL ? PRIOR : 0;
       return scaled([...new Set(games.flatMap((g) => [...g.keys()]))].map((athlete) => {
         const minutes = games.reduce((s, g) => s + (g.get(athlete) ?? 0), 0);
-        const last = lastSeason.get(athlete);
+        const rate = lastSeason.get(athlete);
+        if (rate === undefined) return { athlete, min: minutes / games.length };
+        const last = Math.min(rate, Math.max(...games.map((g) => g.get(athlete) ?? 0)));
         const weight = (prior * games.filter((g) => g.has(athlete)).length) / games.length;
-        return { athlete, min: last === undefined ? minutes / games.length : (minutes + weight * last) / (games.length + weight) };
+        return { athlete, min: (minutes + weight * last) / (games.length + weight) };
       }));
     };
     const season: SeasonRotations = new Map();
