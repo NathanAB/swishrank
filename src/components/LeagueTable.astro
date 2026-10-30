@@ -10,11 +10,11 @@
 // chart stacks above the table on its own axis, and the table keeps its scale. Each team's line, curve and
 // dot carry a faint tint of its colour (lib/tint.ts), which goes full strength while the team is previewed;
 // the rows stay ink. Given a conference, only its teams are drawn and listed, ranked among themselves, on the
-// same league-wide scale, so a rating sits at the same height in every view. Given the week's change, a column after
-// the rating shows each team's move over it, as a bar and a number.
+// same league-wide scale, so a rating sits at the same height in every view. Given the week's change, a column
+// after the rating shows each team's move over it, as a bar and a number.
 import RatingChart from "./RatingChart.astro";
 import { clearOfMark, dateTicks, PLOT, runAndTrail, seasonEndMark, seasonPlot } from "../lib/chart.ts";
-import type { Week } from "../lib/facts.ts";
+import { NOTABLE_MOVE, WEEK_DAYS, type Week } from "../lib/facts.ts";
 import { rating, record, shortDay, signed } from "../lib/format.ts";
 import { scaleAttr } from "../lib/readout.ts";
 import { href } from "../lib/routes.ts";
@@ -27,7 +27,7 @@ interface Props {
   /** The conference to show; leave it out for the whole league. */
   conference?: Conference;
   /** The week's change, for a column of each team's move; leave it out for none. */
-  week?: Week | null;
+  week?: Week;
 }
 
 const { season, conference, week } = Astro.props;
@@ -36,10 +36,10 @@ const { order, rank } = standings(m, conference);
 
 const shown = Object.fromEntries(order.map((a) => [a, Math.round(m.r[a])]));
 const n = order.length;
-// The week's bars share the league's biggest move, so a bar is the same length in every view. A move of NOTABLE
-// points or more is coloured; smaller ones are everyday noise and stay grey.
+// The week's bars share the league's biggest move, so a bar is the same length in every view. A notable move is
+// coloured, bar and number; a smaller one stays grey.
 const widest = week ? Math.max(1, ...m.abbrs.map((a) => Math.abs(week.change[a]))) : 1;
-const NOTABLE = 10;
+const tone = (d: number) => (d >= NOTABLE_MOVE ? "rise" : d <= -NOTABLE_MOVE ? "fall" : null);
 // The longest nickname in the league, so the team column, and with it the chart, keeps one width in every view.
 const longest = Math.max(...m.abbrs.map((a) => m.data.teams[a].short.length));
 const tint = tintStyles(m.data.teams);
@@ -91,7 +91,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
         <th class="num rank" scope="col"><abbr title="Rank">#</abbr></th>
         <th class="team" scope="col">Team<span class="sub"> · record</span></th>
         <th class="num" scope="col">Rating</th>
-        {week && <th class="num week" scope="col"><abbr title={`Change since ${shortDay(week.from)}`}>7 days</abbr></th>}
+        {week && <th class="num week" scope="col"><abbr title={`Change since ${shortDay(week.from.day)}`}>{WEEK_DAYS} days</abbr></th>}
         <th class="num opt" scope="col">Record</th>
       </tr>
     </thead>
@@ -162,9 +162,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
             {week && (
               <td class="num week">
                 <span class="bar" aria-hidden="true">
-                  <span class:list={["fill", week.change[a] < 0 ? "fall" : "rise"]} style={`--share: ${(Math.abs(week.change[a]) / widest).toFixed(3)}`} />
+                  <span class:list={["fill", week.change[a] < 0 ? "down" : "up", tone(week.change[a])]} style={`--share: ${(Math.abs(week.change[a]) / widest).toFixed(3)}`} />
                 </span>
-                <span class:list={["move", { rise: week.change[a] >= NOTABLE, fall: week.change[a] <= -NOTABLE }]}>{signed(week.change[a])}</span>
+                <span class:list={["move", tone(week.change[a])]}>{signed(week.change[a])}</span>
               </td>
             )}
             <td class="num opt">{record(W, L)}</td>
@@ -208,9 +208,11 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .week { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .bar { position: relative; display: inline-block; width: 56px; height: 8px; margin-right: 8px; }
   .bar::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--control); }
-  .fill { position: absolute; top: 0; bottom: 0; width: calc(var(--share) * 50%); }
-  .fill.rise { left: 50%; background: var(--rise); }
-  .fill.fall { right: 50%; background: var(--drop); }
+  .fill { position: absolute; top: 0; bottom: 0; width: calc(var(--share) * 50%); background: var(--bar); }
+  .fill.up { left: 50%; }
+  .fill.down { right: 50%; }
+  .fill.rise { background: var(--rise); }
+  .fill.fall { background: var(--drop); }
   .move { display: inline-block; min-width: 3ch; }
   .move.rise { color: var(--rise); }
   .move.fall { color: var(--drop); }

@@ -3,8 +3,8 @@
 // conference, picked by the switch in the card's header, which is the page's header too. Each page holds all
 // three tables, so the switch filters in place: it shows the picked one and puts its URL and titles on the
 // page without loading it. Without script the switch's links load each view's own page.
-// In the season under way, a line under the title says what the week did: its biggest rise and fall, and a new
-// team at the top.
+// In the season under way, a line under the title says what the view's teams did this week: the biggest rise and
+// fall, and a new team in first place. The switch swaps it with the view.
 import Base from "../layouts/Base.astro";
 import LeagueTable from "./LeagueTable.astro";
 import Panel from "./Panel.astro";
@@ -15,9 +15,9 @@ import { PROVISIONAL } from "../lib/elo.ts";
 import { weekChange, weekFinding } from "../lib/facts.ts";
 import { homeDescription, homeTitle, SITE_NAME } from "../lib/meta.ts";
 import { href, type Route } from "../lib/routes.ts";
-import { seasonSwitch } from "../lib/season.ts";
+import { seasonSwitch, TODAY } from "../lib/season.ts";
 import type { SeasonView } from "../lib/season.ts";
-import { CONFERENCE_ORDER, type Conference } from "../lib/teams.ts";
+import { CONFERENCE_ORDER, standings, type Conference } from "../lib/teams.ts";
 
 interface Props {
   season: SeasonView;
@@ -29,15 +29,17 @@ const { season, conference } = Astro.props;
 const route: Route = { kind: "home", season, conference };
 const preliminary = season.current && season.model.abbrs.some((a) => season.model.log[a].length < PROVISIONAL);
 // The week's moves, for the season under way only: a finished season's last week is not news.
-const week = season.current ? weekChange(season.model) : null;
-const finding = week && weekFinding(season.model, week);
+const week = season.current ? weekChange(season.model, TODAY) : null;
+const moved = week && season.model.abbrs.some((a) => week.change[a] !== 0) ? week : undefined;
 const heading = (c?: Conference) => (c ? `${season.label} · ${c}ern Conference` : `${season.label} ratings`);
 const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   conference: c,
   label: c ?? "All",
   href: href({ kind: "home", season, conference: c }),
   current: c === conference,
+  finding: moved ? weekFinding(season.model, moved, standings(season.model, c).order, c) : null,
 }));
+const finding = views.find((v) => v.current)?.finding;
 ---
 
 <Base
@@ -52,17 +54,18 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
       <Segmented label="Conference" options={views} />
       <SeasonMenu route={route} />
     </Fragment>
-    {finding && <p class="finding">{finding}</p>}
+    {moved && <p class="finding" data-finding hidden={!finding}>{finding}</p>}
     <ScaleKey class="lead">{preliminary && ` Ratings are preliminary until a team has played ${PROVISIONAL} games.`}</ScaleKey>
     {views.map((v) => (
       <div
         hidden={!v.current}
         data-view={v.href}
         data-heading={heading(v.conference)}
+        data-finding={v.finding ?? ""}
         data-doc-title={`${homeTitle(season, v.conference)} · ${SITE_NAME}`}
         data-seasons={JSON.stringify(seasonSwitch({ kind: "home", season, conference: v.conference }).map((o) => o.href))}
       >
-        <LeagueTable season={season} conference={v.conference} week={finding ? week : null} />
+        <LeagueTable season={season} conference={v.conference} week={moved} />
       </div>
     ))}
   </Panel>
@@ -73,6 +76,7 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   const links = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Conference"] a')];
   const heading = document.querySelector("h1");
   const menu = document.querySelector<HTMLSelectElement>("select[data-season-menu]");
+  const finding = document.querySelector<HTMLElement>("[data-finding]:not([data-view])");
 
   function show(path: string) {
     const view = views.find((v) => v.dataset.view === path);
@@ -83,6 +87,10 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
       else a.removeAttribute("aria-current");
     }
     if (heading) heading.textContent = view.dataset.heading ?? "";
+    if (finding) {
+      finding.textContent = view.dataset.finding ?? "";
+      finding.hidden = !finding.textContent;
+    }
     document.title = view.dataset.docTitle ?? document.title;
     const seasons: unknown = JSON.parse(view.dataset.seasons ?? "[]");
     if (menu && Array.isArray(seasons)) seasons.forEach((s, i) => menu.options[i] && (menu.options[i].value = String(s)));
@@ -101,6 +109,6 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
 
 <style>
   .finding { margin: -4px 0 6px; font-size: 17px; line-height: 1.45; }
-  .finding + .lead { margin-top: 0; }
+  .finding:not([hidden]) + .lead { margin-top: 0; }
   .lead { margin: -4px 0 16px; }
 </style>

@@ -1,6 +1,6 @@
 // Facts the pages show, derived from compute()'s season model. Every per-game change here is the
 // displayed one (shownChange), so a list and a table that show the same game agree.
-import { addDays, ranksOf, shownChange, type Abbr, type Result, type Season } from "./elo.ts";
+import { addDays, ranksOf, shownChange, type Abbr, type Result, type Season, type Snapshot } from "./elo.ts";
 import { percent, points } from "./format.ts";
 
 export type Side = "h" | "a";
@@ -59,56 +59,69 @@ export function ratingRange(model: Season): { lo: number; hi: number } {
   return { lo: Math.min(...all), hi: Math.max(...all) };
 }
 
-/** Each team's change in displayed rating over the week to the latest day, and the day it is measured from. */
-export type Week = { from: string; change: Record<Abbr, number> };
-
-/** How far back the home page's weekly change looks, in days. */
-const WEEK_BACK = 7;
+/** The days the home page's weekly change covers: the ones before today. */
+export const WEEK_DAYS = 7;
 
 /**
- * The week's change: from the last day at least WEEK_BACK days before the latest one, or from the season's first
- * day while it is younger than that, so the first week reads from each team's seed.
+ * A week's move this many displayed points or more stands out. In 2023-24 to 2025-26 the median team's week moved 7
+ * points and a quarter of team-weeks moved 15 or more.
  */
-export function weekChange(model: Pick<Season, "abbrs" | "series">): Week | null {
-  const last = model.series.at(-1);
-  if (!last) return null;
-  const cutoff = addDays(last.day, -WEEK_BACK);
-  const then = model.series.findLast((d) => d.day <= cutoff) ?? model.series[0];
-  return { from: then.day, change: Object.fromEntries(model.abbrs.map((a) => [a, Math.round(last.r[a]) - Math.round(then.r[a])])) };
+export const NOTABLE_MOVE = 15;
+
+/** Each team's change in displayed rating over a week, between the ratings it started and ended with. */
+export type Week = { from: Snapshot; to: Snapshot; change: Record<Abbr, number> };
+
+/**
+ * The WEEK_DAYS before `today`: from the ratings at the end of the day before the week began, or the seeds while the
+ * season is younger, to the latest ratings. A week with no games, such as the All-Star break, changes
+ * nothing. Null before the season has a day.
+ */
+export function weekChange(model: Pick<Season, "abbrs" | "series">, today: string): Week | null {
+  const to = model.series.at(-1);
+  if (!to) return null;
+  const start = addDays(today, -WEEK_DAYS);
+  const from = model.series.findLast((d) => d.day < start) ?? model.series[0];
+  return { from, to, change: Object.fromEntries(model.abbrs.map((a) => [a, shownChange(from.r[a], to.r[a])])) };
 }
 
 /**
- * The week in a sentence or two: the biggest rise, the biggest fall, and a new team at the top. Null when no team
- * moved.
+ * The week of `teams` in a sentence or two: the biggest rise, the biggest fall and a new team alone in first place,
+ * with every team tied for a biggest move named. `conference` names where the teams play, for its own first place.
+ * Null when none of them moved.
  */
-export function weekFinding(model: Pick<Season, "abbrs" | "series" | "data">, week: Week): string | null {
-  const the = (a: Abbr) => `the ${model.data.teams[a].short}`;
-  const The = (a: Abbr) => `The ${model.data.teams[a].short}`;
+export function weekFinding(model: Pick<Season, "data">, week: Week, teams: readonly Abbr[], conference?: string): string | null {
+  const name = (a: Abbr) => `the ${model.data.teams[a].short}`;
+  const list = (xs: readonly Abbr[]) => (xs.length === 1 ? name(xs[0]) : `${xs.slice(0, -1).map(name).join(", ")} and ${name(xs[xs.length - 1])}`);
+  const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+  const scope = conference ? `the ${conference}` : "the league";
+  const first = conference ? `first place in the ${conference}` : "first place";
   const { change } = week;
-  const most = (pick: (a: number, b: number) => number) => model.abbrs.reduce((m, a) => pick(change[a], change[m]) > 0 ? a : m);
-  const up = most((a, b) => a - b);
-  const down = most((a, b) => b - a);
-  const tied = (a: Abbr) => model.abbrs.some((b) => b !== a && change[b] === change[a]);
-  // The top is the one team ranked first on displayed ratings; a tie for first has no one at the top.
-  const top = (r: Record<Abbr, number>) => {
-    const firsts = Object.entries(ranksOf(r)).filter(([, rank]) => rank === 1);
-    return firsts.length === 1 ? firsts[0][0] : null;
+  const best = Math.max(...teams.map((a) => change[a]));
+  const worst = Math.min(...teams.map((a) => change[a]));
+  const risers = best > 0 ? teams.filter((a) => change[a] === best) : [];
+  const fallers = worst < 0 ? teams.filter((a) => change[a] === worst) : [];
+  // First place is the teams ranked first on displayed ratings; only a team alone there takes it.
+  const firsts = (r: Record<Abbr, number>) => {
+    const ranks = ranksOf(Object.fromEntries(teams.map((a) => [a, r[a]])));
+    return teams.filter((a) => ranks[a] === 1);
   };
-  const before = model.series.find((d) => d.day === week.from);
-  const now = model.series.at(-1);
-  if (!before || !now) return null;
-  const was = top(before.r);
-  const is = top(now.r);
-  const newTop = is !== null && was !== is ? is : null;
+  const before = firsts(week.from.r);
+  const after = firsts(week.to.r);
+  const taker = after.length === 1 && !before.includes(after[0]) ? after[0] : null;
+  const loser = taker && before.length === 1 ? before[0] : null;
 
   const parts: string[] = [];
-  if (change[up] > 0) {
-    parts.push(`${The(up)} rose ${points(change[up])} this week, ${tied(up) ? "tied for the most" : "the most"} in the league${newTop === up ? " and took first place" : ""}.`);
+  let told = false;
+  if (risers.length) {
+    const takes = risers.length === 1 && risers[0] === taker;
+    told = takes;
+    parts.push(`${sentence(list(risers))} rose ${points(best)} this week, ${risers.length > 1 ? "tied for the most" : "the most"} in ${scope}${takes ? `, and took ${first}` : ""}.`);
   }
-  if (change[down] < 0) {
-    const lost = newTop && was === down ? (newTop === up ? " and lost first place" : ` and lost first place to ${the(newTop)}`) : "";
-    parts.push(`${The(down)} fell ${points(-change[down])}${lost}.`);
+  if (fallers.length) {
+    const loses = taker !== null && fallers.length === 1 && fallers[0] === loser;
+    parts.push(`${sentence(list(fallers))} fell ${risers.length ? -worst : points(-worst)}${loses ? (told ? ` and lost ${first}` : ` and lost ${first} to ${name(taker)}`) : ""}.`);
+    told ||= loses;
   }
-  if (newTop && newTop !== up && was !== down) parts.push(`${The(newTop)} took first place.`);
+  if (taker && !told) parts.push(`${sentence(name(taker))} took ${first}${loser ? ` from ${name(loser)}` : ""}.`);
   return parts.length ? parts.join(" ") : null;
 }
