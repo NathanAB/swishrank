@@ -3,6 +3,8 @@
 // conference, picked by the switch in the card's header, which is the page's header too. Each page holds all
 // three tables, so the switch filters in place: it shows the picked one and puts its URL and titles on the
 // page without loading it. Without script the switch's links load each view's own page.
+// In the season under way, a line under the title says what the week did: its biggest rise and fall, and a new
+// team at the top.
 import Base from "../layouts/Base.astro";
 import LeagueTable from "./LeagueTable.astro";
 import Panel from "./Panel.astro";
@@ -10,6 +12,7 @@ import ScaleKey from "./ScaleKey.astro";
 import SeasonMenu from "./SeasonMenu.astro";
 import Segmented from "./Segmented.astro";
 import { PROVISIONAL } from "../lib/elo.ts";
+import { weekChange, weekFinding } from "../lib/facts.ts";
 import { homeDescription, homeTitle, SITE_NAME } from "../lib/meta.ts";
 import { href, type Route } from "../lib/routes.ts";
 import { seasonSwitch } from "../lib/season.ts";
@@ -25,6 +28,9 @@ interface Props {
 const { season, conference } = Astro.props;
 const route: Route = { kind: "home", season, conference };
 const preliminary = season.current && season.model.abbrs.some((a) => season.model.log[a].length < PROVISIONAL);
+// The week's moves, for the season under way only: a finished season's last week is not news.
+const week = season.current ? weekChange(season.model) : null;
+const finding = week && weekFinding(season.model, week);
 const heading = (c?: Conference) => (c ? `${season.label} · ${c}ern Conference` : `${season.label} ratings`);
 const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   conference: c,
@@ -46,6 +52,7 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
       <Segmented label="Conference" options={views} />
       <SeasonMenu route={route} />
     </Fragment>
+    {finding && <p class="finding">{finding}</p>}
     <ScaleKey class="lead">{preliminary && ` Ratings are preliminary until a team has played ${PROVISIONAL} games.`}</ScaleKey>
     {views.map((v) => (
       <div
@@ -55,7 +62,7 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
         data-doc-title={`${homeTitle(season, v.conference)} · ${SITE_NAME}`}
         data-seasons={JSON.stringify(seasonSwitch({ kind: "home", season, conference: v.conference }).map((o) => o.href))}
       >
-        <LeagueTable season={season} conference={v.conference} />
+        <LeagueTable season={season} conference={v.conference} week={finding ? week : null} />
       </div>
     ))}
   </Panel>
@@ -93,5 +100,7 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
 </script>
 
 <style>
+  .finding { margin: -4px 0 6px; font-size: 17px; line-height: 1.45; }
+  .finding + .lead { margin-top: 0; }
   .lead { margin: -4px 0 16px; }
 </style>
