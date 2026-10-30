@@ -69,6 +69,7 @@ test("the week's finding names the biggest rise and fall, and who lost first pla
 });
 
 test("a quiet week has no finding", () => {
-  const m = days("2026-10-20", { A: [1000, 1000], B: [990, 990] });
+  // Nine days, so the week is measured as usual: A moved and came back, B never moved.
+  const m = days("2026-10-20", { A: [1000, 1000, 1000, 1010, 1005, 1000, 1000, 1000, 1000], B: Array(9).fill(990) });
   assert.equal(weekFinding(m, weekChange(m)!), null);
 });
