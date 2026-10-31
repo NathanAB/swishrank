@@ -6,6 +6,12 @@
 import type { Athlete, BoxRatings, Lineup, Lineups, SeasonBox, SeasonRotations, Sides } from "./players.ts";
 
 export const START = 1000;
+/**
+ * A placeholder in a lineup for minutes no known player is counted for, the minutes of players out for weeks when
+ * the team has too few games without them to say who takes them. Every fit values it as a player with no
+ * appearances: `a` times the box rating every newcomer starts from. ESPN's athlete ids start at 1.
+ */
+export const NEWCOMER = 0;
 export const TZ = "America/New_York";
 
 export type Abbr = string;
@@ -308,11 +314,12 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
       for (let k = offs[g]; k < offs[g + 1]; k++) out[idx[k]] += d * val[k];
     }
   };
-  const snapshot = (): Fit => ({
-    r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])),
-    home: fitted ? x[n] : home.value,
-    v: new Map(athletes.map((a, j) => [a, x[p0 + j]])),
-  });
+  const snapshot = (day?: string): Fit => {
+    const v = new Map(athletes.map((a, j) => [a, x[p0 + j]]));
+    const fresh = day === undefined ? players.ratings.newcomer?.start : players.ratings.newcomer?.after.get(day);
+    if (fresh !== undefined && !v.has(NEWCOMER)) v.set(NEWCOMER, players.rule.a * fresh);
+    return { r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])), home: fitted ? x[n] : home.value, v };
+  };
   return {
     start: snapshot(),
     add({ game: g, b2b }) {
@@ -349,7 +356,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
         rz = rz2;
         for (let k = 0; k < dim; k++) q[k] = z[k] + beta * q[k];
       }
-      return snapshot();
+      return snapshot(day);
     },
   };
 }

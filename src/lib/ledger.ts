@@ -1,6 +1,6 @@
 // Every move of a team's shown rating split into its parts, so each row adds up exactly to the change shown.
 // Mirrors compute() in elo.ts day by day.
-import { ELO_PER_SIGMA, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, playerPart, seasonRule, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
+import { ELO_PER_SIGMA, NEWCOMER, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, playerPart, seasonRule, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
 import { shortDay } from "./format.ts";
 import { parseArchive, type Injury } from "./injuries.ts";
 import { playerName } from "./names.ts";
@@ -94,7 +94,7 @@ export function ledger(season: SeasonView, abbr: Abbr): LedgerRow[] {
 function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   const data = season.model.data;
   const inputs = seasonInputs(season.id) ?? {};
-  const name = (athlete: number) => playerName(athlete) ?? `#${athlete}`;
+  const name = (athlete: number) => (athlete === NEWCOMER ? "Fill-ins" : playerName(athlete) ?? `#${athlete}`);
   const rawInjuries = INJURY_FILES[`../data/injuries/${season.id}.json`];
   const injuries = rawInjuries ? parseArchive(rawInjuries, season.id) : null;
   const scale = ELO_PER_SIGMA / PARAMS.sigma;
@@ -169,7 +169,8 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
       };
     }
     const lines = g ? box[g.id]?.[abbr] : undefined;
-    const report = (injuries?.days[day] ?? injuries?.days[addDays(day, 1)])?.injuries ?? [];
+    // The report saved the morning after the day, as the shown rotation reads it, or the day's own.
+    const report = (injuries?.days[addDays(day, 1)] ?? injuries?.days[day])?.injuries ?? [];
     const ids = new Set([...was, ...usual[abbr]].map((p) => p.athlete));
     const players: PlayerMove[] = held ? [] : [...ids].flatMap((athlete) => {
       const s0 = was.find((p) => p.athlete === athlete)?.share ?? 0;
@@ -251,6 +252,13 @@ function favoredSide(p: number | undefined, home: boolean): boolean | null {
  * joins them when the two effects push the rating the same way, "but" when they pull against each other.
  */
 function playerPhrase(value: number, move: PlayerMove | undefined): string {
+  if (move?.athlete === NEWCOMER) return "In the minutes of players out for weeks, at replacement level";
+  // On a day off only the injury report or a player leaving moves the rotation.
+  if (move && move.played === undefined) {
+    if (move.status === "left" && move.injury) return `Out injured${move.injury.returnDate ? ` until ${shortDay(move.injury.returnDate)}` : ""}`;
+    if (move.status === "more") return "Counted for more minutes";
+    if (move.status === "fewer") return "Counted for fewer minutes";
+  }
   if (move?.played === null) return move.injury ? `Out injured${move.injury.returnDate ? ` until ${shortDay(move.injury.returnDate)}` : ""}` : "Didn't play";
   const how = Math.abs(value) < 0.1 ? "" : value > 0 ? "well" : "poorly";
   if (move?.status === "joined" && move.debut) return how ? `Played ${how} in his first minutes of the season` : "First minutes of the season";
