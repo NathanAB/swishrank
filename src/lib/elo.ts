@@ -35,8 +35,11 @@ export type HomeRule = { kind: "fitted"; centre: number; weight: number } | { ki
  * fades as n0 * exp(-day / fade).
  */
 export type SeedRule = { scale: number; fade: number; carry: number };
-/** Version 2's players: each one's value is pulled toward `a` times his box rating with `np` games. */
-export type PlayerRule = { a: number; np: number; halfLife: number };
+/**
+ * Version 2's players: each one's value is pulled toward `a` times his box rating with `np` games. Version 3 pulls a
+ * player new to the box scores, the season's `rookies`, with `rookieNp` games instead, so his results move him sooner.
+ */
+export type PlayerRule = { a: number; np: number; halfLife: number; rookieNp?: number };
 /**
  * `n0` is the pull toward each team's prior centre, in games against an average team that ended level. Version 1
  * is the rule without `seed`, `b2b` or `players`: every centre at 0, the league average, and a pull that stays.
@@ -72,7 +75,7 @@ export type FitDay = { day: string; games: Pregame[]; before: Fit; after: Fit };
 /** What a season's fit reads beyond its games: each team's prior centre, and its players' lines, ratings and lineups. */
 export type SeasonInputs = {
   centres?: Record<Abbr, number>;
-  players?: { box: SeasonBox; ratings: BoxRatings; lineups: ReadonlyMap<string, Sides<Lineup>> };
+  players?: { box: SeasonBox; ratings: BoxRatings; lineups: ReadonlyMap<string, Sides<Lineup>>; rookies?: ReadonlySet<Athlete> };
 };
 
 /** A season's final, scored games grouped by US Eastern day, in date order. */
@@ -282,6 +285,8 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
   const dim = p0 + athletes.length;
   const col = new Map<string | Athlete, number>([...abbrs.map((a, i) => [a, i] as const), ...athletes.map((a, j) => [a, p0 + j] as const)]);
   const centre = new Float64Array(dim);
+  const { rookieNp } = players.rule;
+  const hold = Float64Array.from(athletes, (a) => (rookieNp !== undefined && players.rookies?.has(a) ? rookieNp : players.rule.np));
   const setPlayerCentres = (rating: Float64Array) => { for (let j = 0; j < athletes.length; j++) centre[p0 + j] = players.rule.a * rating[j]; };
   abbrs.forEach((a, i) => (centre[i] = centres?.[a] ?? 0));
   if (fitted) centre[n] = home.centre;
@@ -319,7 +324,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
     fit(day, strength, rating) {
       setPlayerCentres(rating ?? players.ratings.after.get(day)!);
       for (let k = 0; k < dim; k++) {
-        D[k] = k < n ? strength : k < p0 && fitted ? home.weight : players.rule.np;
+        D[k] = k < n ? strength : k < p0 && fitted ? home.weight : hold[k - p0];
         b[k] = xty[k] + D[k] * centre[k];
       }
       matvec(x, A);
