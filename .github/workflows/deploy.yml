@@ -33,8 +33,13 @@ jobs:
           cache: npm
       # The tests load the History ledger through Vite, so the packages go in before them.
       - run: npm ci
-      - name: Test the Elo math
-        run: npm test
+      # The tests run beside the fetch and the build, in a worktree of the commit as pushed, so the fetch's new files
+      # never reach them, as when they ran first. They take up to a minute; the deploy waits for them below.
+      - name: Start the tests
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/tests" HEAD
+          ln -s "$PWD/node_modules" "$RUNNER_TEMP/tests/node_modules"
+          (cd "$RUNNER_TEMP/tests" && npm test > "$RUNNER_TEMP/tests.log" 2>&1; echo $? > "$RUNNER_TEMP/tests.exit") &
       # A failed fetch never holds back the deploy, so an outage at ESPN never holds back a change to the site. The
       # build reads what is on disk: the scores already committed, or a games file the fetch wrote before it failed
       # later, which the commit step skips. The fetch-failed job below then turns the run red.
@@ -62,7 +67,24 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/data/injuries
           git diff --cached --quiet || { git commit -m "Update the injury report" && git pull --rebase --autostash && git push; }
+      # Each run keeps finished seasons' team histories for the next (src/lib/ledger.ts, SWISHRANK_CACHE), so a day's
+      # build works out only the season in progress. The key changes every run, so each saves a fresh copy, and
+      # restore-keys brings back the latest. A history whose code or data has changed since is worked out again.
+      - name: Restore finished seasons' team histories
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: site-cache-${{ github.run_id }}
+          restore-keys: site-cache-
       - run: npm run build
+        env:
+          SWISHRANK_CACHE: .cache
+      - name: Test the Elo math
+        timeout-minutes: 10
+        run: |
+          until [ -f "$RUNNER_TEMP/tests.exit" ]; do sleep 2; done
+          cat "$RUNNER_TEMP/tests.log"
+          exit "$(cat "$RUNNER_TEMP/tests.exit")"
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v4
         with:
