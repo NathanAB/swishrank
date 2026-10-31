@@ -8,7 +8,8 @@
 // at that day and a box with the team's rating and rank, the nearest team's or, on a team's page, that team's
 // (data-own). A line may carry its team's league rank for each day (data-ranks), for a chart that draws
 // only some teams, such as a game's page; otherwise the rank is among the lines drawn. On a touch screen a tap
-// shows the readout and a second tap on the same team opens its page.
+// shows the readout and a second tap on the same team opens its page. There only a chart previews: a finger on a
+// row or a dot is as likely the start of a scroll as a choice, so it clears the preview, and a tap opens the team.
 import { addDays } from "../lib/elo.ts";
 import { placeLabel, weekdayDay } from "../lib/format.ts";
 import { dayAt, nearestLine, type PlotLine } from "../lib/pick.ts";
@@ -128,7 +129,7 @@ function onChart(e: PointerEvent, svg: SVGSVGElement) {
 const pointed = (e: PointerEvent) => {
   const svg = chartOf(e.target);
   if (svg) return onChart(e, svg);
-  preview(closestOf(e.target, "[data-preview]")?.dataset.team ?? null);
+  preview(e.pointerType === "touch" ? null : closestOf(e.target, "[data-preview]")?.dataset.team ?? null);
 };
 document.addEventListener("pointerover", pointed);
 
