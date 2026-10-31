@@ -332,6 +332,14 @@ The choice failed as written, on two windows, and the site switches to version 2
 - The owner accepted the deviation on 2026-10-28, after seeing the result.
 - The 2026-27 confirmation runs under the same rule: a window is judged only when its games sit in more than two blocks. Its verdict stays binding. If version 2's pooled 2026-27 log loss is not below version 1's, or it is worse in a judged window, the site returns to version 1, frozen as `V1` in `scripts/evaluate.ts`.
 
+### Deviation for the 2026-27 confirmation
+
+Declared on 2026-10-31, when the owner asked for the two-week window rule to be removed or adjusted. The 2026-27 games through 2026-10-30 had been played and are logged in table 11; the confirmation has not run.
+
+- The window constraint no longer judges the confirmation. On the tuning seasons, a model exactly as good as version 1, made by swapping version 1's and version 2's chances at random within each (season, week) block, is worse in at least one of the 17 judged windows in 206 of 400 tries, 52%: with many windows one is worse by chance, and each window's interval, from 13 to 16 blocks, runs narrow. The rule would return the site to version 1 about half the time between two equally good models. `node scripts/window-rule.ts v2` runs the check.
+- The confirmation is now: version 2 stays on the site when its pooled 2026-27 log loss is below version 1's; otherwise the site returns to version 1, frozen as `V1` in `scripts/evaluate.ts`. The two-week windows are still reported. This replaces the last point of the deviation above.
+- The change comes after part of 2026-27 was seen, with version 2 ahead of version 1 there, and it makes the confirmation easier to pass. Its reason, the rule's false-fail rate, comes from the tuning seasons alone. Version 3's plan, `docs/model-v3.md`, judges the same way.
+
 ## How the injury report will be judged
 
 Written on 2026-10-28, before any archived injury report is scored. It decides only the shown rating, never a game's chance, and is not part of the pre-registration.
