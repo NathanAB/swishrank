@@ -117,13 +117,17 @@ const game = opener && {
       <dt>Scale</dt>
       <dd>Borrowed from chess's Elo ratings. Unlike Elo, which moves a rating after each game, these are refitted to the whole season every day.</dd>
       <dt>Players</dt>
-      <dd>Each player has a value, measured from his box scores over past seasons and his team's results this season. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
+      <dd>Each player has a value, measured from his box scores over past seasons and his team's results this season. A rookie has no past seasons, so his team's results move him sooner. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
       <dt>Chances</dt>
       <dd>They follow how often past favorites won at each gap, within one percentage point of Elo's formula, 1 / (1 + 10^(−gap / 400)).</dd>
       <dt>Later games</dt>
       <dd>Each one moves a rating less, because it's one result among many.</dd>
       <dt>Early games</dt>
       <dd>Until both teams have played {EARLY.games}, the chances stay closer to 50%, because a few games say little about a team.</dd>
+      <dt>Injuries</dt>
+      <dd>A game's chances leave out the players that morning's injury report lists as out. The ratings don't.</dd>
+      <dt>Home court</dt>
+      <dd>Its worth is measured each season from the three seasons before.</dd>
       <dt>Back-to-backs</dt>
       <dd>A tired team's chance drops, but its rating doesn't.</dd>
       <dt>Upsets</dt>

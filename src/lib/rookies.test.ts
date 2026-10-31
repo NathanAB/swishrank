@@ -26,13 +26,23 @@ test("a rookie is a player whose first line on file is in that season, and the f
   assert.deepEqual([...rookies.get("2017-18")!], [6]);
 });
 
+test("a player new to the files is no rookie when his team had player lines in fewer than half its games the season before", () => {
+  // In 2016-17 the files hold no lines for A's players; in 2017-18 A's veteran 1 and B's newcomer 7 first appear.
+  const dark = season("2016-17", 2016, 2);
+  for (const g of Object.values(dark.box.games)) delete g.A;
+  const later = season("2017-18", 2017, 2, 7);
+  for (const g of Object.values(later.box.games)) g.B = [...g.B!, line(8, 10, 2)];
+  const rookies = newcomers([season("2015-16", 2015, 2), dark, later]);
+  assert.deepEqual([...rookies.get("2017-18")!].sort(), [8], "B's newcomer is a rookie; A's players, new only to the files, are not");
+});
+
 test("a weaker hold on a rookie lets his team's results move his value, and changes no one else's hold", () => {
   const seasons = [season("2015-16", 2015, 3), season("2016-17", 2016, 6, 5)];
   const rookies = newcomers(seasons).get("2016-17")!;
   const ratings = boxRatings(seasons, 365).get("2016-17")!;
   const inputs = { players: { box: seasons[1].box, ratings, lineups: lineups(seasons).get("2016-17")!.previous, rookies } };
   const v = (rule: FitRule) => fitSeason(seasons[1].data, rule, inputs).at(-1)!.after.v;
-  const base: FitRule = { ...PARAMS, players: { ...PARAMS.players } };
+  const base: FitRule = { ...PARAMS, players: { a: PARAMS.players.a, np: PARAMS.players.np, halfLife: PARAMS.players.halfLife } };
   const held = v(base), loose = v({ ...base, players: { ...base.players!, rookieNp: 40 } });
   const centre = PARAMS.players.a * ratings.after.get(seasons[1].data.games.at(-1)!.t.slice(0, 10))![ratings.athletes.indexOf(5)];
   // A wins every game by 20, so the fit credits A's players; the rookie, held with 40 games, takes more of it.

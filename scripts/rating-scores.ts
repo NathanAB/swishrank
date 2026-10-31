@@ -66,7 +66,7 @@ function misses(model: Season, from = "", to = "9999"): { day: string; abbr: Abb
       let margin = 0, opponents = 0;
       for (const { result: { game }, side } of next) {
         const sign = side === "h" ? 1 : -1;
-        const edge = (game.neutral ? 0 : PARAMS.home.value) + b2bTerm(PARAMS, second.get(game.id)!);
+        const edge = (game.neutral ? 0 : model.home / SCALE) + b2bTerm(PARAMS, second.get(game.id)!);
         margin += sign * (counted(game.hs! - game.as!, PARAMS.margin) - edge);
         opponents += r[side === "h" ? game.away : game.home];
       }

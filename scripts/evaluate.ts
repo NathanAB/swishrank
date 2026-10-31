@@ -17,6 +17,20 @@ export const V1 = {
   early: { games: 5, widen: 1.55 },
 };
 
+/**
+ * Version 2 as the site ran it until 2026-10-31, when it switched to version 3, kept here so version 2's backtest
+ * and version 3's baseline stay checkable after src/lib/elo.ts moved on.
+ */
+export const V2 = {
+  params: {
+    n0: 96, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 },
+    seed: { scale: 5, fade: 120, carry: 0.7 }, b2b: 0.4, players: { a: 0.08, np: 320, halfLife: 365 },
+    sigma: 2.997,
+  } satisfies Params,
+  provisional: 8,
+  early: { games: 5, widen: 1.15 },
+};
+
 const read = (path: string): unknown => JSON.parse(readFileSync(new URL(`../src/data/${path}`, import.meta.url), "utf8"));
 export const loadSeason = (id: string) => read(`games/${id}.json`) as SeasonData;
 export const loadBox = (id: string): SeasonBox => parseBox(read(`box/${id}.json`), id);

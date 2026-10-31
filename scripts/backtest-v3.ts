@@ -2,11 +2,11 @@
 // scores version 3 and each of its changes against version 2 as the site runs it on the tuning and exploration
 // seasons, checks the tuning windows, logs the 2026-27 confirmation games so far and, once the season has its end in
 // src/data/seasons.json, gives the confirmation's verdict. It prints every table and rewrites the Results part of
-// docs/model-v3.md. It exits non-zero when the pre-registration's text has changed, or when src/lib/v3.ts's
-// settings differ from what the plan fits.
+// docs/model-v3.md. It exits non-zero when the pre-registration's text has changed, or when version 3's settings,
+// src/lib/elo.ts's PARAMS and EARLY as src/lib/v3.ts reads them, differ from what the plan fits.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { dayKey, EARLY, ELO_PER_SIGMA, PARAMS, seedCentres, type FitRule, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
+import { dayKey, ELO_PER_SIGMA, seedCentres, type FitRule, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
 import { trailingHomeEdges } from "../src/lib/home.ts";
 import { beforeTip, parseArchive, type InjuryArchive } from "../src/lib/injuries.ts";
 import { boxRatings, lineups, type Lineup, type Sides } from "../src/lib/players.ts";
@@ -15,13 +15,13 @@ import { newcomers } from "../src/lib/rookies.ts";
 import { V3 } from "../src/lib/v3.ts";
 import {
   accuracy, brier, compare, fitSigma, fitWiden, inSeasons, loadBox, loadPreseason, loadSeason, logLoss, modelRows, price,
-  TUNING, windows, type Diff, type Scored,
+  TUNING, V2, windows, type Diff, type Scored,
 } from "./evaluate.ts";
 import { loadVegas } from "./vegas.ts";
 
 const started = performance.now();
 const DOC = new URL("../docs/model-v3.md", import.meta.url);
-const PREREGISTERED = "00dc450fffdebed71e9d946cc41305bf531833684967142b34d971d184e30b78";
+const PREREGISTERED = "d4996fce984e4d47137aac2e1ed0e96c6938085629d344c6073d0510e4a2af59";
 
 const EXPLORATION = ["2023-24", "2024-25", "2025-26"];
 const CONFIRMATION = "2026-27";
@@ -40,13 +40,13 @@ const finished = listed.some((s) => s.id === CONFIRMATION && s.end);
 
 const seasons = ALL.map((id) => {
   const data = loadSeason(id);
-  return { data, box: loadBox(id), centres: seedCentres(PARAMS.seed, Object.keys(data.teams), { preseason: loadPreseason(data), last: {} }) };
+  return { data, box: loadBox(id), centres: seedCentres(V2.params.seed, Object.keys(data.teams), { preseason: loadPreseason(data), last: {} }) };
 });
 const vegas: Record<string, number> = Object.assign({}, ...ALL.map((id) => loadVegas(id).chances));
 const lineupsBy = lineups(seasons);
-const ratings = boxRatings(seasons, PARAMS.players.halfLife);
+const ratings = boxRatings(seasons, V2.params.players.halfLife);
 const rookies = newcomers(seasons);
-const homes = trailingHomeEdges(seasons.map((s) => s.data), PARAMS, V3.home);
+const homes = trailingHomeEdges(seasons.map((s) => s.data), V2.params, V3.home);
 const rawArchive = read(`injuries/${CONFIRMATION}.json`);
 const archive: InjuryArchive | undefined = rawArchive === undefined ? undefined : parseArchive(rawArchive, CONFIRMATION);
 const confirmationData = seasons.find((s) => s.data.season === CONFIRMATION)!.data;
@@ -56,13 +56,13 @@ const withReport = reportLineups(confirmationData, previous, archive);
 type Lineups = (season: string) => ReadonlyMap<string, Sides<Lineup>>;
 const previousLineups: Lineups = (season) => lineupsBy.get(season)!.previous;
 const reportLineupsOf: Lineups = (season) => (season === CONFIRMATION ? withReport : lineupsBy.get(season)!.previous);
-const fixedHome = () => PARAMS.home.value;
+const fixedHome = () => V2.params.home.value;
 const trailingHome = (season: string) => homes.get(season)!.value;
 
 /** Every season's rows under version 2's settings with each season's home edge, lineups and, if given, rookie hold. */
 function rows(home: (season: string) => number, lineupsOf: Lineups, rookieNp?: number) {
   return seasons.flatMap(({ data, box, centres }) => {
-    const rule: FitRule = { ...PARAMS, home: { kind: "fixed", value: home(data.season) }, players: { ...PARAMS.players, rookieNp } };
+    const rule: FitRule = { ...V2.params, home: { kind: "fixed", value: home(data.season) }, players: { ...V2.params.players, rookieNp } };
     const inputs: SeasonInputs = {
       centres,
       players: { box, ratings: ratings.get(data.season)!, lineups: lineupsOf(data.season) as Map<string, Sides<Lineup>>, rookies: rookies.get(data.season) },
@@ -77,13 +77,13 @@ function fitted(r: ReturnType<typeof rows>) {
   return { sigma, widen, scored: price(r, sigma, widen) };
 }
 
-const v2 = price(rows(fixedHome, previousLineups), PARAMS.sigma, EARLY.widen);
+const v2 = price(rows(fixedHome, previousLineups), V2.params.sigma, V2.early.widen);
 const fit3 = fitted(rows(trailingHome, previousLineups, V3.rookieNp));
 const { sigma, widen } = fit3;
 const v3 = price(rows(trailingHome, reportLineupsOf, V3.rookieNp), sigma, widen);
 const homeOnly = fitted(rows(trailingHome, previousLineups)).scored;
 const rookieOnly = fitted(rows(fixedHome, previousLineups, V3.rookieNp)).scored;
-const reportOnly = price(rows(fixedHome, reportLineupsOf), PARAMS.sigma, EARLY.widen);
+const reportOnly = price(rows(fixedHome, reportLineupsOf), V2.params.sigma, V2.early.widen);
 
 const gameOf = new Map(seasons.flatMap(({ data }) => data.games.map((g) => [g.id, g])));
 const tuning = inSeasons(TUNING);
@@ -208,7 +208,7 @@ const lines = doc.split("\n");
 const from = lines.indexOf("## Pre-registration");
 const to = lines.findIndex((l, i) => i > from && l.startsWith("## "));
 const hash = createHash("sha256").update(lines.slice(from + 1, to).join("\n")).digest("hex");
-out.unshift(`Pre-registration SHA-256 now: \`${hash}\`, ${hash === PREREGISTERED ? "unchanged since its amendment on 2026-10-31" : "CHANGED since its amendment on 2026-10-31"}. Bootstrap: 2000 resamples of whole weeks, seed 20261025. Version 3's SIGMA ${f3(sigma)}, early widening ${widen.toFixed(2)}.`);
+out.unshift(`Pre-registration SHA-256 now: \`${hash}\`, ${hash === PREREGISTERED ? "unchanged since its last amendment on 2026-10-31" : "CHANGED since its last amendment on 2026-10-31"}. Bootstrap: 2000 resamples of whole weeks, seed 20261025. Version 3's SIGMA ${f3(sigma)}, early widening ${widen.toFixed(2)}.`);
 if (hash !== PREREGISTERED) process.exitCode = 1;
 
 const body = out.join("\n\n");

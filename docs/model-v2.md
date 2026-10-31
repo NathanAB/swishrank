@@ -305,12 +305,12 @@ The confirmation scores the whole season once, after its last game. Until then t
 
 ### Check
 
-src/lib/elo.ts PARAMS, EARLY and PROVISIONAL match the choice, `{"n0":96,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"seed":{"scale":5,"fade":120,"carry":0.7},"b2b":0.4,"players":{"a":0.08,"np":320,"halfLife":365},"sigma":2.997,"widen":1.15,"provisional":8}`.
+Version 2 as frozen in scripts/evaluate.ts matches the choice, `{"n0":96,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"seed":{"scale":5,"fade":120,"carry":0.7},"b2b":0.4,"players":{"a":0.08,"np":320,"halfLife":365},"sigma":2.997,"widen":1.15,"provisional":8}`.
 <!-- results:end -->
 
 ## Settings and their evidence
 
-Written after the results. Each setting lives in `src/lib/elo.ts` (`PARAMS`, `EARLY`, `PROVISIONAL`). `npm run backtest:v2` fails if they differ from what the tables choose.
+Written after the results. Each setting lived in `src/lib/elo.ts` (`PARAMS`, `EARLY`, `PROVISIONAL`) until the site switched to version 3 on 2026-10-31 (`docs/model-v3.md`), and is frozen since as `V2` in `scripts/evaluate.ts`. `npm run backtest:v2` fails if they differ from what the tables choose.
 
 - **The candidate, `a` 0.08, `np` 320, box rating half-life 365 days.** Lowest tuning log loss of the 18, 0.6156 against version 1's 0.6298, a difference of -0.0142 [-0.0172, -0.0110], and it wins all 8 tuning seasons (tables 1 and 2). It is eligible only under the deviation below. The 12 candidates with `a` 0.08 or 0.11 differ by at most 0.0004, so the data barely separate them. Each `a` 0.15 candidate is 0.0013 to 0.0017 worse than the choice (table 1).
 - **The fixed parts.** The team seed `5.0 * (W / G - 0.5)` with prior strength `96 * exp(-day / 120)`, the back-to-back `0.4` margin units, and the home edge `0.622`, all as the pre-registration fixes them. The seed is worth -0.0073 [-0.0099, -0.0047] of tuning log loss, the back-to-back -0.0014 [-0.0025, -0.0004] more, and the players -0.0055 [-0.0077, -0.0035] more (table 3).
