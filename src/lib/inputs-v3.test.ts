@@ -49,8 +49,8 @@ test("a game is priced without the players its morning's report lists as out, an
   assert.deepEqual(next.sort(), [1, 5], "player 2 played g2, but the latest report holds for the game to come");
 });
 
-// This season A plays B four times. Player 9 plays A's first two games, then the report of 2026-10-23 lists him out
-// until January, and he misses the next two. Player 8 is out for a week on the same report.
+// This season A plays B four times. Player 9 plays A's first two games, is hurt in the second, and the next
+// morning's report lists him out until January; he misses the next two. Player 8 is out for a week on that report.
 const away: SeasonData = {
   season: "2026-27", teams: last.teams,
   games: ["21", "23", "25", "27"].map((d, i) => game(`h${i}`, `2026-10-${d}T23:00Z`, 105, 100)),
@@ -59,9 +59,9 @@ const awayBox = { season: "2026-27", games: Object.fromEntries(away.games.map((g
   A: [line(1, 30, 15), line(5, 30, 12), line(8, 20, 10), ...(i < 2 ? [line(9, 30, 20)] : [line(6, 30, 8)])],
   B: [line(3, 30, 15), line(4, 30, 15)],
 }])) };
-const report = { season: "2026-27", days: { "2026-10-23": { fetched: "2026-10-23T12:00:00.000Z", injuries: [
-  { athlete: 9, team: "A", status: "Out", date: "2026-10-22T20:00Z", returnDate: "2027-01-10" },
-  { athlete: 8, team: "A", status: "Out", date: "2026-10-22T20:00Z", returnDate: "2026-10-30" },
+const report = { season: "2026-27", days: { "2026-10-24": { fetched: "2026-10-24T12:00:00.000Z", injuries: [
+  { athlete: 9, team: "A", status: "Out", date: "2026-10-24T03:00Z", returnDate: "2027-01-10" },
+  { athlete: 8, team: "A", status: "Out", date: "2026-10-24T03:00Z", returnDate: "2026-10-30" },
 ] } } };
 const awayInputs = modelInputs([
   { data: last, box: lastBox, preseason: totals("2025-26") },
@@ -92,4 +92,19 @@ test("the newcomer's minutes count at the value of a player with no appearances"
   const model = compute(away, awayInputs);
   const shown = model.series.find((d) => d.day === "2026-10-23")!.r.A;
   near(shown, START + (fit.r.A + playerPart(fit, shownA("2026-10-23"))) * (ELO_PER_SIGMA / PARAMS.sigma), "A's shown rating counts the newcomer");
+});
+
+test("a player back on the floor counts again, though the report still lists him out for weeks", () => {
+  // Player 9 comes back in A's fourth game, on 2026-10-27, while every report still lists him out until January.
+  const back = { ...awayBox, games: { ...awayBox.games, h3: { ...awayBox.games.h3, A: [line(1, 30, 15), line(5, 30, 12), line(8, 20, 10), line(9, 18, 9)] } } };
+  const stale = { season: "2026-27", days: { ...report.days, "2026-10-27": { fetched: "2026-10-27T12:00:00.000Z", injuries: report.days["2026-10-24"].injuries } } };
+  const inputs = modelInputs([
+    { data: last, box: lastBox, preseason: totals("2025-26") },
+    { data: away, box: back, preseason: totals("2026-27"), injuries: stale },
+  ]).get("2026-27")!;
+  const shown = shownLineups(away, inputs.players!.rotation).after;
+  assert.ok(!shown.get("2026-10-25")!.A.some((p) => p.athlete === 9), "out while he is out");
+  const l = shown.get("2026-10-27")!.A;
+  assert.ok(l.some((p) => p.athlete === 9) && !l.some((p) => p.athlete === NEWCOMER), "back once he plays, at the usual rotation's count");
+  assert.deepEqual(l, inputs.players!.rotation.get("2026-10-27")!.A, "the usual rotation, unchanged");
 });

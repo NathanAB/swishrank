@@ -3,7 +3,7 @@
 // rating, the season's rookies, and the lineups games are priced with, less the players the morning's injury report
 // lists as out. The shown rotation also leaves out the players the report lists as out for weeks. A box rating reads every earlier season, a home edge the seasons before, and a team without a total
 // is seeded from its rating at the end of the season before, so the seasons are walked together, oldest first.
-import { addDays, finalDays, fitModel, NEWCOMER, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
+import { addDays, dayKey, finalDays, fitModel, NEWCOMER, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
 import { trailingHomeEdges } from "./home.ts";
 import { parseArchive, type InjuryArchive, type Report } from "./injuries.ts";
 import { boxRatings, lineups, parseBox, scaled, usualRotations, type Athlete, type BoxLine, type Lineup, type Lineups, type SeasonBox, type SeasonRotations } from "./players.ts";
@@ -64,7 +64,9 @@ function withoutLongAbsent(lineup: Lineup, gone: ReadonlySet<Athlete>, recent: r
 /**
  * A season's shown rotations with its injury reports read: after each game day, a player the next morning's report,
  * or the latest before it, lists as out with a projected return more than LONG_ABSENCE days away leaves his team's
- * rotation (withoutLongAbsent), and the team's usual rotation comes back once none of its players is.
+ * rotation (withoutLongAbsent), and the team's usual rotation comes back once none of its players is. A player who has
+ * played for the team since the day of his entry is back, whatever the entry still says: his minutes then count as
+ * the usual rotation counts them, from the games he has played.
  */
 function withLongAbsences(data: SeasonData, box: SeasonBox, rotation: SeasonRotations, archive: InjuryArchive): SeasonRotations {
   const reportDays = Object.keys(archive.days).sort();
@@ -72,10 +74,12 @@ function withLongAbsences(data: SeasonData, box: SeasonBox, rotation: SeasonRota
   const out: SeasonRotations = new Map();
   let usual: Partial<Record<Abbr, Lineup>> = {};
   const adjusted = new Set<Abbr>();
+  const lastPlayed = new Map<string, string>();
   for (const { day, games: today } of finalDays(data)) {
     for (const g of today) for (const abbr of [g.home, g.away]) {
       const lines = box.games[g.id]?.[abbr];
       if (lines) games.set(abbr, [...(games.get(abbr) ?? []), lines].slice(-10));
+      for (const l of lines ?? []) lastPlayed.set(`${abbr}:${l[0]}`, day);
     }
     const entries = rotation.get(day) ?? {};
     usual = { ...usual, ...entries };
@@ -83,7 +87,8 @@ function withLongAbsences(data: SeasonData, box: SeasonBox, rotation: SeasonRota
     const reportDay = reportDays.filter((d) => d <= addDays(day, 1)).at(-1);
     const gone = new Map<Abbr, Set<Athlete>>();
     for (const e of reportDay ? archive.days[reportDay].injuries : []) {
-      if (OUT_STATUSES.has(e.status) && e.returnDate && e.returnDate > addDays(day, LONG_ABSENCE)) gone.set(e.team, (gone.get(e.team) ?? new Set()).add(e.athlete));
+      const back = (lastPlayed.get(`${e.team}:${e.athlete}`) ?? "") > dayKey(e.date);
+      if (OUT_STATUSES.has(e.status) && e.returnDate && e.returnDate > addDays(day, LONG_ABSENCE) && !back) gone.set(e.team, (gone.get(e.team) ?? new Set()).add(e.athlete));
     }
     const shown: Partial<Record<Abbr, Lineup>> = { ...entries };
     for (const [abbr, lineup] of Object.entries(usual)) {
