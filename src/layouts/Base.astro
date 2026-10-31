@@ -97,7 +97,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
     <footer class="foot">
       <div class="foot-in">
         <p>
-          Updated <LocalTime at={BUILT_AT.toISOString()} kind="stamp" />. Not affiliated with the NBA or its teams.
+          {season.current ? <>Updated <LocalTime at={BUILT_AT.toISOString()} kind="stamp" />.</> : <>The {season.label} season is over.</>} Not affiliated with the NBA or its teams.
         </p>
       </div>
     </footer>

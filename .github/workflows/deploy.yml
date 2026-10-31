@@ -62,7 +62,18 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/data/injuries
           git diff --cached --quiet || { git commit -m "Update the injury report" && git pull --rebase --autostash && git push; }
+      # Each run keeps finished seasons' team histories for the next (src/lib/ledger.ts, SWISHRANK_CACHE), so a day's
+      # build works out only the season in progress. The key changes every run, so each saves a fresh copy, and
+      # restore-keys brings back the latest. A history whose code or data has changed since is worked out again.
+      - name: Restore finished seasons' team histories
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: site-cache-${{ github.run_id }}
+          restore-keys: site-cache-
       - run: npm run build
+        env:
+          SWISHRANK_CACHE: .cache
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v4
         with:

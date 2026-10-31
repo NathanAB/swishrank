@@ -31,3 +31,6 @@ docs/research/
 
 # Wrangler's local dev state
 .wrangler/
+
+# The deploy's cache of finished seasons' team histories (SWISHRANK_CACHE)
+.cache/

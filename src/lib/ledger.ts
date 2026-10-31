@@ -1,6 +1,9 @@
 // Every move of a team's shown rating split into its parts, so each row adds up exactly to the change shown.
 // Mirrors compute() in elo.ts day by day.
 import { ELO_PER_SIGMA, NEWCOMER, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, playerPart, seasonRule, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
+import { createHash } from "node:crypto";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { shortDay } from "./format.ts";
 import { parseArchive, type Injury } from "./injuries.ts";
 import { playerName } from "./names.ts";
@@ -87,14 +90,69 @@ const ledgers = new Map<string, LedgerRow[]>();
 export function ledger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   const key = `${season.id} ${abbr}`;
   let rows = ledgers.get(key);
-  if (!rows) ledgers.set(key, (rows = teamLedger(season, abbr)));
+  if (!rows) ledgers.set(key, (rows = season.end === null ? teamLedger(season, abbr) : finishedLedger(season, abbr)));
+  return rows;
+}
+
+/** A player's name as a row shows it. */
+const nameOf = (athlete: number) => (athlete === NEWCOMER ? "Fill-ins" : playerName(athlete) ?? `#${athlete}`);
+
+/**
+ * Where a build keeps finished seasons' rows for the next one, from SWISHRANK_CACHE, or nowhere when it is unset. The
+ * deploy sets it and restores the directory from its last run, so a day's build works out only the season in progress:
+ * the rows were about nine tenths of a build. Tests and the dev server leave it unset and always work rows out.
+ */
+const CACHE = process.env.SWISHRANK_CACHE ? join(process.env.SWISHRANK_CACHE, "ledger") : null;
+
+/** Every file under `dir`, sorted, recursively. */
+const filesUnder = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? filesUnder(join(dir, e.name)) : [join(dir, e.name)])).sort();
+
+const cacheKeys = new Map<string, string>();
+/**
+ * What a finished season's rows are worked out from: the model's code in src/lib, and the season list and every data
+ * file of the season and the seasons before it. Player names are left out and looked up again when rows are read.
+ */
+function cacheKey(seasonId: string): string {
+  let key = cacheKeys.get(seasonId);
+  if (key) return key;
+  const root = process.cwd();
+  const hash = createHash("sha256");
+  const lib = filesUnder(join(root, "src", "lib")).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
+  const data = ["games", "box", "preseason", "injuries"].flatMap((dir) => filesUnder(join(root, "src", "data", dir)))
+    .filter((f) => (/(\d{4}-\d{2})\.json$/.exec(f)?.[1] ?? "9999") <= seasonId);
+  for (const f of [...lib, join(root, "src", "data", "seasons.json"), ...data]) hash.update(f.slice(root.length)).update("\0").update(readFileSync(f)).update("\0");
+  cacheKeys.set(seasonId, (key = hash.digest("hex")));
+  return key;
+}
+
+/** A finished season's rows from the cache when its key still matches, else worked out and kept there. */
+function finishedLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
+  if (!CACHE) return teamLedger(season, abbr);
+  const file = join(CACHE, season.id, `${abbr}.json`);
+  const key = cacheKey(season.id);
+  try {
+    const kept = JSON.parse(readFileSync(file, "utf8")) as { key: string; rows: LedgerRow[] };
+    if (kept.key === key) {
+      return kept.rows.map((r) => ({ ...r, players: r.players.map((p) => ({ ...p, name: nameOf(p.athlete) })), box: r.box.map((p) => ({ ...p, name: nameOf(p.athlete) })) }));
+    }
+  } catch {
+    // No file yet, or one this build cannot read: work the rows out.
+  }
+  const rows = teamLedger(season, abbr);
+  try {
+    mkdirSync(join(CACHE, season.id), { recursive: true });
+    writeFileSync(file, JSON.stringify({ key, rows }));
+  } catch {
+    // A build that cannot write the cache still has its rows.
+  }
   return rows;
 }
 
 function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   const data = season.model.data;
   const inputs = seasonInputs(season.id) ?? {};
-  const name = (athlete: number) => (athlete === NEWCOMER ? "Fill-ins" : playerName(athlete) ?? `#${athlete}`);
+  const name = nameOf;
   const rawInjuries = INJURY_FILES[`../data/injuries/${season.id}.json`];
   const injuries = rawInjuries ? parseArchive(rawInjuries, season.id) : null;
   const scale = ELO_PER_SIGMA / PARAMS.sigma;
