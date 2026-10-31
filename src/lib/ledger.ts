@@ -1,6 +1,6 @@
 // Every move of a team's shown rating split into its parts, so each row adds up exactly to the change shown.
 // Mirrors compute() in elo.ts day by day.
-import { ELO_PER_SIGMA, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, playerPart, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
+import { ELO_PER_SIGMA, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, playerPart, seasonRule, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
 import { shortDay } from "./format.ts";
 import { parseArchive, type Injury } from "./injuries.ts";
 import { playerName } from "./names.ts";
@@ -101,7 +101,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   /** Each game's pre-game chance for its home side. */
   const homeChance = new Map(season.model.results.map((r) => [r.game.id, r.p]));
   const { players: pl } = inputs;
-  const days = fitSeasonSteps(data, PARAMS, { centres: inputs.centres, players: pl && { ...pl, lineups: pl.lineups.previous } }, abbr);
+  const days = fitSeasonSteps(data, seasonRule(inputs), { centres: inputs.centres, players: pl && { ...pl, lineups: pl.lineups.previous } }, abbr);
   const shown = shownLineups(data, pl?.rotation);
   const box = pl?.box.games ?? {};
   const rate = (fit: Fit, lineup: Lineup) => START + (fit.r[abbr] + playerPart(fit, lineup)) * scale;

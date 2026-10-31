@@ -31,6 +31,7 @@ export const TODAY = dayKey(BUILT_AT.toISOString());
 const GAME_FILES = import.meta.glob<unknown>("../data/games/*.json", { eager: true, import: "default" });
 const BOX_FILES = import.meta.glob<unknown>("../data/box/*.json", { eager: true, import: "default" });
 const PRESEASON_FILES = import.meta.glob<unknown>("../data/preseason/*.json", { eager: true, import: "default" });
+const INJURY_FILES = import.meta.glob<unknown>("../data/injuries/*.json", { eager: true, import: "default" });
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isNumOrNull = (v: unknown): v is number | null => v === null || typeof v === "number";
@@ -89,10 +90,11 @@ const seasonData = (id: string) => {
   return parseSeasonData(raw, id);
 };
 
-// A season without box scores rates its teams alone, and one without preseason totals seeds them from the season before.
+// A season without box scores rates its teams alone, one without preseason totals seeds them from the season before,
+// and one without injury reports prices its games with the previous game's lineups.
 let inputs: Map<string, ModelInputs> | undefined;
 const allInputs = () =>
-  (inputs ??= modelInputs(ENTRIES.all.map(({ id }) => ({ data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id) }))));
+  (inputs ??= modelInputs(ENTRIES.all.map(({ id }) => ({ data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id), injuries: file(INJURY_FILES, "injuries", id) }))));
 
 /** A season's model inputs, as compute() read them. */
 export const seasonInputs = (id: string) => allInputs().get(id);

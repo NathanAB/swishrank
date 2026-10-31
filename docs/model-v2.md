@@ -305,12 +305,12 @@ The confirmation scores the whole season once, after its last game. Until then t
 
 ### Check
 
-src/lib/elo.ts PARAMS, EARLY and PROVISIONAL match the choice, `{"n0":96,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"seed":{"scale":5,"fade":120,"carry":0.7},"b2b":0.4,"players":{"a":0.08,"np":320,"halfLife":365},"sigma":2.997,"widen":1.15,"provisional":8}`.
+Version 2 as frozen in scripts/evaluate.ts matches the choice, `{"n0":96,"margin":{"kind":"power","q":0.5},"home":{"kind":"fixed","value":0.622},"seed":{"scale":5,"fade":120,"carry":0.7},"b2b":0.4,"players":{"a":0.08,"np":320,"halfLife":365},"sigma":2.997,"widen":1.15,"provisional":8}`.
 <!-- results:end -->
 
 ## Settings and their evidence
 
-Written after the results. Each setting lives in `src/lib/elo.ts` (`PARAMS`, `EARLY`, `PROVISIONAL`). `npm run backtest:v2` fails if they differ from what the tables choose.
+Written after the results. Each setting lived in `src/lib/elo.ts` (`PARAMS`, `EARLY`, `PROVISIONAL`) until the site switched to version 3 on 2026-10-31 (`docs/model-v3.md`), and is frozen since as `V2` in `scripts/evaluate.ts`. `npm run backtest:v2` fails if they differ from what the tables choose.
 
 - **The candidate, `a` 0.08, `np` 320, box rating half-life 365 days.** Lowest tuning log loss of the 18, 0.6156 against version 1's 0.6298, a difference of -0.0142 [-0.0172, -0.0110], and it wins all 8 tuning seasons (tables 1 and 2). It is eligible only under the deviation below. The 12 candidates with `a` 0.08 or 0.11 differ by at most 0.0004, so the data barely separate them. Each `a` 0.15 candidate is 0.0013 to 0.0017 worse than the choice (table 1).
 - **The fixed parts.** The team seed `5.0 * (W / G - 0.5)` with prior strength `96 * exp(-day / 120)`, the back-to-back `0.4` margin units, and the home edge `0.622`, all as the pre-registration fixes them. The seed is worth -0.0073 [-0.0099, -0.0047] of tuning log loss, the back-to-back -0.0014 [-0.0025, -0.0004] more, and the players -0.0055 [-0.0077, -0.0035] more (table 3).
@@ -331,6 +331,14 @@ The choice failed as written, on two windows, and the site switches to version 2
 - The deviation: a window whose games sit in two or fewer blocks is not judged. Nothing else changes. Under it, 18 of 18 candidates are eligible and the lowest is the one above (tables 1 and 2).
 - The owner accepted the deviation on 2026-10-28, after seeing the result.
 - The 2026-27 confirmation runs under the same rule: a window is judged only when its games sit in more than two blocks. Its verdict stays binding. If version 2's pooled 2026-27 log loss is not below version 1's, or it is worse in a judged window, the site returns to version 1, frozen as `V1` in `scripts/evaluate.ts`.
+
+### Deviation for the 2026-27 confirmation
+
+Declared on 2026-10-31, when the owner asked for the two-week window rule to be removed or adjusted. The 2026-27 games through 2026-10-30 had been played and are logged in table 11; the confirmation has not run.
+
+- The window constraint no longer judges the confirmation. On the tuning seasons, a model exactly as good as version 1, made by swapping version 1's and version 2's chances at random within each (season, week) block, is worse in at least one of the 17 judged windows in 206 of 400 tries, 52%: with many windows one is worse by chance, and each window's interval, from 13 to 16 blocks, runs narrow. The rule would return the site to version 1 about half the time between two equally good models. `node scripts/window-rule.ts v2` runs the check.
+- The confirmation is now: version 2 stays on the site when its pooled 2026-27 log loss is below version 1's; otherwise the site returns to version 1, frozen as `V1` in `scripts/evaluate.ts`. The two-week windows are still reported. This replaces the last point of the deviation above.
+- The change comes after part of 2026-27 was seen, with version 2 ahead of version 1 there, and it makes the confirmation easier to pass. Its reason, the rule's false-fail rate, comes from the tuning seasons alone. Version 3's plan, `docs/model-v3.md`, judges the same way.
 
 ## How the injury report will be judged
 

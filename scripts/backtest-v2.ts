@@ -1,16 +1,16 @@
 // npm run backtest:v2: runs docs/model-v2.md's pre-registered plan. It scores the 18 candidates on the tuning
 // seasons against version 1 as shipped, chooses version 2 by the plan's rules, prints every table and rewrites
 // the Results part of docs/model-v2.md. 2026-27 is logged only; the confirmation runs after its last game. It
-// exits non-zero when src/lib/elo.ts's PARAMS, EARLY or PROVISIONAL differ from the choice (version 1 when no
+// exits non-zero when version 2 as frozen in scripts/evaluate.ts differs from the choice (version 1 when no
 // candidate is eligible), or when the pre-registration's text has changed.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { EARLY, ELO_PER_SIGMA, PARAMS, PROVISIONAL, seedCentres, type FitRule, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
+import { ELO_PER_SIGMA, seedCentres, type FitRule, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
 import { boxRatings, lineups, type BoxRatings, type Lineups, type SeasonBox } from "../src/lib/players.ts";
 import { stage } from "../src/lib/teams.ts";
 import {
   accuracy, brier, compare, fitSigma, fitWiden, inSeasons, loadBox, loadPreseason, loadSeason, logLoss, loss, mean, modelRows, price,
-  TUNING, V1, windows, worseJudgedV2, type Diff, type Row, type Scored,
+  TUNING, V1, V2 as FROZEN_V2, windows, worseJudgedV2, type Diff, type Row, type Scored,
 } from "./evaluate.ts";
 import { loadVegas } from "./vegas.ts";
 
@@ -264,9 +264,9 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
   const want = chosen
     ? { ...v2.rule, sigma: r3(v2.sigma), widen: r2(v2.widen), provisional: threshold }
     : { ...V1.params, widen: V1.early.widen, provisional: V1.provisional };
-  const have = { ...PARAMS, sigma: r3(PARAMS.sigma), widen: r2(EARLY.widen), provisional: PROVISIONAL };
+  const have = { ...FROZEN_V2.params, sigma: r3(FROZEN_V2.params.sigma), widen: r2(FROZEN_V2.early.widen), provisional: FROZEN_V2.provisional };
   const match = JSON.stringify(want) === JSON.stringify(have);
-  out.push(`### Check\n\nsrc/lib/elo.ts PARAMS, EARLY and PROVISIONAL ${match ? "match" : "DO NOT match"} ${chosen ? "the choice" : "version 1, which the site keeps"}, \`${JSON.stringify(want)}\`.`);
+  out.push(`### Check\n\nVersion 2 as frozen in scripts/evaluate.ts ${match ? "matches" : "DOES NOT match"} ${chosen ? "the choice" : "version 1, which the site keeps"}, \`${JSON.stringify(want)}\`.`);
   if (!match) process.exitCode = 1;
 }
 

@@ -35,8 +35,11 @@ export type HomeRule = { kind: "fitted"; centre: number; weight: number } | { ki
  * fades as n0 * exp(-day / fade).
  */
 export type SeedRule = { scale: number; fade: number; carry: number };
-/** Version 2's players: each one's value is pulled toward `a` times his box rating with `np` games. */
-export type PlayerRule = { a: number; np: number; halfLife: number };
+/**
+ * Version 2's players: each one's value is pulled toward `a` times his box rating with `np` games. Version 3 pulls a
+ * player new to the box scores, the season's `rookies`, with `rookieNp` games instead, so his results move him sooner.
+ */
+export type PlayerRule = { a: number; np: number; halfLife: number; rookieNp?: number };
 /**
  * `n0` is the pull toward each team's prior centre, in games against an average team that ended level. Version 1
  * is the rule without `seed`, `b2b` or `players`: every centre at 0, the league average, and a pull that stays.
@@ -46,11 +49,16 @@ export type FitRule = { n0: number; margin: MarginRule; home: HomeRule; seed?: S
 /** `sigma` turns an expected margin into a win chance: Phi(margin / sigma). */
 export type Params = FitRule & { sigma: number };
 
-/** The site's model, version 2, chosen by the pre-registered backtest: docs/model-v2.md, tables 1 and 2. */
+/**
+ * The site's model, version 3 (docs/model-v3.md): version 2's settings (docs/model-v2.md, tables 1 and 2) with a
+ * rookie's value held with 40 games and SIGMA fitted again. The home edge here, 0.622, is only the fallback: each
+ * season's own edge, from the three seasons before it, comes in its ModelInputs. Version 2 is frozen as `V2` in
+ * scripts/evaluate.ts.
+ */
 export const PARAMS = {
   n0: 96, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 },
-  seed: { scale: 5, fade: 120, carry: 0.7 }, b2b: 0.4, players: { a: 0.08, np: 320, halfLife: 365 },
-  sigma: 2.997,
+  seed: { scale: 5, fade: 120, carry: 0.7 }, b2b: 0.4, players: { a: 0.08, np: 320, halfLife: 365, rookieNp: 40 },
+  sigma: 3.037,
 } satisfies Params;
 
 /** Games a team plays before its rating stops being provisional: docs/model-v2.md, table 9. */
@@ -72,7 +80,7 @@ export type FitDay = { day: string; games: Pregame[]; before: Fit; after: Fit };
 /** What a season's fit reads beyond its games: each team's prior centre, and its players' lines, ratings and lineups. */
 export type SeasonInputs = {
   centres?: Record<Abbr, number>;
-  players?: { box: SeasonBox; ratings: BoxRatings; lineups: ReadonlyMap<string, Sides<Lineup>> };
+  players?: { box: SeasonBox; ratings: BoxRatings; lineups: ReadonlyMap<string, Sides<Lineup>>; rookies?: ReadonlySet<Athlete> };
 };
 
 /** A season's final, scored games grouped by US Eastern day, in date order. */
@@ -282,6 +290,8 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
   const dim = p0 + athletes.length;
   const col = new Map<string | Athlete, number>([...abbrs.map((a, i) => [a, i] as const), ...athletes.map((a, j) => [a, p0 + j] as const)]);
   const centre = new Float64Array(dim);
+  const { rookieNp } = players.rule;
+  const hold = Float64Array.from(athletes, (a) => (rookieNp !== undefined && players.rookies?.has(a) ? rookieNp : players.rule.np));
   const setPlayerCentres = (rating: Float64Array) => { for (let j = 0; j < athletes.length; j++) centre[p0 + j] = players.rule.a * rating[j]; };
   abbrs.forEach((a, i) => (centre[i] = centres?.[a] ?? 0));
   if (fitted) centre[n] = home.centre;
@@ -319,7 +329,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
     fit(day, strength, rating) {
       setPlayerCentres(rating ?? players.ratings.after.get(day)!);
       for (let k = 0; k < dim; k++) {
-        D[k] = k < n ? strength : k < p0 && fitted ? home.weight : players.rule.np;
+        D[k] = k < n ? strength : k < p0 && fitted ? home.weight : hold[k - p0];
         b[k] = xty[k] + D[k] * centre[k];
       }
       matvec(x, A);
@@ -365,9 +375,9 @@ export const ELO_PER_SIGMA = (400 / Math.LN10) * 1.702;
 
 /**
  * A season's first games say little, and the model's chances for them run high. While either side has played
- * fewer than `games` games, a gap counts `widen` times less, fitted on the tuning seasons: docs/model-v2.md, table 2.
+ * fewer than `games` games, a gap counts `widen` times less, fitted on the tuning seasons: docs/model-v3.md.
  */
-export const EARLY = { games: 5, widen: 1.15 };
+export const EARLY = { games: 5, widen: 1.14 };
 
 /** The model's win chance for a rating gap in Elo points, when the less experienced side has `played` games. */
 export const winProb = (gap: number, played = Infinity) => phi(gap / (ELO_PER_SIGMA * (played < EARLY.games ? EARLY.widen : 1)));
@@ -414,14 +424,21 @@ export type Season = {
 };
 
 /**
- * What compute() reads beyond a season's games: each team's seed, and its players' lines, box ratings, the lineups
- * its games are predicted with and the rotation its shown rating counts.
+ * What compute() reads beyond a season's games: each team's seed, the season's home edge, and its players' lines,
+ * box ratings, the lineups its games are predicted with, the rotation its shown rating counts and its rookies.
  */
-export type ModelInputs = { centres?: Record<Abbr, number>; players?: { box: SeasonBox; ratings: BoxRatings; lineups: Lineups; rotation: SeasonRotations } };
+export type ModelInputs = {
+  centres?: Record<Abbr, number>;
+  home?: number;
+  players?: { box: SeasonBox; ratings: BoxRatings; lineups: Lineups; rotation: SeasonRotations; rookies?: ReadonlySet<Athlete> };
+};
+
+/** The site's fit rule for a season: PARAMS with the season's home edge, in margin units, when its inputs have one. */
+export const seasonRule = ({ home }: Pick<ModelInputs, "home">): FitRule => (home === undefined ? PARAMS : { ...PARAMS, home: { kind: "fixed", value: home } });
 
 /** The site's model fitted to a season: each game predicted with the lineup of the team's previous game. */
-export const fitModel = (data: SeasonData, { centres, players }: ModelInputs): FitDay[] =>
-  fitSeason(data, PARAMS, { centres, players: players && { ...players, lineups: players.lineups.previous } });
+export const fitModel = (data: SeasonData, inputs: ModelInputs): FitDay[] =>
+  fitSeason(data, seasonRule(inputs), { centres: inputs.centres, players: inputs.players && { ...inputs.players, lineups: inputs.players.lineups.previous } });
 
 /** Standard competition ranks on displayed (rounded) ratings: equal ratings share a rank, the next rank skips. */
 export function ranksOf(ratings: Record<Abbr, number>) {
@@ -471,7 +488,7 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const shown = shownLineups(data, players?.rotation);
   let usual = shown.opening;
   const rated = (fit: Fit, lineups: Record<Abbr, Lineup>) => Object.fromEntries(abbrs.map((a) => [a, START + (fit.r[a] + playerPart(fit, lineups[a])) * scale]));
-  const start = days[0]?.before ?? startFit(abbrs, PARAMS, centres);
+  const start = days[0]?.before ?? startFit(abbrs, seasonRule(inputs), centres);
   const opening = rated(start, usual);
   let r = opening;
   let latest = start;
