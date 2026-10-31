@@ -254,7 +254,7 @@ function playerPhrase(value: number, move: PlayerMove | undefined): string {
   if (move?.athlete === NEWCOMER) return "In the minutes of players out for weeks, at replacement level";
   // On a day off only the injury report or a player leaving moves the rotation.
   if (move && move.played === undefined) {
-    if (move.status === "left" && move.injury) return `Out${move.injury.returnDate ? ` until ${shortDay(move.injury.returnDate)}` : ""} on the injury report`;
+    if (move.status === "left" && move.injury) return `Out injured${move.injury.returnDate ? ` until ${shortDay(move.injury.returnDate)}` : ""}`;
     if (move.status === "more") return "Counted for more minutes";
     if (move.status === "fewer") return "Counted for fewer minutes";
   }

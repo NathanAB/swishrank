@@ -45,8 +45,9 @@ export const LONG_ABSENCE = 21;
  * box scores, that none of them played, when it has played 2 or more; otherwise the rest of the rotation, with their
  * minutes left to NEWCOMER, a player with no appearances. On the finished seasons, for team-days with a rotation
  * player who missed the next 10 games, this missed those games' margins by 1.3025 in root mean square against 1.3253
- * keeping him, 1.3063 handing his minutes to the rest of the rotation, and 1.3026 always to NEWCOMER, the only one
- * of the four without a bias (mean miss -0.0008, against -0.1063 keeping him).
+ * keeping him, 1.3063 handing his minutes to the rest of the rotation, 1.3026 always to NEWCOMER and 1.3049 to the
+ * players who played more in the games he missed, the only one without a bias (mean miss -0.0008, against -0.1063
+ * keeping him).
  */
 function withoutLongAbsent(lineup: Lineup, gone: ReadonlySet<Athlete>, recent: readonly BoxLine[][]): Lineup {
   const without = recent.filter((lines) => !lines.some((l) => gone.has(l[0])));
