@@ -169,7 +169,8 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
       };
     }
     const lines = g ? box[g.id]?.[abbr] : undefined;
-    const report = (injuries?.days[day] ?? injuries?.days[addDays(day, 1)])?.injuries ?? [];
+    // The report saved the morning after the day, as the shown rotation reads it, or the day's own.
+    const report = (injuries?.days[addDays(day, 1)] ?? injuries?.days[day])?.injuries ?? [];
     const ids = new Set([...was, ...usual[abbr]].map((p) => p.athlete));
     const players: PlayerMove[] = held ? [] : [...ids].flatMap((athlete) => {
       const s0 = was.find((p) => p.athlete === athlete)?.share ?? 0;
