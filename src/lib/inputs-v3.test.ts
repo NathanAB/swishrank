@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, ELO_PER_SIGMA, PARAMS, type Game, type SeasonData } from "./elo.ts";
+import { compute, ELO_PER_SIGMA, fitModel, NEWCOMER, PARAMS, playerPart, shownLineups, START, type Game, type SeasonData } from "./elo.ts";
 import { trailingHomeEdges } from "./home.ts";
 import { modelInputs } from "./inputs.ts";
 import type { BoxLine } from "./players.ts";
 
 // Last season A beat B at home three times by 10. This season A brings in rookie 5. The morning report of A's second
 // game lists player 2 as out; he plays anyway, and the report, the latest, still lists him for the game to come.
+const near = (actual: number, expected: number, what: string) => assert.ok(Math.abs(actual - expected) < 1e-9, `${what}: ${actual}, expected ${expected}`);
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
 const line = (athlete: number, min: number, pts: number): BoxLine => [athlete, min, pts, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 const game = (id: string, t: string, hs: number | null, as: number | null): Game => ({ id, t, home: "A", away: "B", hs, as, final: hs !== null, neutral: false, note: null });
@@ -46,4 +47,49 @@ test("a game is priced without the players its morning's report lists as out, an
   assert.ok(Math.abs(share - 5) < 1e-9, `the lineup still fills 240 minutes: ${share}`);
   const next = inputs.players!.lineups.next.get("2026-10-23")!.A!.map((p) => p.athlete);
   assert.deepEqual(next.sort(), [1, 5], "player 2 played g2, but the latest report holds for the game to come");
+});
+
+// This season A plays B four times. Player 9 plays A's first two games, then the report of 2026-10-23 lists him out
+// until January, and he misses the next two. Player 8 is out for a week on the same report.
+const away: SeasonData = {
+  season: "2026-27", teams: last.teams,
+  games: ["21", "23", "25", "27"].map((d, i) => game(`h${i}`, `2026-10-${d}T23:00Z`, 105, 100)),
+};
+const awayBox = { season: "2026-27", games: Object.fromEntries(away.games.map((g, i) => [g.id, {
+  A: [line(1, 30, 15), line(5, 30, 12), line(8, 20, 10), ...(i < 2 ? [line(9, 30, 20)] : [line(6, 30, 8)])],
+  B: [line(3, 30, 15), line(4, 30, 15)],
+}])) };
+const report = { season: "2026-27", days: { "2026-10-23": { fetched: "2026-10-23T12:00:00.000Z", injuries: [
+  { athlete: 9, team: "A", status: "Out", date: "2026-10-22T20:00Z", returnDate: "2027-01-10" },
+  { athlete: 8, team: "A", status: "Out", date: "2026-10-22T20:00Z", returnDate: "2026-10-30" },
+] } } };
+const awayInputs = modelInputs([
+  { data: last, box: lastBox, preseason: totals("2025-26") },
+  { data: away, box: awayBox, preseason: totals("2026-27"), injuries: report },
+]).get("2026-27")!;
+const shownA = (day: string) => shownLineups(away, awayInputs.players!.rotation).after.get(day)!.A;
+
+test("a player out for weeks leaves the shown rotation, his minutes to a newcomer until the team has 2 games without him", () => {
+  const before = shownA("2026-10-21").map((p) => p.athlete).sort();
+  assert.ok(before.includes(9), "he counts before the report");
+  for (const day of ["2026-10-23", "2026-10-25"]) {
+    const l = shownA(day);
+    assert.ok(!l.some((p) => p.athlete === 9), `${day}: out of the rotation`);
+    assert.ok(l.some((p) => p.athlete === NEWCOMER), `${day}: his minutes go to a newcomer`);
+    assert.ok(l.some((p) => p.athlete === 8), `${day}: a week out is not weeks`);
+    near(l.reduce((s, p) => s + p.share, 0), 5, `${day}: 240 minutes`);
+  }
+  const l = shownA("2026-10-27");
+  assert.deepEqual(l.map((p) => p.athlete).sort(), [1, 5, 6, 8], "two games without him: their minutes");
+  assert.ok(!l.some((p) => p.athlete === NEWCOMER));
+});
+
+test("the newcomer's minutes count at the value of a player with no appearances", () => {
+  const ratings = awayInputs.players!.ratings;
+  const fit = fitModel(away, awayInputs).find((d) => d.day === "2026-10-23")!.after;
+  near(fit.v.get(NEWCOMER)!, PARAMS.players.a * ratings.newcomer!.after.get("2026-10-23")!, "the newcomer's value");
+  assert.ok(fit.v.get(NEWCOMER)! < 0, "below the league's mean");
+  const model = compute(away, awayInputs);
+  const shown = model.series.find((d) => d.day === "2026-10-23")!.r.A;
+  near(shown, START + (fit.r.A + playerPart(fit, shownA("2026-10-23"))) * (ELO_PER_SIGMA / PARAMS.sigma), "A's shown rating counts the newcomer");
 });

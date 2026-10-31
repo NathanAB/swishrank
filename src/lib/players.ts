@@ -46,8 +46,11 @@ export const REPLACEMENT = 8.49;
 /** Minutes of replacement-level play every box rating starts from. */
 export const PSEUDO_MINUTES = 400;
 
-/** Each of a season's players' box rating, in `athletes` order: before its first game day, then after each game day. */
-export type BoxRatings = { athletes: Athlete[]; start: Float64Array; after: Map<string, Float64Array> };
+/**
+ * Each of a season's players' box rating, in `athletes` order: before its first game day, then after each game day.
+ * `newcomer` is the box rating of a player with no appearances on the same days, replacement level less the mean.
+ */
+export type BoxRatings = { athletes: Athlete[]; start: Float64Array; after: Map<string, Float64Array>; newcomer?: { start: number; after: Map<string, number> } };
 
 const epochDay = (day: string) => Date.parse(day) / 86_400_000;
 const linesOf = (box: SeasonBox, id: string): BoxLine[][] => Object.values(box.games[id] ?? {}).flatMap((lines) => (lines ? [lines] : []));
@@ -64,6 +67,7 @@ export function boxRatings(seasons: readonly SeasonPlayers[], halfLife: number):
   for (const { data, box } of seasons) {
     const days = finalDays(data);
     const athletes = [...new Set(Object.keys(box.games).flatMap((id) => linesOf(box, id).flatMap((lines) => lines.map((l) => l[0]))))];
+    let fresh = 0;
     const snapshot = (now: number) => {
       const rel = new Float64Array(G.length);
       let sw = 0, sr = 0;
@@ -73,12 +77,13 @@ export function boxRatings(seasons: readonly SeasonPlayers[], halfLife: number):
         sw += m; sr += m * rel[i];
       }
       const mean = sw ? sr / sw : REPLACEMENT;
+      fresh = REPLACEMENT - mean;
       return Float64Array.from(athletes, (a) => {
         const i = index.get(a);
         return (i === undefined ? REPLACEMENT : rel[i]) - mean;
       });
     };
-    const ratings: BoxRatings = { athletes, start: snapshot(days.length ? epochDay(days[0].day) : 0), after: new Map() };
+    const ratings: BoxRatings = { athletes, start: snapshot(days.length ? epochDay(days[0].day) : 0), after: new Map(), newcomer: { start: fresh, after: new Map() } };
     for (const { day, games } of days) {
       const now = epochDay(day);
       for (const g of games) for (const lines of linesOf(box, g.id)) for (const l of lines) {
@@ -88,6 +93,7 @@ export function boxRatings(seasons: readonly SeasonPlayers[], halfLife: number):
         G[i] = f * G[i] + gameScore(l); M[i] = f * M[i] + l[1]; last[i] = now;
       }
       ratings.after.set(day, snapshot(now));
+      ratings.newcomer!.after.set(day, fresh);
     }
     out.set(data.season, ratings);
   }
