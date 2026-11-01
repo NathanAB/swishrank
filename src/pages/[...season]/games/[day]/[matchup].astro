@@ -12,7 +12,7 @@ import TeamBlock from "../../../../components/TeamBlock.astro";
 import GameBreakdown from "../../../../components/history/GameBreakdown.astro";
 import type { Game } from "../../../../lib/elo.ts";
 import { dayWithYear, longDay, matchup } from "../../../../lib/format.ts";
-import { gameView } from "../../../../lib/game.ts";
+import { blockShare, gameView } from "../../../../lib/game.ts";
 import { gameDescription } from "../../../../lib/meta.ts";
 import type { Route } from "../../../../lib/routes.ts";
 import { gamePaths, team, type SeasonView } from "../../../../lib/season.ts";
@@ -43,8 +43,10 @@ const meta = [view.stage.label, view.series].filter(Boolean).join(" · ");
         <h1 id="h-game">{title}</h1>
         <p class="when">{longDay(view.day)} · <LocalTime at={game.t} />{meta && ` · ${meta}`}</p>
       </header>
-      <div class="blocks">
-        {[view.away, view.home].map((side) => <TeamBlock season={season} view={view} side={side} paint={paint[side.abbr]} />)}
+      <div class="blocks" style={`--n: ${Math.min(blockShare(view, view.away), blockShare(view, view.home)).toFixed(3)}`}>
+        <div class="pair">
+          {[view.away, view.home].map((side) => <TeamBlock season={season} view={view} side={side} paint={paint[side.abbr]} />)}
+        </div>
       </div>
     </section>
     <Panel title="Rating this season" meta="Point at the chart for any day's ratings">
@@ -59,7 +61,12 @@ const meta = [view.stage.label, view.series].filter(Boolean).join(" · ");
   .game > :global(* + *) { margin-top: var(--gap); }
   .title { margin-bottom: 16px; text-align: center; }
   .when { margin-top: 2px; font-size: var(--fs-card); line-height: 24px; color: var(--muted); }
-  .blocks { display: flex; gap: 2px; }
+  /* Both team blocks lay themselves out by the narrower one's width (TeamBlock.astro), so the row they query is
+     that wide: the narrower share (--n) of the row less the 2px gap and the blocks' two 4px edges. The pair inside
+     runs the row's full width again. The row holds still while the blocks grow into their shares, so neither block
+     changes its layout as they do. */
+  .blocks { width: calc(var(--n) * (100% - 10px)); container: blocks / inline-size; }
+  .pair { display: flex; gap: 2px; width: calc(100% / var(--n) + 10px); }
 
   @media (max-width: 640px) {
     .when { font-size: var(--fs-body); line-height: 20px; }

@@ -8,10 +8,9 @@
 // edge in. The team's colour is a real border, so the outer corners round and the stripe's inner edge stays
 // straight. The two blocks lay themselves out alike, by the narrower one's width, which the shares decide as much
 // as the screen does: the name and figures beside the big number where there is room, stacked under it where
-// there is not. So that the wider block reads the same width, each block's layout is queried against a frame as
-// wide as the narrower block (--k, the narrower share over its own), and its content runs the block's own width
-// from inside that frame. The record is the regular season's in a regular-season game and the postseason's after
-// it.
+// there is not. Both query the game's page's row of blocks, which is as wide as the narrower block once the two
+// have grown into their shares and holds that width while they do, so neither changes its layout as they grow.
+// The record is the regular season's in a regular-season game and the postseason's after it.
 import UpsetBadge from "./UpsetBadge.astro";
 import { blockShare, type GameSide, type GameView } from "../lib/game.ts";
 import { pct, rating, record, signed } from "../lib/format.ts";
@@ -28,11 +27,10 @@ interface Props {
 
 const { season, view, side: s, paint } = Astro.props;
 const share = blockShare(view, s);
-const narrower = Math.min(share, blockShare(view, s.side === "away" ? view.home : view.away));
 ---
 
-<a class:list={["block", s.side, { dim: s.line?.won === false }]} href={href({ kind: "team", season, abbr: s.abbr })} style={`${paint}; --w: ${share.toFixed(3)}; --k: ${(narrower / share).toFixed(4)}`}>
-  <span class="frame"><span class="in">
+<a class:list={["block", s.side, { dim: s.line?.won === false }]} href={href({ kind: "team", season, abbr: s.abbr })} style={`${paint}; --w: ${share.toFixed(3)}`}>
+  <span class="in">
     <span class="id"><span class="ab">{s.abbr}</span><span class="nm">{team(season, s.abbr).name}</span></span>
     <span class="big num">{s.line ? s.line.score : pct(s.chance)}</span>
     <dl class="stats">
@@ -46,7 +44,7 @@ const narrower = Math.min(share, blockShare(view, s.side === "away" ? view.home 
       <div><dt>Rank</dt><dd class="num">{s.place}</dd></div>
       <div><dt>{view.stage.phase === "regular" ? "Record" : "Postseason"}</dt><dd class="num">{record(...s.record)}</dd></div>
     </dl>
-  </span></span>
+  </span>
 </a>
 
 <style>
@@ -61,9 +59,7 @@ const narrower = Math.min(share, blockShare(view, s.side === "away" ? view.home 
   .block.home { text-align: right; border-left: 0; border-right: 4px solid var(--tint); border-radius: 0 4px 4px 0; }
   @keyframes grow { from { flex-grow: 0.5; } }
   @media (prefers-reduced-motion: reduce) { .block { animation: none; } }
-  /* The blocks' widths are their shares of the row, so the narrower block's is the wider's times --k. */
-  .frame { display: block; width: calc(var(--k) * 100%); container-type: inline-size; }
-  .in { width: calc(100% / var(--k)); display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id big" "st big"; align-items: center; column-gap: 16px; row-gap: 14px; padding: 16px 20px; }
+  .in { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id big" "st big"; align-items: center; column-gap: 16px; row-gap: 14px; padding: 16px 20px; }
   .home .in { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "big id" "big st"; }
   .id { grid-area: id; min-width: 0; display: flex; flex-direction: column; }
   .ab { font-size: 40px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; }
@@ -82,7 +78,7 @@ const narrower = Math.min(share, blockShare(view, s.side === "away" ? view.home 
   /* About half a 1024px page: too narrow for a played game's four figures in a row beside the big number, so
      they stand two by two, mirrored in the home block, rather than leave one on a line of its own. A game to
      come has three, which fit in a row. */
-  @container (max-width: 559px) {
+  @container blocks (max-width: 559px) {
     .stats:where(:has(> :nth-child(4))) { display: grid; grid-template-columns: repeat(2, max-content); }
     .home .stats:where(:has(> :nth-child(4))) { direction: rtl; }
     .home .stats > div { direction: ltr; }
@@ -90,7 +86,7 @@ const narrower = Math.min(share, blockShare(view, s.side === "away" ? view.home 
 
   /* Too narrow for the big figure beside the rest: about 100px of abbreviation, 150px of figure, the gap and
      the padding. */
-  @container (max-width: 359px) {
+  @container blocks (max-width: 359px) {
     .in, .home .in { grid-template-columns: 1fr; grid-template-areas: "id" "big" "st"; row-gap: 8px; padding: 12px; }
     .nm { display: none; }
     .ab { font-size: 24px; line-height: 28px; }
