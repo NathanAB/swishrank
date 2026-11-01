@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { SURFACE, coloursOf, gameColours, lineColor, pairStyles, tintStyles } from "./tint.ts";
+import { SURFACE, coloursOf, distinctLines, gameColours, lineColor, pairStyles, tintStyles } from "./tint.ts";
 
 test("a team draws in its exact primary colour where it shows clearly: the Celtics' green", () => {
   const celtics = { name: "Boston Celtics", short: "Celtics", color: "008348", alternateColor: "ffffff" };
@@ -54,4 +54,15 @@ test("a game page gives each team one colour, from a pair that reads apart as bl
   assert.deepEqual(gameColours({ color: "e31837", alternateColor: "002b5c" }, { color: "860038", alternateColor: "bc945c" }), ["002b5c", "860038"]);
   // The Spurs' black and silver are both greys, so the block is grey.
   assert.deepEqual(gameColours(knicks, { color: "000000", alternateColor: "c4ced4" }), ["1d428a", "000000"]);
+});
+
+test("several teams drawn together keep their own colours unless two would read as one", () => {
+  const thunder = { color: "007ac1", alternateColor: "ef3b24" };
+  const spurs = { color: "000000", alternateColor: "c4ced4" };
+  const pistons = { color: "1d428a", alternateColor: "c8102e" };
+  const knicks = { color: "1d428a", alternateColor: "f58426" };
+  const nuggets = { color: "0e2240", alternateColor: "fec524" };
+  // The Pistons, Knicks and Nuggets share a blue with each other and nearly with the Thunder: two of them take their other colour.
+  assert.deepEqual(distinctLines([thunder, spurs, pistons, knicks, nuggets]), ["#007ac1", "#c4ced4", "#c8102e", "#2a60c9", "#fec524"]);
+  assert.deepEqual(distinctLines([thunder, spurs]), [lineColor(thunder), lineColor(spurs)]);
 });

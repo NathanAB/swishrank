@@ -8,8 +8,9 @@ import { stage } from "./teams.ts";
 /** A chance in percent as the pages write it: whole numbers, under 1% and over 99% for the ends, 0% for never. */
 export const oddsPct = (v: number) => (v <= 0 ? "0%" : v < 0.5 ? "<1%" : v >= 99.5 ? ">99%" : `${Math.round(v)}%`);
 
-/** How many teams the title race draws in colour and names. */
-export const NAMED = 5;
+/** The title race draws a team whose title chance reached RACE_FLOOR percent on some day, at most RACE_LINES of them. */
+export const RACE_FLOOR = 8;
+export const RACE_LINES = 6;
 
 /** The season's champion: the team that won four games of the Finals, or null while there is none. */
 export function champion(model: Pick<Season, "results">): Abbr | null {
@@ -23,15 +24,17 @@ export function champion(model: Pick<Season, "results">): Abbr | null {
 }
 
 /**
- * The teams the title race names, likeliest on its last day first: the five likeliest then, or for a finished
- * season its champion and the four that ran highest at any point.
+ * The teams the title race draws, likeliest on its last day first: those whose chance reached RACE_FLOOR on some
+ * day, the RACE_LINES that ran highest if more did, and at least the three that ran highest. A finished season's
+ * champion is always one of them.
  */
 export function contenders(history: readonly OddsDay[], champ: Abbr | null): Abbr[] {
   const last = history[history.length - 1];
-  const abbrs = Object.keys(last.title);
-  const peak = (a: Abbr) => Math.max(...history.map((d) => d.title[a]));
-  const picked = champ ? [champ, ...abbrs.filter((a) => a !== champ).sort((a, b) => peak(b) - peak(a) || a.localeCompare(b)).slice(0, NAMED - 1)] : abbrs;
-  return [...picked].sort((a, b) => last.title[b] - last.title[a] || a.localeCompare(b)).slice(0, NAMED);
+  const peak = new Map(Object.keys(last.title).map((a) => [a, Math.max(...history.map((d) => d.title[a]))]));
+  const byPeak = [...peak.keys()].sort((a, b) => peak.get(b)! - peak.get(a)! || a.localeCompare(b));
+  let picked = byPeak.filter((a, i) => i < 3 || peak.get(a)! >= RACE_FLOOR).slice(0, RACE_LINES);
+  if (champ && !picked.includes(champ)) picked = [...picked.slice(0, RACE_LINES - 1), champ];
+  return picked.sort((a, b) => last.title[b] - last.title[a] || a.localeCompare(b));
 }
 
 /** The day a week before the race's last, or its first day when it is younger than a week, and which it is. */
