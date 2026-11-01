@@ -5,7 +5,7 @@
 // chart and the history beside them; a finished season has nothing ahead, so the chart and the history take the width.
 import Empty from "../../../components/Empty.astro";
 import FixtureList from "../../../components/FixtureList.astro";
-import Outlook from "../../../components/Outlook.astro";
+import Projections from "../../../components/Projections.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
 import TeamHeader from "../../../components/TeamHeader.astro";
@@ -50,7 +50,7 @@ const odds = season.current ? currentOdds() : null;
 >
   <TeamHeader season={season} abbr={abbr} route={route} paint={paint} />
 
-  {odds && odds.teams[abbr] && <div class="outlook"><Outlook season={season} abbr={abbr} odds={odds} /></div>}
+  {odds && odds.teams[abbr] && <div class="projections"><Projections season={season} abbr={abbr} odds={odds} /></div>}
 
   <div class:list={["cols", { solo: !ahead }]}>
     {ahead && (
@@ -81,7 +81,7 @@ const odds = season.current ? currentOdds() : null;
      chart. */
   .cols { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: var(--gap); align-items: start; margin-top: var(--gap); }
   .solo { grid-template-columns: minmax(0, 1fr); }
-  .outlook { margin-top: var(--gap); }
+  .projections { margin-top: var(--gap); }
   .side { position: sticky; top: var(--gap); }
   .main > :global(* + *) { margin-top: var(--gap); }
   .days { display: grid; gap: 16px; }

@@ -99,6 +99,43 @@ export function pairStyles(away: Pick<Team, "color" | "alternateColor">, home: P
   return [style(a), style(h)];
 }
 
+/**
+ * Line colours for several teams drawn side by side, such as a season's title race, in the order given. Each team
+ * draws in its line colour, or in its other colour where that tells it apart from the rest, as pairStyles does for
+ * two: of every way to give each team one of its two colours, the one with the fewest pairs that read as one wins,
+ * then the one with the most teams in their own line colour, then the one whose closest pair is furthest apart, so a
+ * team keeps its own colour unless a rival's would hide it. A colour that vanishes on the surface is never picked.
+ */
+export function distinctLines(teams: readonly Pick<Team, "color" | "alternateColor">[]): string[] {
+  const visible = (c: string) => contrast(c.slice(1), SURFACE) >= MIN_VISIBLE;
+  const options = teams.map((t) => {
+    const line = lineColor(t);
+    const shade = `#${primaryShade(t)}`;
+    const other = line === shade ? `#${t.alternateColor.toLowerCase()}` : shade;
+    return [line, other].filter((c, i, all) => (i === 0 || visible(c)) && all.indexOf(c) === i);
+  });
+  /** Whether score `x` beats `y`: lower wins, the first place they differ deciding. */
+  const before = (x: number[], y: number[]) => { const k = x.findIndex((v, i) => v !== y[i]); return k >= 0 && x[k] < y[k]; };
+  let best: { pick: string[]; score: number[] } | null = null;
+  const choose = (i: number, pick: string[]) => {
+    if (i === teams.length) {
+      let close = 0, nearest = Infinity;
+      for (let a = 0; a < pick.length; a++) for (let b = a + 1; b < pick.length; b++) {
+        const d = apart(pick[a], pick[b]);
+        if (d < MIN_APART) close++;
+        nearest = Math.min(nearest, d);
+      }
+      const moved = pick.filter((c, k) => c !== options[k][0]).length;
+      const score = [close, moved, -nearest];
+      if (!best || before(score, best.score)) best = { pick: [...pick], score };
+      return;
+    }
+    for (const c of options[i]) choose(i + 1, [...pick, c]);
+  };
+  choose(0, []);
+  return (best as { pick: string[] } | null)?.pick ?? [];
+}
+
 /** A colour in OKLab: lightness 0 to 1, then the two colour axes. */
 const okLab = (hex: string): [number, number, number] => {
   const [r, g, b] = channels(hex).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
