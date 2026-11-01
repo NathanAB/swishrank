@@ -1,15 +1,15 @@
 ---
-// The title race on a season's home: every team's chance of winning the title on every day of the regular season,
-// the five the race names (src/lib/race.ts contenders) each in a colour of the dataviz palette's categorical slots,
-// checked for colour-blind separation on the card's surface, and the rest grey. Team colours would not do here: the
-// Spurs' silver reads as grey and three contenders can share a blue. On a wide screen each named line ends in its
-// name and chance; on a phone the legend carries the chances and the plot takes the width. Pointing anywhere on the
-// plot reads out every named team's chance that day, and the grey line under the pointer, if any, joins them.
+// The title race on a season's home: the chance of winning the title on every day of the regular season for the
+// teams that were real contenders at some point (src/lib/race.ts contenders), each in its own colour, or its other
+// one where two contenders' colours would read as one (src/lib/tint.ts distinctLines). On a wide screen each line
+// ends in its team's name and chance; on a phone the legend carries the chances and the plot takes the width.
+// Pointing anywhere on the plot reads out every drawn team's chance that day.
 import Panel from "./Panel.astro";
 import { shortDay } from "../lib/format.ts";
 import type { OddsDay } from "../lib/odds.ts";
 import { champion, contenders, oddsPct, raceLead } from "../lib/race.ts";
 import { team, type SeasonView } from "../lib/season.ts";
+import { distinctLines } from "../lib/tint.ts";
 
 interface Props {
   season: SeasonView;
@@ -17,15 +17,14 @@ interface Props {
 }
 
 const { season, history } = Astro.props;
-const SLOTS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"];
 const champ = season.current ? null : champion(season.model);
 const named = contenders(history, champ);
-const colour = Object.fromEntries(named.map((a, i) => [a, SLOTS[i]]));
-const abbrs = Object.keys(history[0].title).sort();
+const colours = distinctLines(named.map((a) => team(season, a)));
+const colour = Object.fromEntries(named.map((a, i) => [a, colours[i]]));
 const name = (a: string) => team(season, a).short;
 const n = history.length;
 const last = history[n - 1];
-const peak = Math.max(...history.flatMap((d) => abbrs.map((a) => d.title[a])));
+const peak = Math.max(...history.flatMap((d) => named.map((a) => d.title[a])));
 const yMax = Math.max(10, Math.ceil(peak / 10) * 10);
 const step = yMax > 60 ? 20 : 10;
 const W = 1000, H = 300;
@@ -56,9 +55,9 @@ if (n > 40) {
 }
 const data = JSON.stringify({
   days: history.map((d) => shortDay(d.day)),
-  names: Object.fromEntries(abbrs.map((a) => [a, name(a)])),
+  names: Object.fromEntries(named.map((a) => [a, name(a)])),
   named, colours: named.map((a) => colour[a]), yMax,
-  series: Object.fromEntries(abbrs.map((a) => [a, history.map((d) => Math.round(d.title[a] * 10))])),
+  series: Object.fromEntries(named.map((a) => [a, history.map((d) => Math.round(d.title[a] * 10))])),
 });
 const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name(a)} ${oddsPct(last.title[a])}`).join(", ")} on the last day.`;
 ---
@@ -75,7 +74,6 @@ const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
           {ticks.map((t) => <path class:list={["rule", { zero: t === 0 }]} d={`M0,${y(t)}H${W}`} />)}
           <g data-lines>
-            {abbrs.filter((a) => !named.includes(a)).map((a) => <polyline class="line other" data-abbr={a} points={points(a)} />)}
             {[...named].reverse().map((a) => <polyline class="line" data-abbr={a} style={`stroke: ${colour[a]}`} points={points(a)} />)}
           </g>
           <path class="cross" data-cross d={`M0,0V${H}`} />
@@ -105,19 +103,14 @@ const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name
     const cross = root.querySelector<SVGPathElement>("[data-cross]")!;
     const dots = root.querySelector<HTMLElement>("[data-dots]")!;
     const tip = root.querySelector<HTMLElement>("[data-tip]")!;
-    const lines = new Map([...root.querySelectorAll<SVGPolylineElement>("polyline[data-abbr]")].map((l) => [l.dataset.abbr ?? "", l]));
     const n = race.days.length;
-    const colour = (a: string) => race.colours[race.named.indexOf(a)] ?? "var(--text)";
+    const colour = (a: string) => race.colours[race.named.indexOf(a)];
     const value = (a: string, i: number) => race.series[a][i] / 10;
     const text = (v: number) => (v <= 0 ? "0%" : v < 0.1 ? "<0.1%" : v < 10 ? `${v.toFixed(1)}%` : `${Math.round(v)}%`);
-    let lifted: string | null = null;
-
     function rest() {
       cross.classList.remove("on");
       dots.replaceChildren();
       tip.hidden = true;
-      if (lifted) lines.get(lifted)?.classList.remove("lift");
-      lifted = null;
     }
 
     function read(e: PointerEvent) {
@@ -126,24 +119,9 @@ const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name
       if (fx < -0.02 || fx > 1.02) return rest();
       const i = Math.max(0, Math.min(n - 1, Math.round(fx * (n - 1))));
       const at = n === 1 ? 1 : i / (n - 1);
-      const yOf = (v: number) => (1 - v / race.yMax) * box.height;
-      const py = e.clientY - box.top;
-      // The grey line nearest the pointer, within 10px, joins the readout.
-      let near: string | null = null, best = 10;
-      for (const a of Object.keys(race.series)) {
-        if (race.named.includes(a)) continue;
-        const d = Math.abs(yOf(value(a, i)) - py);
-        if (d < best) { best = d; near = a; }
-      }
-      if (near !== lifted) {
-        if (lifted) lines.get(lifted)?.classList.remove("lift");
-        if (near) { const l = lines.get(near); l?.classList.add("lift"); l?.parentElement?.append(l); }
-        lifted = near;
-      }
       cross.style.transform = `translateX(${at * 1000}px)`;
       cross.classList.add("on");
-      const shown = [...race.named, ...(near ? [near] : [])];
-      dots.replaceChildren(...shown.map((a) => {
+      dots.replaceChildren(...race.named.map((a) => {
         const d = document.createElement("span");
         d.className = "dot";
         d.style.left = `${at * 100}%`;
@@ -153,9 +131,9 @@ const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name
       }));
       const day = document.createElement("span");
       day.textContent = race.days[i];
-      const rows = [...race.named].sort((a, b) => value(b, i) - value(a, i)).concat(near ? [near] : []).map((a) => {
+      const rows = [...race.named].sort((a, b) => value(b, i) - value(a, i)).map((a) => {
         const row = document.createElement("span");
-        row.className = a === near ? "row near" : "row";
+        row.className = "row";
         const key = document.createElement("i");
         key.style.background = colour(a);
         const v = document.createElement("strong");
@@ -201,8 +179,6 @@ const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name
   .rule { stroke: var(--grid); stroke-width: 1; }
   .rule.zero { stroke: var(--control); }
   .line { stroke-width: 2; }
-  .line.other { stroke: var(--line-other); stroke-opacity: 0.45; stroke-width: 1.5; }
-  .line.other.lift { stroke: var(--text); stroke-opacity: 0.9; stroke-width: 2; }
   .cross { stroke: var(--text); stroke-opacity: 0.35; stroke-width: 1; opacity: 0; }
   .cross.on { opacity: 1; }
   .dot, [data-dots] :global(.dot) {
@@ -221,7 +197,6 @@ const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name
   .tip :global(.row i) { width: 14px; height: 3px; border-radius: 2px; }
   .tip :global(.row strong) { margin: 0; text-align: right; }
   .tip :global(.row b) { font-weight: 400; color: var(--muted); }
-  .tip :global(.row.near b) { color: var(--text); }
 
   @media (max-width: 640px) {
     .lead { font-size: 15px; }
