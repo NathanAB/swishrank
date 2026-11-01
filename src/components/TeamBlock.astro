@@ -94,15 +94,18 @@ const share = blockShare(view, s);
     dd { height: auto; font-size: 15px; line-height: 20px; }
   }
 
-  /* A phone: each block keeps to its team and its big figure, one over the other from its outer edge, and the rest
-     moves into one table under both (MatchupFigures.astro), which closes the blocks' square lower corners. A block
-     keeps a third of the row, about, so its figure always fits; the figure grows with the screen, the same in both. */
+  /* A phone: both blocks stand alike, whatever their widths: the team, its big figure under it, and its figures in
+     one column under that, each name over its figure, all from the block's outer edge. A block keeps about a third
+     of the row so its big figure fits, and the figure grows with the screen, the same in both; a figure too long
+     for its block wraps rather than run past it. */
   @media (max-width: 640px) {
-    .block { min-width: 34%; border-radius: var(--radius-card) 0 0 0; }
-    .block.home { border-radius: 0 var(--radius-card) 0 0; }
-    .in, .home .in { grid-template-columns: minmax(0, 1fr); grid-template-areas: "id" "big"; row-gap: 2px; padding: 12px 14px 14px; }
-    .block :is(.nm, .stats) { display: none; }
+    .block { min-width: 34%; }
+    .in, .home .in { grid-template-columns: minmax(0, 1fr); grid-template-areas: "id" "big" "st"; row-gap: 2px; padding: 12px 14px 16px; }
+    .block .nm { display: none; }
     .ab { font-size: 18px; line-height: 24px; }
     .big { font-size: clamp(32px, 10vw, 44px); line-height: 1.1; }
+    .block .stats { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; direction: ltr; }
+    .stats > div { display: flex; flex-direction: column; }
+    dd { flex-wrap: wrap; column-gap: 6px; height: auto; font-size: 16px; line-height: 22px; white-space: normal; }
   }
 </style>

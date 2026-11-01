@@ -5,7 +5,6 @@
 // /<id>/games/... every other season's; a game at a neutral site reads <away>-vs-<home>.
 import Base from "../../../../layouts/Base.astro";
 import LocalTime from "../../../../components/LocalTime.astro";
-import MatchupFigures from "../../../../components/MatchupFigures.astro";
 import Panel from "../../../../components/Panel.astro";
 import PreviousGames from "../../../../components/PreviousGames.astro";
 import RatingChart from "../../../../components/RatingChart.astro";
@@ -47,7 +46,6 @@ const meta = [view.stage.label, view.series].filter(Boolean).join(" · ");
       <div class="blocks">
         {[view.away, view.home].map((side) => <TeamBlock season={season} view={view} side={side} paint={paint[side.abbr]} />)}
       </div>
-      <MatchupFigures season={season} view={view} />
     </section>
     <Panel title="Rating this season" meta="Point at the chart for any day's ratings">
       <RatingChart season={season} focus={[game.away, game.home]} paint={paint} mark={view.played ? { day: view.day, label: "This game" } : undefined} />
