@@ -1,7 +1,8 @@
 ---
 // A day's walk, from the rating before to the rating after, on the day's own scale. The axis on top holds the two
 // ratings, with a faint line down from each; under it each part's heading carries its figure, and each step is a bar
-// from the running rating, its figure at the end it moved to, drops and rises in two colours.
+// from the running rating, its figure at the end it moved to, drops and rises in two colours. On a phone each bar
+// sits on a track of the scale, and the axis splits: the rating before at the top, the rating after at the bottom.
 // `id` names the walk on its page, so its drawers' ids are unique and the same on every build.
 import { MINUS, signed } from "../../lib/format.ts";
 import type { Walk, WalkLine, WalkPart } from "../../lib/ledger.ts";
@@ -58,7 +59,7 @@ const note = tipped && !steps.some((s) => s.kind === "line" && words(s).why === 
 const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 3.5 5 7l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 ---
 
-<div class="wrap"><div class="walk">
+<div class="wrap"><div class="walk" style={`--from:${place(from)};--to:${place(to)}`}>
   <div class="gridlines" aria-hidden="true"><i style={`--p:${place(from)}`} /><i style={`--p:${place(to)}`} /></div>
   <div class:list={["step axis", { close }]}>
     <span class="s-label"></span>
@@ -101,6 +102,13 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
       </div>
     );
   })}
+  {/* A phone's walk reads down the page, from the rating before at the top to the rating after under the last bar. */}
+  {from !== to && (
+    <div class="step axis end" aria-hidden="true">
+      <span class="s-label"></span>
+      <span class="s-chart"><span class="tick num" style={`--p:${place(to)}`}><span class="muted">To</span> {to}</span></span>
+    </div>
+  )}
 </div>{note && <p class="note">A small move, tipped to a whole point by rounding.</p>}</div>
 
 <script>
@@ -148,6 +156,7 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
   /* Two ratings close together put the second label on a line of its own, so the two never meet. */
   .axis.close .s-chart { min-height: 40px; }
   .axis.close .tick.to { top: 16px; }
+  .step.axis.end { display: none; }
   .tick.to-mid { left: var(--x); transform: translateX(-50%); }
   /* A rating at either end of the scale turns its label inward, so it never runs past the chart. */
   .tick.to-mid.at-lo { transform: none; }
@@ -185,20 +194,53 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
   .drawer li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; padding: 4px 0; }
   .drawer li .num { min-width: 36px; text-align: right; font-size: 13px; line-height: 20px; }
 
-  /* On a phone each label sits over its own bar; labels mask the gridlines so the lines show only in the bars' lanes. */
+  /* On a phone each label sits over its own bar, close under it, and the gridlines give way to a track under each
+     bar: the day's scale from end to end, with a mark at the rating before and the rating after. */
   @container (max-width: 600px) {
-    .walk { --inset: 48px; }
+    .walk {
+      --inset: 44px; --track-h: 18px;
+      --track: color-mix(in oklab, var(--text) 4%, transparent); --mark: color-mix(in oklab, var(--text) 18%, transparent);
+      padding: 0 0 4px;
+    }
+    .gridlines { display: none; }
     .step { grid-template-columns: minmax(0, 1fr); }
-    .s-label, .s-more { position: relative; z-index: 1; background: var(--walk-bg, var(--surface)); }
-    .s-chart { grid-column: 1; grid-row: 2; min-height: 30px; }
+    .s-label { padding: calc(var(--top) + 14px) 0 0; }
+    .s-chart { grid-column: 1; grid-row: 2; min-height: var(--track-h); margin-top: 8px; }
+    .s-chart::before {
+      content: ""; position: absolute; top: 0; height: var(--track-h); left: var(--in-l); right: var(--in-r); border-radius: 3px;
+      background:
+        linear-gradient(var(--mark), var(--mark)) calc(var(--from) * 100%) 0 / 1px 100% no-repeat,
+        linear-gradient(var(--mark), var(--mark)) calc(var(--to) * 100%) 0 / 1px 100% no-repeat,
+        var(--track);
+    }
     .s-more { grid-column: 1; grid-row: 3; }
+    .step.head, .step.single { --top: 8px; }
+    .step.head + .step .s-label { padding-top: 6px; }
+    .step.head .s-chart, .step.flat .s-chart { display: none; }
+    .bar { top: 0; height: var(--track-h); }
+    /* A figure is backed in the colour it sits on, the track's unless its bar ends at the end of the scale, so no mark
+       runs through it. */
+    .fig { top: 0; line-height: var(--track-h); padding: 0 3px; border-radius: 3px; background: linear-gradient(var(--track), var(--track)), var(--walk-bg, var(--surface)); }
+    .down.at-lo .fig, .up.at-hi .fig { background: none; }
+    .down .fig { margin-right: 3px; }
+    .up .fig { margin-left: 3px; }
+    .drawer { margin-top: 8px; padding-left: 8px; }
+
+    /* The axis splits in two, so the walk reads down the page: the rating before over the first bar and the rating
+       after under the last, each on a tick across a hairline of the scale. A label slides along its tick as its
+       rating does along the scale, starting at the tick at one end and ending at it at the other, so it never runs
+       past the chart. The rating after keeps its place at the top for a screen reader, out of sight. */
     .step.axis .s-label { display: none; }
-    .step.axis .s-chart { grid-row: 1; }
-    .step.head .s-label { padding-bottom: 0; }
-    .step.head .s-chart { display: none; }
-    .step.single .s-chart { --top: 0px; }
-    .step.flat .s-chart { display: none; }
-    .gridlines { left: 0; }
-    .drawer { padding-left: 8px; }
+    .step.axis .s-chart { --track-h: 1px; --tick: var(--from); grid-row: 1; margin-top: 0; min-height: 0; height: 28px; }
+    .step.axis .s-chart::before { top: 24px; border-radius: 0; background: var(--mark); }
+    .step.axis .s-chart::after { content: ""; position: absolute; top: 19px; width: 1px; height: 9px; background: var(--muted); left: calc(var(--in-l) + var(--tick) * (100% - var(--in-l) - var(--in-r) - 1px)); }
+    .step.axis .tick { left: var(--x); right: auto; width: auto; display: block; direction: ltr; transform: translateX(calc(var(--p) * -100%)); }
+    .step.axis :is(.t-in, .to-mid) { padding: 0; }
+    .step.axis:not(.end) .tick.to { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .step.axis.end { display: grid; }
+    .step.axis.end .s-chart { --tick: var(--to); margin-top: 14px; }
+    .step.axis.end .s-chart::before { top: 4px; }
+    .step.axis.end .s-chart::after { top: 0; }
+    .step.axis.end .tick { top: 14px; }
   }
 </style>
