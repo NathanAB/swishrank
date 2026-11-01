@@ -147,15 +147,18 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
     display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 24px; text-align: center;
   }
 
+  /* On a phone the name keeps to the left and the links to the right, so the two never read as one phrase. The first
+     link's auto margin does it, and gives way to nothing when the links fill the row and scroll. */
   @media (max-width: 640px) {
     .bar-in { gap: 8px; }
-    .nav { gap: 14px; }
+    .nav { gap: 20px; }
+    .nav a:first-child { margin-left: auto; }
     .brand { font-size: 16px; }
     .brand svg { width: 22px; height: 22px; }
   }
   @media (max-width: 399px) {
     .bar-in { gap: 6px; }
-    .nav { gap: 10px; font-size: 14px; }
+    .nav { gap: 16px; font-size: 14px; }
     .brand { font-size: 15px; }
   }
 </style>

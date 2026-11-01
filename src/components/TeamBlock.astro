@@ -77,8 +77,8 @@ const share = blockShare(view, s);
      they stand two by two, mirrored in the home block, rather than leave one on a line of its own. A game to
      come has three, which fit in a row. */
   @container (max-width: 559px) {
-    .stats:has(> :nth-child(4)) { display: grid; grid-template-columns: repeat(2, max-content); }
-    .home .stats:has(> :nth-child(4)) { direction: rtl; }
+    .stats:where(:has(> :nth-child(4))) { display: grid; grid-template-columns: repeat(2, max-content); }
+    .home .stats:where(:has(> :nth-child(4))) { direction: rtl; }
     .home .stats > div { direction: ltr; }
   }
 
@@ -92,5 +92,20 @@ const share = blockShare(view, s);
     .stats, .home .stats { display: flex; flex-direction: column; gap: 4px; direction: ltr; }
     .stats > div { display: flex; flex-direction: column; }
     dd { height: auto; font-size: 15px; line-height: 20px; }
+  }
+
+  /* A phone: both blocks stand alike, whatever their widths: the team, its big figure under it, and its figures in
+     one column under that, each name over its figure, all from the block's outer edge. A block keeps about a third
+     of the row so its big figure fits, and the figure grows with the screen, the same in both; a figure too long
+     for its block wraps rather than run past it. */
+  @media (max-width: 640px) {
+    .block { min-width: 34%; }
+    .in, .home .in { grid-template-columns: minmax(0, 1fr); grid-template-areas: "id" "big" "st"; row-gap: 2px; padding: 12px 14px 16px; }
+    .block .nm { display: none; }
+    .ab { font-size: 18px; line-height: 24px; }
+    .big { font-size: clamp(32px, 10vw, 44px); line-height: 1.1; }
+    .block .stats { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; direction: ltr; }
+    .stats > div { display: flex; flex-direction: column; }
+    dd { flex-wrap: wrap; column-gap: 6px; height: auto; font-size: 16px; line-height: 22px; white-space: normal; }
   }
 </style>
