@@ -8,7 +8,7 @@ import type { SeasonView } from "./season.ts";
 const server = await createServer({ root: new URL("../..", import.meta.url).pathname, configFile: false, logLevel: "error", server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] } });
 after(() => server.close());
 const { allSeasons } = (await server.ssrLoadModule("/src/lib/season.ts")) as typeof import("./season.ts");
-const { ledger, walk } = (await server.ssrLoadModule("/src/lib/ledger.ts")) as typeof import("./ledger.ts");
+const { ledger, minuteRows, walk } = (await server.ssrLoadModule("/src/lib/ledger.ts")) as typeof import("./ledger.ts");
 const { counted, EARLY, phi, PARAMS } = (await server.ssrLoadModule("/src/lib/elo.ts")) as typeof import("./elo.ts");
 
 /** Names ESPN gives more than one athlete id, which can rightly show twice in a walk. */
@@ -105,4 +105,24 @@ test(`no game's Result in a finished season runs more than ${AGAINST} points aga
     if (!season.end) continue;
     assert.ok(surprise > 0 ? w.whole.result >= -AGAINST : w.whole.result <= AGAINST, `${at}: did ${surprise > 0 ? "better" : "worse"} than expected, Result ${w.whole.result}`);
   }
+});
+
+test("minutes that change hands are credited to whoever caused the trade, and the rows still add up", () => {
+  // Player 1, rated -40 a 48, sits 10 of his minutes and 4 (+10) gives up 3; 2 (-60) takes 8, 3 (+20) 2, and 5 (-50),
+  // new to the rotation, 3.
+  const m = (athlete: number, before: number, after: number, value: number, sat = false) => ({ athlete, before: before / 48, after: after / 48, value, gap: 0, sat });
+  const changes = [m(1, 20, 10, -40, true), m(2, 10, 18, -60), m(3, 30, 32, 20), m(4, 30, 27, 10), m(5, 0, 3, -50)];
+  const rows = minuteRows(changes);
+  const total = changes.reduce((s, c) => s + (c.after - c.before) * c.value, 0);
+  assert.ok(Math.abs([...rows.values()].reduce((s, r) => s + r.points, 0) - total) < 1e-9, "the rows add up to the rotation's change");
+  assert.ok(rows.get(1)!.points < 0, "the player who sat is charged for the worse player who took most of his minutes");
+  // 5 joined, so his trade with 4 is all his; 4's row holds half of his trades with 2 and 3.
+  const fours = (3 / 48) * (8 / 13) * (-60 - 10) * 0.5 + (3 / 48) * (2 / 13) * (20 - 10) * 0.5;
+  assert.ok(Math.abs(rows.get(4)!.points - fours) < 1e-9, `4: ${rows.get(4)!.points} against ${fours}`);
+  // An absent player's gap is his on the day he leaves, and the takers' as it fades.
+  const leaving = minuteRows([{ athlete: 9, before: 0.5, after: 0, value: 30, gap: -10, sat: false }, { athlete: 1, before: 4.5, after: 5, value: 0, gap: 0, sat: false }]);
+  assert.equal(leaving.get(9)!.backups, -10);
+  const fading = minuteRows([{ athlete: 9, before: 0, after: 0, value: 30, gap: 2, sat: false }, { athlete: 1, before: 4, after: 4.5, value: 0, gap: 0, sat: false }, { athlete: 2, before: 1, after: 0.5, value: 0, gap: 0, sat: false }]);
+  assert.equal(fading.get(9)!.points, 0, "nothing on the absent player while he stays out");
+  assert.equal(fading.get(1)!.points, 2, "the fading gap goes to the teammate now counted for his minutes");
 });

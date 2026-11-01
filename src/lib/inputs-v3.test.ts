@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, ELO_PER_SIGMA, fitModel, NEWCOMER, PARAMS, playerPart, shownLineups, START, type Game, type SeasonData } from "./elo.ts";
+import { BACKUP_GAP, compute, ELO_PER_SIGMA, fitModel, PARAMS, playerPart, shownLineups, START, type Game, type SeasonData } from "./elo.ts";
 import { trailingHomeEdges } from "./home.ts";
 import { modelInputs } from "./inputs.ts";
 import type { BoxLine } from "./players.ts";
@@ -69,29 +69,34 @@ const awayInputs = modelInputs([
 ]).get("2026-27")!;
 const shownA = (day: string) => shownLineups(away, awayInputs.players!.rotation).after.get(day)!.A;
 
-test("a player out for weeks leaves the shown rotation, his minutes to a newcomer until the team has 2 games without him", () => {
-  const before = shownA("2026-10-21").map((p) => p.athlete).sort();
-  assert.ok(before.includes(9), "he counts before the report");
+test("a player out for weeks leaves the shown rotation, the rest of it takes his minutes, and a gap rides on them", () => {
+  const before = shownA("2026-10-21");
+  assert.ok(before.some((p) => p.athlete === 9), "he counts before the report");
+  // The usual rotation, as it stands without the report.
+  const plain = modelInputs([{ data: last, box: lastBox, preseason: totals("2025-26") }, { data: away, box: awayBox, preseason: totals("2026-27") }]).get("2026-27")!;
   for (const day of ["2026-10-23", "2026-10-25"]) {
+    const usual = shownLineups(away, plain.players!.rotation).after.get(day)!.A;
     const l = shownA(day);
     assert.ok(!l.some((p) => p.athlete === 9), `${day}: out of the rotation`);
-    assert.ok(l.some((p) => p.athlete === NEWCOMER), `${day}: his minutes go to a newcomer`);
     assert.ok(l.some((p) => p.athlete === 8), `${day}: a week out is not weeks`);
-    near(l.reduce((s, p) => s + p.share, 0), 5, `${day}: 240 minutes`);
+    near(l.filter((p) => p.athlete > 0).reduce((s, p) => s + p.share, 0), 5, `${day}: the rest fill 240 minutes`);
+    const his = usual.find((p) => p.athlete === 9)?.share ?? 0;
+    near(l.find((p) => p.athlete === -9)?.share ?? 0, his, `${day}: the gap rides on the share the rotation counted him for`);
+    const kept = usual.filter((p) => p.athlete !== 9);
+    const scale = 5 / kept.reduce((s, p) => s + p.share, 0);
+    for (const p of kept) near(l.find((q) => q.athlete === p.athlete)!.share, p.share * scale, `${day}: ${p.athlete} takes his part of the minutes`);
   }
-  const l = shownA("2026-10-27");
-  assert.deepEqual(l.map((p) => p.athlete).sort(), [1, 5, 6, 8], "two games without him: their minutes");
-  assert.ok(!l.some((p) => p.athlete === NEWCOMER));
+  assert.ok((shownA("2026-10-25").find((p) => p.athlete === -9)?.share ?? 0) < (shownA("2026-10-23").find((p) => p.athlete === -9)?.share ?? 0), "the gap fades as the team plays without him");
 });
 
-test("the newcomer's minutes count at the value of a player with no appearances", () => {
-  const ratings = awayInputs.players!.ratings;
+test("the gap counts BACKUP_GAP below the rest of the rotation in the shown rating", () => {
   const fit = fitModel(away, awayInputs).find((d) => d.day === "2026-10-23")!.after;
-  near(fit.v.get(NEWCOMER)!, PARAMS.players.a * ratings.newcomer!.after.get("2026-10-23")!, "the newcomer's value");
-  assert.ok(fit.v.get(NEWCOMER)! < 0, "below the league's mean");
+  const l = shownA("2026-10-23");
+  const gap = l.find((p) => p.athlete === -9)!.share;
+  near(playerPart(fit, l), playerPart(fit, l.filter((p) => p.athlete > 0)) - BACKUP_GAP * gap, "the gap's part");
   const model = compute(away, awayInputs);
   const shown = model.series.find((d) => d.day === "2026-10-23")!.r.A;
-  near(shown, START + (fit.r.A + playerPart(fit, shownA("2026-10-23"))) * (ELO_PER_SIGMA / PARAMS.sigma), "A's shown rating counts the newcomer");
+  near(shown, START + (fit.r.A + playerPart(fit, l)) * (ELO_PER_SIGMA / PARAMS.sigma), "A's shown rating counts the gap");
 });
 
 test("a player back on the floor counts again, though the report still lists him out for weeks", () => {
@@ -105,6 +110,6 @@ test("a player back on the floor counts again, though the report still lists him
   const shown = shownLineups(away, inputs.players!.rotation).after;
   assert.ok(!shown.get("2026-10-25")!.A.some((p) => p.athlete === 9), "out while he is out");
   const l = shown.get("2026-10-27")!.A;
-  assert.ok(l.some((p) => p.athlete === 9) && !l.some((p) => p.athlete === NEWCOMER), "back once he plays, at the usual rotation's count");
+  assert.ok(l.some((p) => p.athlete === 9) && !l.some((p) => p.athlete < 0), "back once he plays, at the usual rotation's count, with no gap");
   assert.deepEqual(l, inputs.players!.rotation.get("2026-10-27")!.A, "the usual rotation, unchanged");
 });

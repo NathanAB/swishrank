@@ -7,11 +7,13 @@ import type { Athlete, BoxRatings, Lineup, Lineups, SeasonBox, SeasonRotations, 
 
 export const START = 1000;
 /**
- * A placeholder in a lineup for minutes no known player is counted for, the minutes of players out for weeks when
- * the team has too few games without them to say who takes them. Every fit values it as a player with no
- * appearances: `a` times the box rating every newcomer starts from. ESPN's athlete ids start at 1.
+ * What the minutes of a player out for weeks are worth below the rest of his team's rotation, per 48, in margin units
+ * (29 Elo points at version 3's SIGMA): his teammates play them, and the backups who get them play worse than the
+ * regulars (docs/model-v2.md). A shown lineup carries those minutes as a slot with his id negated, at the share the
+ * rotation counted him for, beside the rest of the rotation scaled up to take them; the slot counts -BACKUP_GAP.
+ * Version 4 prices a game the same way, with V4.fill in src/lib/v4.ts. ESPN's athlete ids start at 1.
  */
-export const NEWCOMER = 0;
+export const BACKUP_GAP = 0.3;
 export const TZ = "America/New_York";
 
 export type Abbr = string;
@@ -122,8 +124,11 @@ export function secondNights(data: SeasonData): Map<string, Sides<boolean>> {
 /** The back-to-back term of a game's expected home margin: the home side gains when only its rival is on a second night. */
 export const b2bTerm = (rule: FitRule, second: Sides<boolean>) => (rule.b2b ? rule.b2b * (Number(second.away) - Number(second.home)) : 0);
 
+/** A lineup slot's value under `fit`: a player's own, or for a negated id, the gap on an absent player's minutes. */
+export const slotValue = (fit: Fit, athlete: Athlete) => (athlete < 0 ? -BACKUP_GAP : fit.v.get(athlete) ?? 0);
+
 /** A lineup's part of its team's expected margin. */
-export const playerPart = (fit: Fit, lineup: Lineup) => lineup.reduce((s, p) => s + p.share * (fit.v.get(p.athlete) ?? 0), 0);
+export const playerPart = (fit: Fit, lineup: Lineup) => lineup.reduce((s, p) => s + p.share * slotValue(fit, p.athlete), 0);
 
 /** A game's expected home margin under `fit`. */
 export const expected = (fit: Fit, { game, b2b, lineup }: Pregame) =>
@@ -319,12 +324,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
       for (let k = offs[g]; k < offs[g + 1]; k++) out[idx[k]] += d * val[k];
     }
   };
-  const snapshot = (day?: string): Fit => {
-    const v = new Map(athletes.map((a, j) => [a, x[p0 + j]]));
-    const fresh = day === undefined ? players.ratings.newcomer?.start : players.ratings.newcomer?.after.get(day);
-    if (fresh !== undefined && !v.has(NEWCOMER)) v.set(NEWCOMER, players.rule.a * fresh);
-    return { r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])), home: fitted ? x[n] : home.value, v };
-  };
+  const snapshot = (): Fit => ({ r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])), home: fitted ? x[n] : home.value, v: new Map(athletes.map((a, j) => [a, x[p0 + j]])) });
   return {
     start: snapshot(),
     add({ game: g, b2b }) {
@@ -361,7 +361,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
         rz = rz2;
         for (let k = 0; k < dim; k++) q[k] = z[k] + beta * q[k];
       }
-      return snapshot(day);
+      return snapshot();
     },
   };
 }
