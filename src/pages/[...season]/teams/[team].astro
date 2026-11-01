@@ -5,6 +5,7 @@
 // chart and the history beside them; a finished season has nothing ahead, so the chart and the history take the width.
 import Empty from "../../../components/Empty.astro";
 import FixtureList from "../../../components/FixtureList.astro";
+import Outlook from "../../../components/Outlook.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
 import TeamHeader from "../../../components/TeamHeader.astro";
@@ -17,6 +18,7 @@ import { teamDescription } from "../../../lib/meta.ts";
 import type { Route } from "../../../lib/routes.ts";
 import { TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
 import { nextGames, teamGames } from "../../../lib/teams.ts";
+import { currentOdds } from "../../../lib/season-odds.ts";
 import { teamPaint } from "../../../lib/tint.ts";
 
 export function getStaticPaths() {
@@ -36,6 +38,7 @@ const paint = teamPaint(me);
 const log = teamGames(m, abbr).reverse();
 const rows = ledger(season, abbr);
 const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
+const odds = season.current ? currentOdds() : null;
 ---
 
 <Base
@@ -46,6 +49,8 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
   ownHeading
 >
   <TeamHeader season={season} abbr={abbr} route={route} paint={paint} />
+
+  {odds && odds.teams[abbr] && <div class="outlook"><Outlook season={season} abbr={abbr} odds={odds} /></div>}
 
   <div class:list={["cols", { solo: !ahead }]}>
     {ahead && (
@@ -76,6 +81,7 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
      chart. */
   .cols { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: var(--gap); align-items: start; margin-top: var(--gap); }
   .solo { grid-template-columns: minmax(0, 1fr); }
+  .outlook { margin-top: var(--gap); }
   .side { position: sticky; top: var(--gap); }
   .main > :global(* + *) { margin-top: var(--gap); }
   .days { display: grid; gap: 16px; }

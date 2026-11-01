@@ -87,3 +87,11 @@ test("a game's link from its season at the root finds it under that season once 
   const guess = (path: string) => guessPath(path, { current: now.id, aliases: {}, months: { "2026-01": "2025-26" } });
   assert.equal(guess("/games/2026-01-23/ind-at-okc/"), "/2025-26/games/2026-01-23/ind-at-okc/");
 });
+
+test("the odds live at /odds/, a conference's under it, and a finished season's menu entry leads to its home", () => {
+  assert.equal(routePath({ kind: "odds", season: now }), "/odds/");
+  assert.equal(routePath({ kind: "odds", season: now, conference: "East" }), "/odds/east/");
+  assert.equal(sharePath(shareImage({ kind: "odds", season: now }, now)), "/share/2026-27.png");
+  assert.deepEqual(switchTarget({ kind: "odds", season: now, conference: "West" }, past, anyTeam), { kind: "home", season: past, conference: "West" });
+  assert.deepEqual(switchTarget({ kind: "odds", season: now }, now, anyTeam), { kind: "odds", season: now });
+});

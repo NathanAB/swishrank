@@ -43,12 +43,25 @@ export function homeDescription(season: Shown, conference?: Conference): string 
   return `${lede} ${leaders(season, conference)}`;
 }
 
+/** The odds page's document title, led by the words people search for. */
+export const oddsTitle = (season: Pick<SeasonView, "label">, conference?: Conference) =>
+  conference ? `${season.label} ${conference} playoff odds` : `NBA playoff and title odds ${season.label}`;
+
+/** "Every NBA team's projected record and its chances … The Spurs have the best title chance, at 25%." */
+export function oddsDescription(season: Shown, title: Record<Abbr, number>, conference?: Conference): string {
+  const { order } = standings(season.model, conference);
+  const best = [...order].sort((a, b) => title[b] - title[a])[0];
+  const who = conference ? `Every ${conference}ern Conference team's` : "Every NBA team's";
+  const lead = best ? ` The ${season.model.data.teams[best].short} have the best title chance${conference ? ` in the ${conference}` : ""}, at ${Math.round(title[best])}%.` : "";
+  return `${who} projected record and its chances to make the playoffs and win the title.${lead}`;
+}
+
 /** "The Celtics are 9th of 30 at 1032 with a 3–1 record." and what the page holds. */
 export function teamDescription(season: Pick<SeasonView, "model" | "current">, abbr: Abbr): string {
   const m = season.model;
   const [W, L] = standingsRecord(m, abbr);
   const name = `The ${m.data.teams[abbr].short}`;
-  const holds = season.current ? "Rating chart, rating history and next games." : "Rating chart and rating history.";
+  const holds = season.current ? "Playoff and title odds, rating chart, rating history and next games." : "Rating chart and rating history.";
   if (W + L === 0) return `${name} have not played yet, so they are rated on their preseason odds. ${holds}`;
   return `${name} ${season.current ? "are" : "finished"} ${place(m, abbr)} of ${m.abbrs.length} at ${rating(m.r[abbr])} with a ${record(W, L)} record. ${holds}`;
 }
