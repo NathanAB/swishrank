@@ -79,14 +79,19 @@ export function counted(margin: number, rule: MarginRule): number {
 
 /** One fit: each team's rating, the home edge and each player's value, in the margin rule's units. */
 export type Fit = { r: Record<Abbr, number>; home: number; v: ReadonlyMap<Athlete, number> };
-/** A final game as its prediction saw it: the back-to-back term, in margin units, and each side's lineup. */
+/** A final game as its prediction saw it: the back-to-back term, with any SeasonInputs `extra`, in margin units, and each side's lineup. */
 export type Pregame = { game: FinalGame; b2b: number; lineup: Sides<Lineup> };
 /** A game day: its games, the fit they were predicted from, and the fit after them. */
 export type FitDay = { day: string; games: Pregame[]; before: Fit; after: Fit };
-/** What a season's fit reads beyond its games: each team's prior centre, and its players' lines, ratings and lineups. */
+/**
+ * What a season's fit reads beyond its games: each team's prior centre, its players' lines, ratings and lineups, and,
+ * for version 4 (docs/model-v4.md), a term by game id added to the back-to-back term: in the expected margin, and
+ * taken out of the margin in the fit.
+ */
 export type SeasonInputs = {
   centres?: Record<Abbr, number>;
   players?: { box: SeasonBox; ratings: BoxRatings; lineups: ReadonlyMap<string, Sides<Lineup>>; rookies?: ReadonlySet<Athlete> };
+  extra?: ReadonlyMap<string, number>;
 };
 
 /** A season's final, scored games grouped by US Eastern day, in date order. */
@@ -185,7 +190,7 @@ export function fitSeason(data: SeasonData, rule: FitRule, inputs: SeasonInputs 
   const days = finalDays(data);
   const first = days.length ? Date.parse(days[0].day) : 0;
   const strength = (day: string) => (rule.seed ? rule.n0 * Math.exp(-Math.round((Date.parse(day) - first) / 86_400_000) / rule.seed.fade) : rule.n0);
-  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
+  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!) + (inputs.extra?.get(game.id) ?? 0), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
   const solver = players ? playerSolver(abbrs, rule, centres, players) : teamSolver(abbrs, rule, centres);
   let fit = solver.start;
   const out: FitDay[] = [];
@@ -218,7 +223,7 @@ export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonIn
   const days = finalDays(data);
   const start = days.length ? Date.parse(days[0].day) : 0;
   const strength = (day: string) => (rule.seed ? rule.n0 * Math.exp(-Math.round((Date.parse(day) - start) / 86_400_000) / rule.seed.fade) : rule.n0);
-  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
+  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!) + (inputs.extra?.get(game.id) ?? 0), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
   const solver = players ? playerSolver(abbrs, rule, inputs.centres, players) : teamSolver(abbrs, rule, inputs.centres);
   const ratings = players?.ratings;
   const index = new Map(ratings?.athletes.map((a, j) => [a, j]) ?? []);

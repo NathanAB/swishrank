@@ -1,7 +1,8 @@
 // Fetch a season's NBA games from ESPN's public scoreboard into src/data/games/<season>.json, the box score of
 // every final game src/data/box/<season>.json lacks from ESPN's game summary, and the day's injury report into
 // src/data/injuries/<season>.json. Then src/data/players.json gets the name of every player in the box scores
-// and injury reports: from each summary the box step reads, and from ESPN's athlete page for any still missing.
+// and injury reports: from each summary the box step reads, and from ESPN's athlete page for any still missing; and
+// src/data/draft.json the draft of every player in the box scores it lacks, from the same page (docs/model-v4.md).
 //
 //   node scripts/fetch-season.mjs            seasons still in progress (no "end" in seasons.json)
 //   node scripts/fetch-season.mjs 2025-26    one season by id
@@ -12,6 +13,7 @@
 import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
 import { dayKey } from "../src/lib/elo.ts";
 import { boxLines, fetchEvents, fetchJson, lostFinals, parse, playerNames } from "../src/lib/espn.ts";
+import { parseDraft } from "../src/lib/draft.ts";
 import { parseArchive, parseFeed, withReport } from "../src/lib/injuries.ts";
 
 const SEASONS = JSON.parse(await readFile(new URL("../src/data/seasons.json", import.meta.url), "utf8"));
@@ -19,6 +21,7 @@ const OUT_DIR = new URL("../src/data/games/", import.meta.url);
 const BOX_DIR = new URL("../src/data/box/", import.meta.url);
 const INJURY_DIR = new URL("../src/data/injuries/", import.meta.url);
 const NAMES_FILE = new URL("../src/data/players.json", import.meta.url);
+const DRAFT_FILE = new URL("../src/data/draft.json", import.meta.url);
 const INJURIES = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries";
 const ATHLETE = (id) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${id}`;
 const SUMMARY = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
@@ -136,6 +139,31 @@ async function fetchNames() {
   console.log(`names: ${wanted.size} players, ${found} looked up, ${missing.length - found} still without a name`);
 }
 
+// A draft ESPN cannot give leaves the player out of the file, so the next run asks again. Version 4 reads it only
+// for a rookie's starting level, and the site runs version 3.
+async function fetchDrafts() {
+  const draft = JSON.parse(await readFile(DRAFT_FILE, "utf8").catch(() => "{}"));
+  const boxes = await readAll(BOX_DIR);
+  const wanted = new Set(boxes.flatMap((box) => Object.values(box.games).flatMap((teams) => Object.values(teams).flat().map((line) => line[0]))));
+  const missing = [...wanted].filter((id) => !(id in draft));
+  let found = 0;
+  for (let i = 0; i < missing.length; i += 8) {
+    await Promise.all(missing.slice(i, i + 8).map(async (id) => {
+      try {
+        const athlete = (await fetchJson(ATHLETE(id))).athlete;
+        if (!athlete?.id) throw new Error("no athlete");
+        draft[id] = parseDraft(athlete.displayDraft);
+        found++;
+      } catch (err) {
+        console.warn(`no draft for athlete ${id} this time: ${err.message}`);
+      }
+    }));
+  }
+  const keys = Object.keys(draft).sort((a, b) => Number(a) - Number(b));
+  await writeFile(DRAFT_FILE, `{\n${keys.map((k) => `${JSON.stringify(k)}: ${JSON.stringify(draft[k])}`).join(",\n")}\n}\n`);
+  console.log(`drafts: ${wanted.size} players, ${found} looked up, ${missing.length - found} still without one`);
+}
+
 const ids = process.argv.slice(2);
 if (ids.includes("--names")) {
   await fetchNames();
@@ -147,4 +175,5 @@ if (ids.includes("--names")) {
     await fetchSeason(season);
   }
   await fetchNames();
+  await fetchDrafts();
 }
