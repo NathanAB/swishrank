@@ -27,17 +27,23 @@ test("a two-team toy season fits the least-squares answer, day by day", () => {
   near(two.after.home, 14 / 3, "home edge after day two");
 });
 
-test("the re-fit moves a team that did not play when a past opponent's results change", () => {
-  // A has a game to come, so its season is not over and nothing holds its rating.
-  const m = compute({
-    season: "x", teams: teams("A", "B", "C"),
+test("a team that does not play keeps its rating, and a past opponent's results reach it on its next game day", () => {
+  // A beats B, then B beats or loses to C while A rests, then A beats D. D has a game to come, so nothing is held.
+  const world = (bWins: boolean): SeasonData => ({
+    season: "x", teams: teams("A", "B", "C", "D"),
     games: [
-      game("1", "2026-10-20T23:00Z", "A", "B", 110, 100, true), game("2", "2026-10-21T23:00Z", "B", "C", 110, 100, true),
-      game("3", "2026-10-23T23:00Z", "A", "C", null, null, false),
+      game("1", "2026-10-20T23:00Z", "A", "B", 110, 100, true), game("2", "2026-10-21T23:00Z", "B", "C", bWins ? 110 : 100, bWins ? 100 : 110, true),
+      game("3", "2026-10-23T23:00Z", "A", "D", 105, 100, true), game("4", "2026-10-25T23:00Z", "D", "C", null, null),
     ],
   });
-  const [, dayOne, dayTwo] = m.series;
-  assert.ok(dayTwo.r.A > dayOne.r.A, `A rose from ${dayOne.r.A} to ${dayTwo.r.A} without playing`);
+  const on = (d: SeasonData, day: string) => compute(d).series.find((x) => x.day === day)!.r.A;
+  const [up, down] = [world(true), world(false)];
+  assert.equal(on(up, "2026-10-21"), on(up, "2026-10-20"), "A keeps its rating on the day it rests");
+  assert.equal(on(up, "2026-10-21"), on(down, "2026-10-21"), "whatever B did that day");
+  assert.ok(on(up, "2026-10-23") > on(down, "2026-10-23"), "on A's next game day, B's win makes A's win over B count for more");
+  // Without the freeze, as version 3's plan defines the fit, the re-fit moves A on the day it rests.
+  const refit = fitSeason(world(true), { ...PARAMS, idle: undefined });
+  assert.ok(refit[1].after.r.A > refit[0].after.r.A, "the plain re-fit lifts A without playing");
 });
 
 test("a game's ratings before and after are the team's ratings at the end of the day before and of its day", () => {

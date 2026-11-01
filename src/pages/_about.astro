@@ -82,8 +82,8 @@ const game = opener && {
       <Fragment slot="side">{season && <WinValue season={season} />}</Fragment>
     </Panel></li>
 
-    <li><Panel title="Every rating is redone each day">
-      <p class="say">Each morning's ratings use every result so far. A win counts for more once the beaten team proves strong, so a team can rise without playing.</p>
+    <li><Panel title="Every rating is redone each game day">
+      <p class="say">Each time a team plays, its rating uses every result so far. A win counts for more once the beaten team proves strong, and that shows the next time the team plays. A team that doesn't play keeps its rating.</p>
       <Fragment slot="side">
         {rest ? <DayOff season={season!} /> : game && (
           <div class="game">

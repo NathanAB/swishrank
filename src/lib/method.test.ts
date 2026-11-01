@@ -50,11 +50,10 @@ test("leaves out a kind with no game yet", () => {
   assert.deepEqual(contrasts.map((c) => c.kind), ["close", "blowout"]);
 });
 
-test("names a team that rose on a day it did not play, and the team it had beaten that won that day", () => {
-  // A beats B, D beats C and I beats H; two days later B, C, D and I all win. A and H rest and rise, H by more,
-  // but H lost to I rather than beat it. D rises most and had beaten C, but D played. K and L open the season a
-  // year earlier, so by these days the pull toward each team's seed has faded and one game moves a rating. A and H
-  // still have a game to come, so their seasons are not over.
+test("names no team that rose on a day it did not play: under the site's model a team that rests keeps its rating", () => {
+  // A beats B, D beats C and I beats H; two days later B, C, D and I all win while A and H rest. K and L open the
+  // season a year earlier, so by these days the pull toward each team's seed has faded and one game moves a rating.
+  // A and H still have a game to come, so their seasons are not over.
   const dayTwo = (g: Game): Game => ({ ...g, t: "2026-10-22T23:00Z" });
   const m = compute({
     season: "x",
@@ -71,9 +70,8 @@ test("names a team that rose on a day it did not play, and the team it had beate
       { ...game("A and H to come", "H", "A", 0, 0), t: "2026-10-24T23:00Z", hs: null, as: null, final: false },
     ],
   });
-  const pick = offDay(m.results, m.series);
-  assert.deepEqual(
-    pick && [pick.abbr, pick.day, pick.change, pick.beaten.result.game.id, pick.win.result.game.id],
-    ["A", "2026-10-22", 12, "A beats B", "B beats E"],
-  );
+  // Under the plain re-fit, A rose 12 that day for B's win over E. Since 2026-11-01 a team moves only on its game days.
+  assert.equal(offDay(m.results, m.series), null);
+  const rated = (day: string) => m.series.find((x) => x.day === day)!.r.A;
+  assert.equal(rated("2026-10-22"), rated("2026-10-20"));
 });
