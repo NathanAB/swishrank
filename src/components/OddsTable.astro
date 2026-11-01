@@ -1,0 +1,118 @@
+---
+// The odds for the whole league or one conference, a row a team: its record, its projected record, how its season
+// ends (a top-6 seed, the play-in or the lottery, as one bar in three blues), and its chances of the playoffs and
+// the title. On a phone each row takes two lines, the bar under the team. The headers sort the rows in place
+// (OddsPage.astro); without script they stand in projected order. Pointing at or focusing a bar reads out its parts
+// and the team's likeliest seed.
+import type { Abbr } from "../lib/elo.ts";
+import { record } from "../lib/format.ts";
+import type { SeasonOdds } from "../lib/odds.ts";
+import { oddsPct } from "../lib/race.ts";
+import { href } from "../lib/routes.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+import { standings, standingsRecord, type Conference } from "../lib/teams.ts";
+import { tintStyles } from "../lib/tint.ts";
+
+interface Props {
+  season: SeasonView;
+  odds: SeasonOdds;
+  conference?: Conference;
+}
+
+const { season, odds, conference } = Astro.props;
+const m = season.model;
+const tint = tintStyles(m.data.teams);
+const order = [...standings(m, conference).order].sort((a, b) => odds.teams[b].wins - odds.teams[a].wins || odds.teams[b].playoffs - odds.teams[a].playoffs);
+const ordinal = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th");
+const rows = order.map((abbr: Abbr) => {
+  const o = odds.teams[abbr];
+  const lottery = Math.max(0, Math.round((100 - o.top6 - o.playIn) * 10) / 10);
+  const parts = [
+    { share: o.top6, name: "Top 6 seed", color: "var(--result-top6)" },
+    { share: o.playIn, name: "Play-in", color: "var(--result-playin)" },
+    { share: lottery, name: "Lottery", color: "var(--result-lottery)" },
+  ];
+  const wins = Math.round(o.wins);
+  return {
+    abbr, tint: tint[abbr], name: team(season, abbr).short, href: href({ kind: "team", season, abbr }),
+    record: record(...standingsRecord(m, abbr)), projected: record(wins, 82 - wins), o, parts,
+    seed: ordinal(1 + o.seed.indexOf(Math.max(...o.seed))),
+    readout: JSON.stringify([team(season, abbr).name, ...parts.map((p) => [p.name, oddsPct(p.share)])]),
+  };
+});
+// In one conference, rules after the 6th and 10th rows mark the cut lines while the rows stand in projected order.
+const cuts = conference ? [6, 10] : [];
+---
+
+<div class="odds" role="table" aria-label={`${conference ? `${conference}ern Conference` : "League"} odds`} data-odds>
+  <div class="row head" role="row">
+    <span role="columnheader" class="rank">#</span>
+    <span role="columnheader">Team</span>
+    <span role="columnheader" class="rec r">Record</span>
+    <span role="columnheader" class="r"><button type="button" data-sort="wins" aria-sort="descending"><span class="wide">Projected</span><span class="narrow">Proj.</span></button></span>
+    <span role="columnheader" class="res"><button type="button" data-sort="result">Season result</button></span>
+    <span role="columnheader" class="r"><button type="button" data-sort="playoffs">Playoffs</button></span>
+    <span role="columnheader" class="r"><button type="button" data-sort="title">Title</button></span>
+  </div>
+  {rows.map((r, i) => (
+    <div class:list={["row", { cut: cuts.includes(i) }]} role="row" style={r.tint} data-team={r.abbr}
+      data-wins={r.o.wins} data-result={r.o.top6 * 1000 + r.o.playIn} data-playoffs={r.o.playoffs} data-title={r.o.title}>
+      <span role="cell" class="rank num" data-rank>{i + 1}</span>
+      <a role="cell" class="team" href={r.href}><span class="dot"></span><span class="name">{r.name}</span></a>
+      <span role="cell" class="rec r num">{r.record}</span>
+      <span role="cell" class="r num strong">{r.projected}</span>
+      <span role="cell" class="res">
+        <span class="bar" tabindex="0" data-readout={r.readout} data-seed={r.seed}
+          aria-label={`${r.name}: ${r.parts.map((p) => `${p.name.toLowerCase()} ${oddsPct(p.share)}`).join(", ")}`}>
+          {r.parts.filter((p) => p.share >= 0.5).map((p) => <span style={`flex: ${p.share} 0 0; background: ${p.color}`}></span>)}
+        </span>
+      </span>
+      <span role="cell" class="r num strong">{oddsPct(r.o.playoffs)}</span>
+      <span role="cell" class="r num strong">{oddsPct(r.o.title)}</span>
+    </div>
+  ))}
+</div>
+
+<style>
+  .odds { display: grid; font-variant-numeric: tabular-nums; }
+  .row {
+    display: grid; grid-template-columns: 28px minmax(130px, 1.3fr) 64px 88px minmax(160px, 3fr) 76px 64px;
+    column-gap: 12px; align-items: center; min-height: 36px; border-top: 1px solid var(--rule);
+  }
+  .row.head { border-top: 0; min-height: 0; padding-bottom: 8px; color: var(--muted); font-size: 11px; line-height: 14px; align-items: end; }
+  .row.cut { border-top-color: var(--control); }
+  .row > * { min-width: 0; }
+  .r { text-align: right; }
+  .rank, .rec { color: var(--muted); }
+  .strong { font-weight: 600; }
+  .head button { width: 100%; color: inherit; font-size: inherit; text-align: inherit; }
+  .head button:hover, .head button[aria-sort] { color: var(--text); }
+  .head button[aria-sort]::after { content: " ▾"; }
+  .team { display: flex; align-items: center; gap: 8px; }
+  .team:hover .name { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tint); flex: none; box-shadow: 0 0 0 2px var(--surface); }
+  /* A thin segmented bar: one part a result, a 2px gap between them, the ends rounded. */
+  .bar { display: flex; gap: 2px; height: 10px; width: 100%; border-radius: 5px; }
+  .bar > span { height: 100%; }
+  .bar > span:first-child { border-radius: 5px 0 0 5px; }
+  .bar > span:last-child { border-radius: 0 5px 5px 0; }
+  .bar > span:only-child { border-radius: 5px; }
+  .bar:focus-visible { outline-offset: 3px; }
+  .narrow { display: none; }
+
+  @media (max-width: 640px) {
+    .row { grid-template-columns: 18px minmax(0, 1fr) 50px 52px 38px; column-gap: 8px; row-gap: 6px; padding-block: 9px; }
+    .rec { display: none; }
+    .res { grid-column: 2 / -1; grid-row: 2; }
+    .row.head .res { display: none; }
+    .row.head { padding-block: 0 8px; }
+    .wide { display: none; }
+    .narrow { display: inline; }
+  }
+  @media (max-width: 380px) {
+    .row { grid-template-columns: minmax(0, 1fr) 50px 52px 38px; }
+    .rank { display: none; }
+    .res { grid-column: 1 / -1; }
+  }
+</style>

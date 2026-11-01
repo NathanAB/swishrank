@@ -16,7 +16,10 @@
     "backtest:v2": "node scripts/backtest-v2.ts",
     "backtest:v3": "node scripts/backtest-v3.ts",
     "backtest:v4": "node scripts/backtest-v4.ts",
-    "ratings": "node scripts/rating-scores.ts"
+    "ratings": "node scripts/rating-scores.ts",
+    "backtest:projections": "node scripts/backtest-projections.ts",
+    "project": "node scripts/project.ts",
+    "odds": "node scripts/odds-history.ts"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",

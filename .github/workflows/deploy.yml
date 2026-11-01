@@ -43,7 +43,7 @@ jobs:
       # A failed fetch never holds back the deploy, so an outage at ESPN never holds back a change to the site. The
       # build reads what is on disk: the scores already committed, or a games file the fetch wrote before it failed
       # later, which the commit step skips. The fetch-failed job below then turns the run red.
-      - name: Fetch this season's games, box scores and injury report from ESPN
+      - name: Fetch this season's games, box scores, injury report and schedule from ESPN
         id: fetch
         continue-on-error: true
         # A day's fetch takes minutes; ESPN failing with many names to look up could retry for hours and hold every
@@ -55,7 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/games src/data/box src/data/injuries src/data/players.json src/data/draft.json
+          git add src/data/games src/data/box src/data/injuries src/data/schedule src/data/players.json src/data/draft.json
           # A run that waited in the queue may be behind a push made since, which would reject its own.
           git diff --cached --quiet || { git commit -m "Update scores" && git pull --rebase && git push; }
       # The fetch saves the injury report before the scores, and the day's first saved report stands, so it is kept

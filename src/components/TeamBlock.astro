@@ -6,9 +6,11 @@
 // then home, meeting at a 2px gap as a chance bar's two parts do, each as wide as its share of the points or
 // the chances (lib/game.ts blockShare); the home block mirrors the away one, its figures read from its outer
 // edge in. The team's colour is a real border, so the outer corners round and the stripe's inner edge stays
-// straight. A block lays itself out by its own width, which its share decides as much as the screen does: the
-// name and figures beside the big number where there is room, stacked under it where there is not. The record
-// is the regular season's in a regular-season game and the postseason's after it.
+// straight. The two blocks lay themselves out alike, by the narrower one's width, which the shares decide as much
+// as the screen does: the name and figures beside the big number where there is room, stacked under it where
+// there is not. Both query the game's page's row of blocks, which is as wide as the narrower block once the two
+// have grown into their shares and holds that width while they do, so neither changes its layout as they grow.
+// The record is the regular season's in a regular-season game and the postseason's after it.
 import UpsetBadge from "./UpsetBadge.astro";
 import { blockShare, type GameSide, type GameView } from "../lib/game.ts";
 import { pct, rating, record, signed } from "../lib/format.ts";
@@ -47,7 +49,7 @@ const share = blockShare(view, s);
 
 <style>
   .block {
-    flex: var(--w) 1 0; min-width: 0; container-type: inline-size;
+    flex: var(--w) 1 0; min-width: 0;
     background: var(--fill); border-left: 4px solid var(--tint); border-radius: 4px 0 0 4px;
     animation: grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1); transition: background-color 120ms ease;
   }
@@ -76,7 +78,7 @@ const share = blockShare(view, s);
   /* About half a 1024px page: too narrow for a played game's four figures in a row beside the big number, so
      they stand two by two, mirrored in the home block, rather than leave one on a line of its own. A game to
      come has three, which fit in a row. */
-  @container (max-width: 559px) {
+  @container blocks (max-width: 559px) {
     .stats:where(:has(> :nth-child(4))) { display: grid; grid-template-columns: repeat(2, max-content); }
     .home .stats:where(:has(> :nth-child(4))) { direction: rtl; }
     .home .stats > div { direction: ltr; }
@@ -84,7 +86,7 @@ const share = blockShare(view, s);
 
   /* Too narrow for the big figure beside the rest: about 100px of abbreviation, 150px of figure, the gap and
      the padding. */
-  @container (max-width: 359px) {
+  @container blocks (max-width: 359px) {
     .in, .home .in { grid-template-columns: 1fr; grid-template-areas: "id" "big" "st"; row-gap: 8px; padding: 12px; }
     .nm { display: none; }
     .ab { font-size: 24px; line-height: 28px; }

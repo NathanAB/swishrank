@@ -12,3 +12,10 @@ test("no text is held to a narrower measure than its box: the owner wants text t
   );
   assert.deepEqual(capped, []);
 });
+
+test("no text is balanced, made pretty or broken by hand into shorter lines: the owner's rule in AGENTS.md", () => {
+  const forced = styled.flatMap((f) =>
+    [...readFileSync(join(src, f), "utf8").matchAll(/text-wrap:\s*(?:balance|pretty)|<br\s*\/?>/g)].map((m) => `${f}: ${m[0]}`),
+  );
+  assert.deepEqual(forced, []);
+});

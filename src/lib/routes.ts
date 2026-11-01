@@ -14,6 +14,8 @@ export type Route =
   /** `month` ("YYYY-MM") is that month's results alone; without it, the week ahead and the newest month. */
   | { kind: "games"; season: SeasonRef; month?: string }
   | { kind: "team"; season: SeasonRef; abbr: string }
+  /** Every team's projected record and chances, for the whole league or one conference; the season in progress only. */
+  | { kind: "odds"; season: SeasonRef; conference?: Conference }
   /** One game, played or to come: its day and its two teams name it, as no two teams meet twice in a day. */
   | { kind: "game"; season: SeasonRef; game: GameRef }
   /** Every season as a plain link to its home: the season menu's fallback without script. */
@@ -43,6 +45,8 @@ export function routePath(route: Route): string {
       return `${prefix(route.season)}/games/${route.month ? `${route.month}/` : ""}`;
     case "team":
       return `${prefix(route.season)}/teams/${teamSlug(route.abbr)}/`;
+    case "odds":
+      return `${prefix(route.season)}/odds/${route.conference ? `${conferenceSlug(route.conference)}/` : ""}`;
     case "game": {
       const { day, matchup } = gameSlug(route.game);
       return `${prefix(route.season)}/games/${day}/${matchup}/`;
@@ -73,6 +77,7 @@ export function shareImage(route: Route | undefined, current: SeasonRef): ShareI
     case "home":
     case "games":
     case "game":
+    case "odds":
       return { kind: "season", season: route.season };
     case "seasons":
     case "about":
@@ -109,8 +114,8 @@ export const href = (route: Route) => withBase(routePath(route));
 
 /**
  * The page a reader lands on when they pick season `to` from `route`: the same page in that season. A
- * conference carries over, a month of games or a game does not, and a team that `to` lacks falls back to that
- * season's home.
+ * conference carries over, a month of games or a game does not, a team that `to` lacks falls back to that
+ * season's home, and so do the odds in a season that is over.
  */
 export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string) => boolean): Route {
   switch (route.kind) {
@@ -124,6 +129,8 @@ export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string
       return { kind: "games", season: to };
     case "team":
       return hasTeam(route.abbr) ? { kind: "team", season: to, abbr: route.abbr } : { kind: "home", season: to };
+    case "odds":
+      return to.current ? { ...route, season: to } : { kind: "home", season: to, conference: route.conference };
     default: {
       const _exhaustive: never = route;
       return _exhaustive;

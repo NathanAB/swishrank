@@ -22,6 +22,11 @@
   /* A diverging pair for a walk's drops and rises (components/history/Walk.astro). */
   --drop: #d9722a;
   --rise: #3987e5;
+  /* How a season ends in the odds (OddsTable.astro, Outlook.astro): a top-6 seed, the play-in or the lottery. One blue
+     ramp, lightest for the best, checked as an ordinal ramp against the card's surface. */
+  --result-top6: #9ec5f4;
+  --result-playin: #3987e5;
+  --result-lottery: #184f95;
   /* How much of a team's colour its line carries at rest, mixed into the grey of an ordinary line. A previewed
      team draws in its full colour. */
   --tint-mix: 50%;

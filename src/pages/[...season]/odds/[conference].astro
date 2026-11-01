@@ -1,0 +1,24 @@
+---
+// The odds for one conference: /odds/east/ and /odds/west/, the season in progress only.
+import OddsPage from "../../../components/OddsPage.astro";
+import { currentOdds } from "../../../lib/season-odds.ts";
+import { currentSeason, type SeasonView } from "../../../lib/season.ts";
+import type { SeasonOdds } from "../../../lib/odds.ts";
+import { conferenceSlug } from "../../../lib/routes.ts";
+import { CONFERENCE_ORDER, type Conference } from "../../../lib/teams.ts";
+
+export function getStaticPaths() {
+  const odds = currentOdds();
+  return odds ? CONFERENCE_ORDER.map((conference) => ({ params: { season: undefined, conference: conferenceSlug(conference) }, props: { season: currentSeason(), odds, conference } })) : [];
+}
+
+interface Props {
+  season: SeasonView;
+  odds: SeasonOdds;
+  conference: Conference;
+}
+
+const { season, odds, conference } = Astro.props;
+---
+
+<OddsPage season={season} odds={odds} conference={conference} />

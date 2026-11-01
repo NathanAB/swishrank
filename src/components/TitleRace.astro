@@ -1,0 +1,233 @@
+---
+// The title race on a season's home: every team's chance of winning the title on every day of the regular season,
+// the five the race names (src/lib/race.ts contenders) each in a colour of the dataviz palette's categorical slots,
+// checked for colour-blind separation on the card's surface, and the rest grey. Team colours would not do here: the
+// Spurs' silver reads as grey and three contenders can share a blue. On a wide screen each named line ends in its
+// name and chance; on a phone the legend carries the chances and the plot takes the width. Pointing anywhere on the
+// plot reads out every named team's chance that day, and the grey line under the pointer, if any, joins them.
+import Panel from "./Panel.astro";
+import { shortDay } from "../lib/format.ts";
+import type { OddsDay } from "../lib/odds.ts";
+import { champion, contenders, oddsPct, raceLead } from "../lib/race.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+
+interface Props {
+  season: SeasonView;
+  history: OddsDay[];
+}
+
+const { season, history } = Astro.props;
+const SLOTS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"];
+const champ = season.current ? null : champion(season.model);
+const named = contenders(history, champ);
+const colour = Object.fromEntries(named.map((a, i) => [a, SLOTS[i]]));
+const abbrs = Object.keys(history[0].title).sort();
+const name = (a: string) => team(season, a).short;
+const n = history.length;
+const last = history[n - 1];
+const peak = Math.max(...history.flatMap((d) => abbrs.map((a) => d.title[a])));
+const yMax = Math.max(10, Math.ceil(peak / 10) * 10);
+const step = yMax > 60 ? 20 : 10;
+const W = 1000, H = 300;
+const x = (i: number) => (n === 1 ? W : (i / (n - 1)) * W);
+const y = (v: number) => H - (v / yMax) * H;
+const points = (a: string) => history.map((d, i) => `${x(i).toFixed(1)},${y(d.title[a]).toFixed(1)}`).join(" ");
+const ticks = Array.from({ length: yMax / step + 1 }, (_, i) => i * step);
+const pctOf = (v: number, of: number) => `${((v / of) * 100).toFixed(2)}%`;
+
+// End labels, pushed apart where they crowd, as shares of the plot's height so they hold at any height.
+const ends = named.map((a) => ({ a, at: y(last.title[a]), y: y(last.title[a]) })).sort((p, q) => p.y - q.y);
+for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 16) ends[i].y = ends[i - 1].y + 16;
+const over = (ends.at(-1)?.y ?? 0) - H;
+if (over > 0) for (const e of ends) e.y -= over;
+
+// Dates: the months for a long race, a few days for a short one.
+const dates: { at: number; text: string; anchor: "from" | "mid" | "to" }[] = [];
+if (n > 40) {
+  let month = "";
+  history.forEach((d, i) => {
+    if (d.day.slice(5, 7) !== month && Number(d.day.slice(8)) <= 7 && i > 0 && i < n - 8) dates.push({ at: x(i), text: shortDay(d.day).split(" ")[0], anchor: "mid" });
+    month = d.day.slice(5, 7);
+  });
+} else {
+  dates.push({ at: 0, text: shortDay(history[0].day), anchor: "from" });
+  if (n > 6) dates.push({ at: x(Math.floor((n - 1) / 2)), text: shortDay(history[Math.floor((n - 1) / 2)].day), anchor: "mid" });
+  if (n > 1) dates.push({ at: W, text: shortDay(last.day), anchor: "to" });
+}
+const data = JSON.stringify({
+  days: history.map((d) => shortDay(d.day)),
+  names: Object.fromEntries(abbrs.map((a) => [a, name(a)])),
+  named, colours: named.map((a) => colour[a]), yMax,
+  series: Object.fromEntries(abbrs.map((a) => [a, history.map((d) => Math.round(d.title[a] * 10))])),
+});
+const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name(a)} ${oddsPct(last.title[a])}`).join(", ")} on the last day.`;
+---
+
+<Panel title="Title race">
+  <p class="lead">{raceLead(history, name, season.label, champ)}</p>
+  <ul class="legend">
+    {named.map((a) => <li><i style={`background: ${colour[a]}`}></i>{name(a)}<span class="now"> {oddsPct(last.title[a])}</span></li>)}
+  </ul>
+  <div class="race" data-race={data}>
+    <div class="plot" role="img" aria-label={label}>
+      <div class="ticks">{ticks.map((t) => <span style={`top: ${pctOf(y(t), H)}`}>{t}%</span>)}</div>
+      <div class="field" data-field>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+          {ticks.map((t) => <path class:list={["rule", { zero: t === 0 }]} d={`M0,${y(t)}H${W}`} />)}
+          <g data-lines>
+            {abbrs.filter((a) => !named.includes(a)).map((a) => <polyline class="line other" data-abbr={a} points={points(a)} />)}
+            {[...named].reverse().map((a) => <polyline class="line" data-abbr={a} style={`stroke: ${colour[a]}`} points={points(a)} />)}
+          </g>
+          <path class="cross" data-cross d={`M0,0V${H}`} />
+        </svg>
+        {named.map((a) => <span class="dot end" style={`background: ${colour[a]}; top: ${pctOf(y(last.title[a]), H)}`}></span>)}
+        <div data-dots></div>
+      </div>
+      <div class="lane">
+        {ends.map((e) => (
+          <>
+            <svg class="leader" viewBox={`0 0 12 ${H}`} preserveAspectRatio="none" aria-hidden="true"><path d={`M0,${e.at}L10,${e.y}`} /></svg>
+            <span class="label" style={`top: ${pctOf(e.y, H)}`}>{name(e.a)} {oddsPct(last.title[e.a])}</span>
+          </>
+        ))}
+      </div>
+      <div class="dates">{dates.map((d) => <span class={d.anchor} style={`left: ${pctOf(d.at, W)}`}>{d.text}</span>)}</div>
+    </div>
+    <div class="tip" data-tip hidden></div>
+  </div>
+</Panel>
+
+<script>
+  type Race = { days: string[]; names: Record<string, string>; named: string[]; colours: string[]; yMax: number; series: Record<string, number[]> };
+  for (const root of document.querySelectorAll<HTMLElement>("[data-race]")) {
+    const race = JSON.parse(root.dataset.race ?? "{}") as Race;
+    const field = root.querySelector<HTMLElement>("[data-field]")!;
+    const cross = root.querySelector<SVGPathElement>("[data-cross]")!;
+    const dots = root.querySelector<HTMLElement>("[data-dots]")!;
+    const tip = root.querySelector<HTMLElement>("[data-tip]")!;
+    const lines = new Map([...root.querySelectorAll<SVGPolylineElement>("polyline[data-abbr]")].map((l) => [l.dataset.abbr ?? "", l]));
+    const n = race.days.length;
+    const colour = (a: string) => race.colours[race.named.indexOf(a)] ?? "var(--text)";
+    const value = (a: string, i: number) => race.series[a][i] / 10;
+    const text = (v: number) => (v <= 0 ? "0%" : v < 0.1 ? "<0.1%" : v < 10 ? `${v.toFixed(1)}%` : `${Math.round(v)}%`);
+    let lifted: string | null = null;
+
+    function rest() {
+      cross.classList.remove("on");
+      dots.replaceChildren();
+      tip.hidden = true;
+      if (lifted) lines.get(lifted)?.classList.remove("lift");
+      lifted = null;
+    }
+
+    function read(e: PointerEvent) {
+      const box = field.getBoundingClientRect();
+      const fx = (e.clientX - box.left) / box.width;
+      if (fx < -0.02 || fx > 1.02) return rest();
+      const i = Math.max(0, Math.min(n - 1, Math.round(fx * (n - 1))));
+      const at = n === 1 ? 1 : i / (n - 1);
+      const yOf = (v: number) => (1 - v / race.yMax) * box.height;
+      const py = e.clientY - box.top;
+      // The grey line nearest the pointer, within 10px, joins the readout.
+      let near: string | null = null, best = 10;
+      for (const a of Object.keys(race.series)) {
+        if (race.named.includes(a)) continue;
+        const d = Math.abs(yOf(value(a, i)) - py);
+        if (d < best) { best = d; near = a; }
+      }
+      if (near !== lifted) {
+        if (lifted) lines.get(lifted)?.classList.remove("lift");
+        if (near) { const l = lines.get(near); l?.classList.add("lift"); l?.parentElement?.append(l); }
+        lifted = near;
+      }
+      cross.style.transform = `translateX(${at * 1000}px)`;
+      cross.classList.add("on");
+      const shown = [...race.named, ...(near ? [near] : [])];
+      dots.replaceChildren(...shown.map((a) => {
+        const d = document.createElement("span");
+        d.className = "dot";
+        d.style.left = `${at * 100}%`;
+        d.style.top = `${(1 - value(a, i) / race.yMax) * 100}%`;
+        d.style.background = colour(a);
+        return d;
+      }));
+      const day = document.createElement("span");
+      day.textContent = race.days[i];
+      const rows = [...race.named].sort((a, b) => value(b, i) - value(a, i)).concat(near ? [near] : []).map((a) => {
+        const row = document.createElement("span");
+        row.className = a === near ? "row near" : "row";
+        const key = document.createElement("i");
+        key.style.background = colour(a);
+        const v = document.createElement("strong");
+        v.textContent = text(value(a, i));
+        const who = document.createElement("b");
+        who.textContent = race.names[a];
+        row.append(key, v, who);
+        return row;
+      });
+      tip.replaceChildren(day, ...rows);
+      tip.hidden = false;
+      const area = root.getBoundingClientRect();
+      const px = e.clientX - area.left;
+      const gap = e.pointerType === "touch" ? 24 : 12;
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      const left = px + gap + w > area.width ? px - gap - w : px + gap;
+      const top = Math.min(Math.max(0, e.clientY - area.top - h - gap), area.height - h);
+      tip.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, top)}px)`;
+    }
+
+    field.addEventListener("pointermove", read);
+    field.addEventListener("pointerdown", read);
+    field.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") rest(); });
+    field.addEventListener("pointercancel", rest);
+    document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Node && field.contains(e.target))) rest(); });
+  }
+</script>
+
+<style>
+  .lead { margin: -2px 0 12px; font-size: 17px; line-height: 1.45; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px; font-size: 13px; line-height: 18px; }
+  .legend li { display: inline-flex; align-items: center; gap: 8px; }
+  .legend i { width: 16px; height: 3px; border-radius: 2px; flex: none; }
+  .legend .now { display: none; color: var(--muted); }
+
+  .race { position: relative; --h: 300px; }
+  .plot { display: grid; grid-template-columns: 40px minmax(0, 1fr) 132px; grid-template-rows: var(--h) 22px; }
+  .ticks, .field, .lane { position: relative; height: var(--h); }
+  .ticks span { position: absolute; right: 8px; transform: translateY(-50%); color: var(--muted); font-size: var(--fs-small); line-height: 16px; font-variant-numeric: tabular-nums; }
+  .field { touch-action: pan-y pinch-zoom; }
+  .field svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  path, polyline { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+  .rule { stroke: var(--grid); stroke-width: 1; }
+  .rule.zero { stroke: var(--control); }
+  .line { stroke-width: 2; }
+  .line.other { stroke: var(--line-other); stroke-opacity: 0.45; stroke-width: 1.5; }
+  .line.other.lift { stroke: var(--text); stroke-opacity: 0.9; stroke-width: 2; }
+  .cross { stroke: var(--text); stroke-opacity: 0.35; stroke-width: 1; opacity: 0; }
+  .cross.on { opacity: 1; }
+  .dot, [data-dots] :global(.dot) {
+    position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); pointer-events: none;
+  }
+  .end { left: 100%; }
+  [data-dots] { position: absolute; inset: 0; pointer-events: none; }
+  .lane .leader { position: absolute; left: 4px; top: 0; width: 12px; height: 100%; overflow: visible; }
+  .leader path { stroke: var(--control); stroke-width: 1; }
+  .label { position: absolute; left: 18px; transform: translateY(-50%); white-space: nowrap; font-size: var(--fs-small); line-height: 16px; font-variant-numeric: tabular-nums; }
+  .dates { grid-column: 2; position: relative; }
+  .dates span { position: absolute; top: 6px; color: var(--muted); font-size: var(--fs-small); line-height: 16px; white-space: nowrap; transform: translateX(-50%); }
+  .dates .from { transform: none; }
+  .dates .to { transform: translateX(-100%); }
+  .tip :global(.row) { display: grid; grid-template-columns: 14px 40px auto; align-items: center; gap: 6px; }
+  .tip :global(.row i) { width: 14px; height: 3px; border-radius: 2px; }
+  .tip :global(.row strong) { margin: 0; text-align: right; }
+  .tip :global(.row b) { font-weight: 400; color: var(--muted); }
+  .tip :global(.row.near b) { color: var(--text); }
+
+  @media (max-width: 640px) {
+    .lead { font-size: 15px; }
+    .legend .now { display: inline; }
+    .race { --h: 220px; }
+    .plot { grid-template-columns: 34px minmax(0, 1fr) 8px; }
+    .lane { display: none; }
+  }
+</style>

@@ -10,6 +10,6 @@ test("a team page's description gives the team's rank of every team, a shared ra
   // The Thunder beat the Celtics and the Knicks by the same score at home, so those two are level behind them.
   const model = compute({ season: "2026-27", teams: { OKC: team("Thunder"), BOS: team("Celtics"), NY: team("Knicks") }, games: [final("1", "BOS"), final("2", "NY")] });
   const season = { model, current: true };
-  assert.equal(teamDescription(season, "OKC"), `The Thunder are 1st of 3 at ${rating(model.r.OKC)} with a 2–0 record. Rating chart, rating history and next games.`);
-  assert.equal(teamDescription(season, "BOS"), `The Celtics are tied 2nd of 3 at ${rating(model.r.BOS)} with a 0–1 record. Rating chart, rating history and next games.`);
+  assert.equal(teamDescription(season, "OKC"), `The Thunder are 1st of 3 at ${rating(model.r.OKC)} with a 2–0 record. Playoff and title odds, rating chart, rating history and next games.`);
+  assert.equal(teamDescription(season, "BOS"), `The Celtics are tied 2nd of 3 at ${rating(model.r.BOS)} with a 0–1 record. Playoff and title odds, rating chart, rating history and next games.`);
 });
