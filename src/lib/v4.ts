@@ -23,8 +23,8 @@ export const V4 = {
   /** A top-three pick's starting box rating above the previous season's minutes-weighted mean, per 36 minutes. */
   topThree: 0.28,
   /** SIGMA and the early widening, fitted on the tuning seasons by scripts/backtest-v4.ts. */
-  sigma: 2.983,
-  widen: 1.14,
+  sigma: 2.981,
+  widen: 1.15,
 };
 
 /** What availability() reads of V4; scripts/backtest-v4.ts also runs version 3's rule, "Out" only, through it. */

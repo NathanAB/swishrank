@@ -51,22 +51,25 @@ export type PlayerRule = { a: number; np: number; halfLife: number; rookieNp?: n
 /**
  * `n0` is the pull toward each team's prior centre, in games against an average team that ended level. Version 1
  * is the rule without `seed`, `b2b` or `players`: every centre at 0, the league average, and a pull that stays.
- * `b2b` is what a team on the second night of a back-to-back gives up, in margin units.
+ * `b2b` is what a team on the second night of a back-to-back gives up, in margin units. With `idle: "freeze"`, a
+ * day's fit moves only the teams that played that day and the players with lines in their games; everyone else keeps
+ * the day before's value, so a team's rating moves only on its own game days.
  */
-export type FitRule = { n0: number; margin: MarginRule; home: HomeRule; seed?: SeedRule; b2b?: number; players?: PlayerRule };
+export type FitRule = { n0: number; margin: MarginRule; home: HomeRule; seed?: SeedRule; b2b?: number; players?: PlayerRule; idle?: "freeze" };
 /** `sigma` turns an expected margin into a win chance: Phi(margin / sigma). */
 export type Params = FitRule & { sigma: number };
 
 /**
  * The site's model, version 3 (docs/model-v3.md): version 2's settings (docs/model-v2.md, tables 1 and 2) with a
  * rookie's value held with 40 games and SIGMA fitted again. The home edge here, 0.622, is only the fallback: each
- * season's own edge, from the three seasons before it, comes in its ModelInputs. Version 2 is frozen as `V2` in
- * scripts/evaluate.ts.
+ * season's own edge, from the three seasons before it, comes in its ModelInputs. Since 2026-11-01, by the owner's
+ * choice outside version 3's plan, a team's rating moves only on its own game days (`idle`); docs/model-v3.md, The
+ * switch, has why. Version 2 is frozen as `V2` in scripts/evaluate.ts.
  */
 export const PARAMS = {
   n0: 96, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 },
   seed: { scale: 5, fade: 120, carry: 0.7 }, b2b: 0.4, players: { a: 0.08, np: 320, halfLife: 365, rookieNp: 40 },
-  sigma: 3.037,
+  idle: "freeze", sigma: 3.037,
 } satisfies Params;
 
 /** Games a team plays before its rating stops being provisional: docs/model-v2.md, table 9. */
@@ -222,10 +225,22 @@ export function fitSeason(data: SeasonData, rule: FitRule, inputs: SeasonInputs 
     const pre = games.map(pregame);
     for (const p of pre) solver.add(p);
     const before = fit;
-    fit = solver.fit(day, strength(day));
+    fit = solver.fit(day, strength(day), undefined, rule.idle === "freeze" ? dayFree(games, players?.box) : undefined);
     out.push({ day, games: pre, before, after: fit });
   }
   return out;
+}
+
+/** The teams and players a day's fit may move when the rule freezes idle ones: those in the day's games. */
+type Free = { teams: ReadonlySet<Abbr>; players: ReadonlySet<Athlete> };
+function dayFree(games: readonly FinalGame[], box: SeasonBox | undefined): Free {
+  const teams = new Set<Abbr>(), players = new Set<Athlete>();
+  for (const g of games) {
+    teams.add(g.home);
+    teams.add(g.away);
+    for (const lines of Object.values(box?.games[g.id] ?? {})) for (const l of lines ?? []) players.add(l[0]);
+  }
+  return { teams, players };
 }
 
 /**
@@ -260,22 +275,24 @@ export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonIn
     const today = ratings?.after.get(day);
     const mix = previous && Float64Array.from(previous);
     const before = fit;
-    const priors = solver.fit(day, strength(day), mix);
+    const free = rule.idle === "freeze" ? dayFree(games, players?.box) : undefined;
+    const priors = solver.fit(day, strength(day), mix, free);
     const steps = order.map((p, i) => {
       solver.add(p);
       // `first`'s own game is also fitted before its players' box ratings move, to split the result from the box score.
-      const result = i === 0 && (p.game.home === first || p.game.away === first) ? solver.fit(day, strength(day), mix) : undefined;
+      const result = i === 0 && (p.game.home === first || p.game.away === first) ? solver.fit(day, strength(day), mix, free) : undefined;
       if (mix && today) for (const lines of Object.values(players!.box.games[p.game.id] ?? {})) for (const l of lines ?? []) { const j = index.get(l[0]); if (j !== undefined) mix[j] = today[j]; }
-      return { game: p.game, fit: solver.fit(day, strength(day), mix), result };
+      return { game: p.game, fit: solver.fit(day, strength(day), mix, free), result };
     });
-    fit = solver.fit(day, strength(day));
+    fit = solver.fit(day, strength(day), undefined, free);
     out.push({ day, games: pre, before, after: fit, priors, steps });
     previous = today;
   }
   return out;
 }
 
-type Solver = { start: Fit; add: (p: Pregame) => void; fit: (day: string, strength: number, rating?: Float64Array) => Fit };
+/** A day's fit: with `free`, everyone outside it keeps the day before's value. */
+type Solver = { start: Fit; add: (p: Pregame) => void; fit: (day: string, strength: number, rating?: Float64Array, free?: Free) => Fit };
 
 /** Teams only: the normal equations are 30 or 31 wide, so they are solved exactly each day. */
 function teamSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number> | undefined): Solver {
@@ -284,6 +301,7 @@ function teamSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number> 
   const xx = Array.from({ length: n + 1 }, () => new Array<number>(n + 1).fill(0));
   const xy = new Array<number>(n + 1).fill(0);
   const home = rule.home;
+  let last: number[] = [...abbrs.map((a) => centres?.[a] ?? 0), home.kind === "fixed" ? home.value : home.centre];
   return {
     start: startFit(abbrs, rule, centres),
     add({ game: g, b2b }) {
@@ -295,7 +313,7 @@ function teamSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number> 
         for (const [j, xj] of idx) xx[i][j] += xi * xj;
       }
     },
-    fit(_day, strength) {
+    fit(_day, strength, _rating, free) {
       const size = home.kind === "fixed" ? n : n + 1;
       const M = xx.slice(0, size).map((row) => row.slice(0, size));
       const v = xy.slice(0, size);
@@ -306,7 +324,15 @@ function teamSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number> 
         M[n][n] += home.weight;
         v[n] += home.weight * home.centre;
       }
+      // A frozen team keeps its value: its part moves to the other equations' right side, its own equation pins it.
+      if (free) for (let i = 0; i < n; i++) {
+        if (free.teams.has(abbrs[i])) continue;
+        for (let k = 0; k < size; k++) if (k !== i) { v[k] -= M[k][i] * last[i]; M[k][i] = 0; M[i][k] = 0; }
+        M[i][i] = 1;
+        v[i] = last[i];
+      }
       const x = solveCholesky(M, v);
+      last = x;
       return { r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])), home: home.kind === "fixed" ? home.value : x[n], v: NO_PLAYERS };
     },
   };
@@ -335,6 +361,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
   const offs = [0], idx: number[] = [], val: number[] = [];
   const D = new Float64Array(dim), diag = new Float64Array(dim), xty = new Float64Array(dim);
   const A = new Float64Array(dim), r = new Float64Array(dim), z = new Float64Array(dim), q = new Float64Array(dim), b = new Float64Array(dim);
+  const on = new Uint8Array(dim).fill(1);
   const matvec = (v: Float64Array, out: Float64Array) => {
     for (let i = 0; i < dim; i++) out[i] = D[i] * v[i];
     for (let g = 0; g + 1 < offs.length; g++) {
@@ -357,15 +384,18 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
       for (const [c, v] of cols) { idx.push(c); val.push(v); diag[c] += v * v; xty[c] += v * y; }
       offs.push(idx.length);
     },
-    fit(day, strength, rating) {
+    fit(day, strength, rating, free) {
       setPlayerCentres(rating ?? players.ratings.after.get(day)!);
       for (let k = 0; k < dim; k++) {
         D[k] = k < n ? strength : k < p0 && fitted ? home.weight : hold[k - p0];
         b[k] = xty[k] + D[k] * centre[k];
       }
+      // With `free`, conjugate gradients on the free columns alone, the rest held at the day before's values.
+      if (free) for (let k = 0; k < dim; k++) on[k] = k < n ? Number(free.teams.has(abbrs[k])) : k < p0 ? 1 : Number(free.players.has(athletes[k - p0]));
+      else on.fill(1);
       matvec(x, A);
       let rz = 0, bb = 0;
-      for (let k = 0; k < dim; k++) { r[k] = b[k] - A[k]; z[k] = r[k] / (diag[k] + D[k]); q[k] = z[k]; rz += r[k] * z[k]; bb += b[k] * b[k]; }
+      for (let k = 0; k < dim; k++) { r[k] = on[k] ? b[k] - A[k] : 0; z[k] = r[k] / (diag[k] + D[k]); q[k] = z[k]; rz += r[k] * z[k]; if (on[k]) bb += b[k] * b[k]; }
       for (let it = 0; it < 2000; it++) {
         let rr = 0;
         for (let k = 0; k < dim; k++) rr += r[k] * r[k];
@@ -375,7 +405,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
         for (let k = 0; k < dim; k++) qa += q[k] * A[k];
         const alpha = rz / qa;
         let rz2 = 0;
-        for (let k = 0; k < dim; k++) { x[k] += alpha * q[k]; r[k] -= alpha * A[k]; z[k] = r[k] / (diag[k] + D[k]); rz2 += r[k] * z[k]; }
+        for (let k = 0; k < dim; k++) { x[k] += alpha * q[k]; r[k] = on[k] ? r[k] - alpha * A[k] : 0; z[k] = r[k] / (diag[k] + D[k]); rz2 += r[k] * z[k]; }
         const beta = rz2 / rz;
         rz = rz2;
         for (let k = 0; k < dim; k++) q[k] = z[k] + beta * q[k];

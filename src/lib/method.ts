@@ -43,7 +43,8 @@ export type OffDay = { abbr: Abbr; day: string; change: number; beaten: Outcome;
  * A team that rose on a day it did not play because a team it had beaten won that day, which shows each
  * morning's fit re-reading every past game: the biggest such rise, earliest first on a tie. `beaten` is the
  * team's earlier win and `win` the beaten team's win that day; of several, the one that lifted the beaten
- * team most. Null until a season has such a day.
+ * team most. Null until a season has such a day, and always null under the site's model since 2026-11-01, in
+ * which a team's rating moves only on its own game days (elo.ts PARAMS `idle`).
  */
 export function offDay(results: readonly Result[], series: readonly Snapshot[]): OffDay | null {
   const games = results.map(outcome);

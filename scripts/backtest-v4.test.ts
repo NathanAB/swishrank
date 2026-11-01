@@ -13,11 +13,11 @@ test("src/lib/v4.ts's SIGMA and widening are the fit docs/model-v4.md's Check li
   assert.equal(JSON.stringify({ sigma: r(V4.sigma, 3), widen: r(V4.widen, 2) }), check[1]);
 });
 
-test("docs/model-v4.md's pre-registration is the text whose hash it records", () => {
+test("docs/model-v4.md's pre-registration is the text whose latest hash it records", () => {
   const lines = doc.split("\n");
   const from = lines.indexOf("## Pre-registration");
   const to = lines.findIndex((l, i) => i > from && l.startsWith("## "));
   const hash = createHash("sha256").update(lines.slice(from + 1, to).join("\n")).digest("hex");
-  assert.match(doc, new RegExp(`This plan when written: \`${hash}\``));
+  assert.ok(doc.split("\n").some((l) => l.startsWith("The plan this one replaced") && l.endsWith(`\`${hash}\`.`)), "the Results line ends on the plan's current hash");
   assert.match(readFileSync(new URL("./backtest-v4.ts", import.meta.url), "utf8"), new RegExp(`const PREREGISTERED = "${hash}"`));
 });
