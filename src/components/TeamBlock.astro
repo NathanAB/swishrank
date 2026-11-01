@@ -6,9 +6,12 @@
 // then home, meeting at a 2px gap as a chance bar's two parts do, each as wide as its share of the points or
 // the chances (lib/game.ts blockShare); the home block mirrors the away one, its figures read from its outer
 // edge in. The team's colour is a real border, so the outer corners round and the stripe's inner edge stays
-// straight. A block lays itself out by its own width, which its share decides as much as the screen does: the
-// name and figures beside the big number where there is room, stacked under it where there is not. The record
-// is the regular season's in a regular-season game and the postseason's after it.
+// straight. The two blocks lay themselves out alike, by the narrower one's width, which the shares decide as much
+// as the screen does: the name and figures beside the big number where there is room, stacked under it where
+// there is not. So that the wider block reads the same width, each block's layout is queried against a frame as
+// wide as the narrower block (--k, the narrower share over its own), and its content runs the block's own width
+// from inside that frame. The record is the regular season's in a regular-season game and the postseason's after
+// it.
 import UpsetBadge from "./UpsetBadge.astro";
 import { blockShare, type GameSide, type GameView } from "../lib/game.ts";
 import { pct, rating, record, signed } from "../lib/format.ts";
@@ -25,10 +28,11 @@ interface Props {
 
 const { season, view, side: s, paint } = Astro.props;
 const share = blockShare(view, s);
+const narrower = Math.min(share, blockShare(view, s.side === "away" ? view.home : view.away));
 ---
 
-<a class:list={["block", s.side, { dim: s.line?.won === false }]} href={href({ kind: "team", season, abbr: s.abbr })} style={`${paint}; --w: ${share.toFixed(3)}`}>
-  <span class="in">
+<a class:list={["block", s.side, { dim: s.line?.won === false }]} href={href({ kind: "team", season, abbr: s.abbr })} style={`${paint}; --w: ${share.toFixed(3)}; --k: ${(narrower / share).toFixed(4)}`}>
+  <span class="frame"><span class="in">
     <span class="id"><span class="ab">{s.abbr}</span><span class="nm">{team(season, s.abbr).name}</span></span>
     <span class="big num">{s.line ? s.line.score : pct(s.chance)}</span>
     <dl class="stats">
@@ -42,12 +46,12 @@ const share = blockShare(view, s);
       <div><dt>Rank</dt><dd class="num">{s.place}</dd></div>
       <div><dt>{view.stage.phase === "regular" ? "Record" : "Postseason"}</dt><dd class="num">{record(...s.record)}</dd></div>
     </dl>
-  </span>
+  </span></span>
 </a>
 
 <style>
   .block {
-    flex: var(--w) 1 0; min-width: 0; container-type: inline-size;
+    flex: var(--w) 1 0; min-width: 0;
     background: var(--fill); border-left: 4px solid var(--tint); border-radius: 4px 0 0 4px;
     animation: grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1); transition: background-color 120ms ease;
   }
@@ -57,7 +61,9 @@ const share = blockShare(view, s);
   .block.home { text-align: right; border-left: 0; border-right: 4px solid var(--tint); border-radius: 0 4px 4px 0; }
   @keyframes grow { from { flex-grow: 0.5; } }
   @media (prefers-reduced-motion: reduce) { .block { animation: none; } }
-  .in { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id big" "st big"; align-items: center; column-gap: 16px; row-gap: 14px; padding: 16px 20px; }
+  /* The blocks' widths are their shares of the row, so the narrower block's is the wider's times --k. */
+  .frame { display: block; width: calc(var(--k) * 100%); container-type: inline-size; }
+  .in { width: calc(100% / var(--k)); display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id big" "st big"; align-items: center; column-gap: 16px; row-gap: 14px; padding: 16px 20px; }
   .home .in { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "big id" "big st"; }
   .id { grid-area: id; min-width: 0; display: flex; flex-direction: column; }
   .ab { font-size: 40px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; }
