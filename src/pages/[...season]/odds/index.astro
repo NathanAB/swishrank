@@ -1,0 +1,21 @@
+---
+// The odds for the whole league: /odds/, the season in progress only.
+import OddsPage from "../../../components/OddsPage.astro";
+import { currentOdds } from "../../../lib/season-odds.ts";
+import { currentSeason, type SeasonView } from "../../../lib/season.ts";
+import type { SeasonOdds } from "../../../lib/odds.ts";
+
+export function getStaticPaths() {
+  const odds = currentOdds();
+  return odds ? [{ params: { season: undefined }, props: { season: currentSeason(), odds } }] : [];
+}
+
+interface Props {
+  season: SeasonView;
+  odds: SeasonOdds;
+}
+
+const { season, odds } = Astro.props;
+---
+
+<OddsPage season={season} odds={odds} />

@@ -1,6 +1,7 @@
 // Fetch a season's NBA games from ESPN's public scoreboard into src/data/games/<season>.json, the box score of
 // every final game src/data/box/<season>.json lacks from ESPN's game summary, and the day's injury report into
-// src/data/injuries/<season>.json. Then src/data/players.json gets the name of every player in the box scores
+// src/data/injuries/<season>.json. For a season in progress, the rest of its regular-season schedule past the games
+// file's two weeks goes into src/data/schedule/<season>.json for the odds. Then src/data/players.json gets the name of every player in the box scores
 // and injury reports: from each summary the box step reads, and from ESPN's athlete page for any still missing.
 //
 //   node scripts/fetch-season.mjs            seasons still in progress (no "end" in seasons.json)
@@ -13,11 +14,13 @@ import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
 import { dayKey } from "../src/lib/elo.ts";
 import { boxLines, fetchEvents, fetchJson, lostFinals, parse, playerNames } from "../src/lib/espn.ts";
 import { parseArchive, parseFeed, withReport } from "../src/lib/injuries.ts";
+import { stage } from "../src/lib/teams.ts";
 
 const SEASONS = JSON.parse(await readFile(new URL("../src/data/seasons.json", import.meta.url), "utf8"));
 const OUT_DIR = new URL("../src/data/games/", import.meta.url);
 const BOX_DIR = new URL("../src/data/box/", import.meta.url);
 const INJURY_DIR = new URL("../src/data/injuries/", import.meta.url);
+const SCHEDULE_DIR = new URL("../src/data/schedule/", import.meta.url);
 const NAMES_FILE = new URL("../src/data/players.json", import.meta.url);
 const INJURIES = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries";
 const ATHLETE = (id) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${id}`;
@@ -83,6 +86,27 @@ async function fetchBox(id, finals) {
   console.log(`${id}: box scores for ${added} more games, ${finals.length - Object.keys(box.games).length} final games without one`);
 }
 
+// The regular season's games scheduled past the games file, for the odds (src/lib/schedule.ts), through April 30 of
+// the season's second year, which is past any regular season's end. A failed or empty fetch keeps the file as it was
+// and only warns: the odds fill what a team lacks with stand-in games, where a failed run would hold back scores.
+async function fetchSchedule(season) {
+  try {
+    const days = [];
+    const last = Date.parse(`${Number(season.id.slice(0, 4)) + 1}-04-30`);
+    for (let d = Date.now() + (FIXTURE_DAYS + 1) * DAY; d <= last; d += DAY) days.push(isoDay(d));
+    const perDay = [];
+    for (let i = 0; i < days.length; i += 8) perDay.push(...(await Promise.all(days.slice(i, i + 8).map(fetchDay))));
+    const byId = new Map(perDay.flatMap((events) => parse(season.id, events, {})).filter((g) => !g.final && stage(g.note).phase === "regular").map((g) => [g.id, g]));
+    const games = [...byId.values()].sort((a, b) => a.t.localeCompare(b.t) || a.id.localeCompare(b.id)).map(({ id, t, home, away, neutral, note }) => ({ id, t, home, away, neutral, note }));
+    if (days.length && !games.length) return console.warn(`${season.id}: ESPN has no games scheduled past the next ${FIXTURE_DAYS} days, so the schedule stays as it was`);
+    await mkdir(SCHEDULE_DIR, { recursive: true });
+    await writeFile(new URL(`${season.id}.json`, SCHEDULE_DIR), JSON.stringify({ season: season.id, games }) + "\n");
+    console.log(`${season.id}: ${games.length} regular-season games scheduled past the next ${FIXTURE_DAYS} days`);
+  } catch (err) {
+    console.warn(`${season.id}: no schedule this time: ${err.message}`);
+  }
+}
+
 // A missing day costs the team pages' History section only that day's injury lines, so a failed, empty or
 // unreadable report is a warning and never fails the run.
 async function fetchInjuries(id) {
@@ -145,6 +169,7 @@ if (ids.includes("--names")) {
   for (const season of targets) {
     if (!season.end) await fetchInjuries(season.id);
     await fetchSeason(season);
+    if (!season.end) await fetchSchedule(season);
   }
   await fetchNames();
 }

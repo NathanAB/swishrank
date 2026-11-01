@@ -17,11 +17,9 @@ import { addDays, compute, dayKey, ELO_PER_SIGMA, fitModel, PARAMS, phi, playerP
 import { modelInputs, LONG_ABSENCE } from "../src/lib/inputs.ts";
 import { parseArchive } from "../src/lib/injuries.ts";
 import { scaled, type Lineup } from "../src/lib/players.ts";
-import { DIVISIONS, divisionOf, generator, meanWins, setupAt, shownOutlook, simulate, stakes, winsAt, type Drift, type Fixture, type Outlook, type Projection } from "../src/lib/project.ts";
+import { DIVISIONS, divisionOf, DRIFT, generator, meanWins, setupAt, shownOutlook, simulate, stakes, winsAt, type Drift, type Fixture, type Outlook, type Projection } from "../src/lib/project.ts";
 import { conferenceOf, stage } from "../src/lib/teams.ts";
 
-/** The drift scripts/backtest-projections.ts chose on the tuning seasons. */
-export const DRIFT: Drift = { tau: 60, walk: 20, playoff: 0.5 };
 const RUNS = 20000;
 const HISTORY_RUNS = 1500;
 /** The stand-in schedule's last day, about when the regular season ends. */

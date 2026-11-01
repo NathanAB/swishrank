@@ -1,0 +1,186 @@
+---
+// The odds: every team's projected record and its chances, for the whole league or one conference, picked by the
+// switch in the card's header. As on the home page, each page holds all three views and the switch shows the picked
+// one in place, with its URL and titles, and without script its links load each view's own page. The season in
+// progress only: a finished season's menu entry leads to its home.
+import Base from "../layouts/Base.astro";
+import OddsTable from "./OddsTable.astro";
+import Panel from "./Panel.astro";
+import SeasonMenu from "./SeasonMenu.astro";
+import Segmented from "./Segmented.astro";
+import { oddsDescription, oddsTitle, SITE_NAME } from "../lib/meta.ts";
+import type { SeasonOdds } from "../lib/odds.ts";
+import { oddsPct } from "../lib/race.ts";
+import { href, type Route } from "../lib/routes.ts";
+import { seasonSwitch, team, type SeasonView } from "../lib/season.ts";
+import { CONFERENCE_ORDER, standings, type Conference } from "../lib/teams.ts";
+
+interface Props {
+  season: SeasonView;
+  odds: SeasonOdds;
+  conference?: Conference;
+}
+
+const { season, odds, conference } = Astro.props;
+const route: Route = { kind: "odds", season, conference };
+const title = Object.fromEntries(Object.entries(odds.teams).map(([a, o]) => [a, o.title]));
+const heading = (c?: Conference) => (c ? `${season.label} odds · ${c}` : `${season.label} odds`);
+/** "The Spurs have the best chance to win the title, at 25%. The Thunder are next at 14%." */
+const lead = (c?: Conference) => {
+  const [a, b] = [...standings(season.model, c).order].sort((x, y) => title[y] - title[x]);
+  const where = c ? ` in the ${c}` : "";
+  return `The ${team(season, a).short} have the best chance${where} to win the title, at ${oddsPct(title[a])}. The ${team(season, b).short} are next at ${oddsPct(title[b])}.`;
+};
+const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
+  conference: c,
+  label: c ?? "All",
+  href: href({ kind: "odds", season, conference: c }),
+  current: c === conference,
+}));
+---
+
+<Base title={heading(conference)} docTitle={oddsTitle(season, conference)} description={oddsDescription(season, title, conference)} route={route} ownHeading>
+  <Panel level={1} title={heading(conference)}>
+    <Fragment slot="aside">
+      <Segmented label="Conference" options={views} />
+      <SeasonMenu route={route} />
+    </Fragment>
+    <p class="lead" data-lead>{lead(conference)}</p>
+    <p class="legend">
+      <span class="key">Season result</span>
+      <span><i style="background: var(--result-top6)"></i>Top 6 seed</span>
+      <span><i style="background: var(--result-playin)"></i>Play-in</span>
+      <span><i style="background: var(--result-lottery)"></i>Lottery</span>
+    </p>
+    <div class="views">
+      {views.map((v) => (
+        <div
+          hidden={!v.current}
+          data-view={v.href}
+          data-heading={heading(v.conference)}
+          data-lead={lead(v.conference)}
+          data-doc-title={`${oddsTitle(season, v.conference)} · ${SITE_NAME}`}
+          data-seasons={JSON.stringify(seasonSwitch({ kind: "odds", season, conference: v.conference }).map((o) => o.href))}
+        >
+          <OddsTable season={season} odds={odds} conference={v.conference} />
+        </div>
+      ))}
+      <div class="tip" data-odds-tip hidden></div>
+    </div>
+  </Panel>
+</Base>
+
+<script>
+  const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Conference"] a')];
+  const heading = document.querySelector("h1");
+  const lead = document.querySelector<HTMLElement>("p[data-lead]");
+  const menu = document.querySelector<HTMLSelectElement>("select[data-season-menu]");
+
+  function show(path: string) {
+    const view = views.find((v) => v.dataset.view === path);
+    if (!view) return false;
+    for (const v of views) v.hidden = v !== view;
+    for (const a of links) {
+      if (a.pathname === path) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    }
+    if (heading) heading.textContent = view.dataset.heading ?? "";
+    if (lead) lead.textContent = view.dataset.lead ?? "";
+    document.title = view.dataset.docTitle ?? document.title;
+    const seasons: unknown = JSON.parse(view.dataset.seasons ?? "[]");
+    if (menu && Array.isArray(seasons)) seasons.forEach((s, i) => menu.options[i] && (menu.options[i].value = String(s)));
+    return true;
+  }
+  for (const a of links) {
+    a.addEventListener("click", (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      if (a.pathname !== location.pathname && show(a.pathname)) history.pushState(null, "", a.href);
+    });
+  }
+  addEventListener("popstate", () => show(location.pathname) || location.reload());
+
+  // Sorting: a header puts its table's rows in that column's order, highest first, and renumbers them. The cut lines
+  // after the 6th and 10th rows of a conference stand only in projected order.
+  for (const table of document.querySelectorAll<HTMLElement>("[data-odds]")) {
+    const rows = [...table.querySelectorAll<HTMLElement>(".row:not(.head)")];
+    const cuts = rows.map((r, i) => (r.classList.contains("cut") ? i : -1)).filter((i) => i >= 0);
+    const buttons = [...table.querySelectorAll<HTMLButtonElement>("button[data-sort]")];
+    const value = (r: HTMLElement, key: string) => Number(r.dataset[key]);
+    for (const b of buttons) {
+      b.addEventListener("click", () => {
+        const key = b.dataset.sort ?? "wins";
+        const sorted = [...rows].sort((x, y) => value(y, key) - value(x, key) || value(y, "wins") - value(x, "wins"));
+        table.append(...sorted);
+        sorted.forEach((r, i) => {
+          const rank = r.querySelector("[data-rank]");
+          if (rank) rank.textContent = String(i + 1);
+          r.classList.toggle("cut", key === "wins" && cuts.includes(i));
+        });
+        for (const o of buttons) {
+          if (o === b) o.setAttribute("aria-sort", "descending");
+          else o.removeAttribute("aria-sort");
+        }
+      });
+    }
+  }
+
+  // A season result's readout: on hover, focus or a tap, beside the bar.
+  const tip = document.querySelector<HTMLElement>("[data-odds-tip]");
+  const box = tip?.parentElement;
+  const KEYS = ["var(--result-top6)", "var(--result-playin)", "var(--result-lottery)"];
+  function readout(bar: HTMLElement, x: number, y: number, finger: boolean) {
+    if (!tip || !box) return;
+    const [name, ...parts] = JSON.parse(bar.dataset.readout ?? "[]") as [string, ...[string, string][]];
+    const head = document.createElement("span");
+    head.textContent = name;
+    const lines = parts.map(([label, value], i) => {
+      const row = document.createElement("span");
+      row.className = "part";
+      const key = document.createElement("i");
+      key.style.background = KEYS[i];
+      const v = document.createElement("strong");
+      v.textContent = value;
+      const b = document.createElement("b");
+      b.textContent = label;
+      row.append(key, v, b);
+      return row;
+    });
+    const seed = document.createElement("span");
+    seed.textContent = `Likeliest seed: ${bar.dataset.seed ?? ""}`;
+    tip.replaceChildren(head, ...lines, seed);
+    tip.hidden = false;
+    const area = box.getBoundingClientRect();
+    const gap = finger ? 24 : 12;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    const px = x - area.left, py = y - area.top;
+    const left = px + gap + w > area.width ? px - gap - w : px + gap;
+    tip.style.transform = `translate(${Math.max(0, Math.min(left, area.width - w))}px, ${Math.max(0, py - h - gap)}px)`;
+  }
+  const hide = () => tip && (tip.hidden = true);
+  for (const bar of document.querySelectorAll<HTMLElement>("[data-readout]")) {
+    bar.addEventListener("pointermove", (e) => readout(bar, e.clientX, e.clientY, e.pointerType === "touch"));
+    bar.addEventListener("pointerdown", (e) => readout(bar, e.clientX, e.clientY, e.pointerType === "touch"));
+    bar.addEventListener("pointerleave", (e) => e.pointerType !== "touch" && hide());
+    bar.addEventListener("focus", () => { const r = bar.getBoundingClientRect(); readout(bar, r.left + r.width / 2, r.top, false); });
+    bar.addEventListener("blur", hide);
+  }
+  document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Element && e.target.closest("[data-readout]"))) hide(); });
+</script>
+
+<style>
+  .lead { margin: -4px 0 12px; font-size: 17px; line-height: 1.45; }
+  .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-bottom: 14px; font-size: 13px; line-height: 18px; }
+  .legend .key { color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .legend i { width: 14px; height: 14px; border-radius: 3px; flex: none; }
+  .views { position: relative; }
+  .tip :global(.part) { display: grid; grid-template-columns: 10px 36px auto; align-items: center; gap: 6px; }
+  .tip :global(.part i) { width: 10px; height: 10px; border-radius: 2px; }
+  .tip :global(.part strong) { margin: 0; text-align: right; }
+  .tip :global(.part b) { font-weight: 400; color: var(--muted); }
+  @media (max-width: 640px) {
+    .lead { font-size: 15px; }
+  }
+</style>

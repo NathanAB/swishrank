@@ -56,6 +56,9 @@ export type Setup = {
  */
 export type Drift = { tau: number; walk: number; playoff?: number };
 
+/** The site's drift, chosen on the tuning seasons, 2015-16 to 2022-23, by scripts/backtest-projections.ts: docs/projections.md. */
+export const DRIFT: Drift = { tau: 60, walk: 20, playoff: 0.5 };
+
 /** What happened to each team across the simulated seasons, as counts out of `runs`. */
 export type TeamOdds = {
   /** Final wins: wins[k] is how many seasons the team finished on k wins. */
@@ -393,12 +396,14 @@ export function shownOutlook(model: Season, day: string): Outlook {
 
 /**
  * The season as it stood at the end of `day`: the standings games final by then as played, and every later
- * standings game in the file, played or not, as a fixture. A finished season's later games are the real schedule.
+ * standings game in the file, played or not, as a fixture, with `extra` games the file lacks. A finished season's
+ * later games are the real schedule.
  */
 export function setupAt(model: Season, day: string, drift: Drift, opts: { outlook?: Outlook; extra?: Fixture[]; format?: Format } = {}): Setup {
   const counts = (g: Game) => stage(g.note).standings;
   const played = model.results.filter((r) => r.day <= day && counts(r.game)).map((r) => ({ home: r.game.home, away: r.game.away, homeWon: r.game.hs! > r.game.as! }));
-  const later = [...model.results.filter((r) => r.day > day).map((r) => r.game), ...model.upcoming.filter((g) => dayKey(g.t) > day)].filter(counts);
+  // Every game not yet final is still to play, a postponed one included, whatever day the file gives it.
+  const later = [...model.results.filter((r) => r.day > day).map((r) => r.game), ...model.upcoming].filter(counts);
   const fixtures: Fixture[] = later.map((g) => ({ id: g.id, day: dayKey(g.t), home: g.home, away: g.away, edge: (g.neutral ? 0 : model.home) + (model.b2b[g.id] ?? 0) }));
   return {
     abbrs: model.abbrs,
