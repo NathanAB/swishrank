@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BACKUP_GAP, compute, ELO_PER_SIGMA, fitModel, PARAMS, playerPart, shownLineups, START, type Game, type SeasonData } from "./elo.ts";
+import { BACKUP_GAP, compute, ELO_PER_SIGMA, fitModel, gapValue, PARAMS, playerPart, shownLineups, START, type Game, type SeasonData } from "./elo.ts";
 import { trailingHomeEdges } from "./home.ts";
 import { modelInputs } from "./inputs.ts";
 import type { BoxLine } from "./players.ts";
@@ -89,11 +89,19 @@ test("a player out for weeks leaves the shown rotation, the rest of it takes his
   assert.ok((shownA("2026-10-25").find((p) => p.athlete === -9)?.share ?? 0) < (shownA("2026-10-23").find((p) => p.athlete === -9)?.share ?? 0), "the gap fades as the team plays without him");
 });
 
-test("the gap counts BACKUP_GAP below the rest of the rotation in the shown rating", () => {
+test("the gap counts BACKUP_GAP below the rest of the rotation, and never lets an absence raise a team", () => {
+  // Players 1 and 2 are worth 0.5 and 0.1 a 48; 9, out, takes 1 of their 5 shares' worth of minutes.
+  const v = (nine: number) => ({ r: {}, home: 0, v: new Map([[1, 0.5], [2, 0.1], [9, nine]]) });
+  const lineup = [{ athlete: 1, share: 2.5 }, { athlete: 2, share: 2.5 }, { athlete: -9, share: 1 }];
+  near(gapValue(v(0.6), 9, 0.3), -BACKUP_GAP, "a good player's minutes: the gap");
+  near(playerPart(v(0.6), lineup), 2.5 * 0.5 + 2.5 * 0.1 - BACKUP_GAP, "the rest at their worth, less the gap");
+  near(gapValue(v(-1), 9, 0.3), -1.3, "a player rated below his backups: his minutes count at his own value");
+  // With him in, the others' 5 shares were 4, 2 each: 2 * 0.5 + 2 * 0.1 + 1 * -1.
+  near(playerPart(v(-1), lineup), 2 * 0.5 + 2 * 0.1 - 1, "so his absence moves nothing");
   const fit = fitModel(away, awayInputs).find((d) => d.day === "2026-10-23")!.after;
   const l = shownA("2026-10-23");
   const gap = l.find((p) => p.athlete === -9)!.share;
-  near(playerPart(fit, l), playerPart(fit, l.filter((p) => p.athlete > 0)) - BACKUP_GAP * gap, "the gap's part");
+  near(playerPart(fit, l), playerPart(fit, l.filter((p) => p.athlete > 0)) + gapValue(fit, 9, playerPart(fit, l.filter((p) => p.athlete > 0)) / 5) * gap, "the gap's part");
   const model = compute(away, awayInputs);
   const shown = model.series.find((d) => d.day === "2026-10-23")!.r.A;
   near(shown, START + (fit.r.A + playerPart(fit, l)) * (ELO_PER_SIGMA / PARAMS.sigma), "A's shown rating counts the gap");

@@ -1,6 +1,6 @@
 // Every move of a team's shown rating split into its parts, so each row adds up exactly to the change shown.
 // Mirrors compute() in elo.ts day by day.
-import { ELO_PER_SIGMA, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, playerPart, seasonRule, shownChange, shownLineups, slotValue, type Abbr, type Fit } from "./elo.ts";
+import { ELO_PER_SIGMA, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, gapValue, playerPart, restValue, seasonRule, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
 import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,7 +16,7 @@ const INJURY_FILES = import.meta.glob<unknown>("../data/injuries/*.json", { eage
  * A player whose counted minutes changed that day, and what the change did at the values after the day, credited
  * as minuteRows credits it. For a player
  * out for weeks, `backups` is the part of `points` from the gap on the minutes his teammates play for him
- * (BACKUP_GAP in src/lib/elo.ts): taking it on when he leaves, its fading as the team plays without him ("out"),
+ * (gapValue in src/lib/elo.ts): taking it on when he leaves, its fading as the team plays without him ("out"),
  * and its end when he is back.
  */
 export type PlayerMove = {
@@ -192,7 +192,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
     const g = pg?.game;
     // The team's own game is the first step, fitted once before its players' box ratings move (`result`) and once after.
     const own = g ? steps[0] : undefined;
-    const value = (fit: Fit, athlete: number) => slotValue(fit, athlete) * scale;
+    const value = (fit: Fit, athlete: number) => (fit.v.get(athlete) ?? 0) * scale;
     const result = own?.result;
     const boxed: BoxPlayer[] = own && result
       ? was.filter((p) => p.athlete > 0).map((p) => ({ athlete: p.athlete, name: name(p.athlete), points: (value(own.fit, p.athlete) - value(result, p.athlete)) * p.share }))
@@ -239,11 +239,12 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
     // A player out for weeks is two slots, his own and the gap on his minutes (his id negated): see minuteRows.
     const shareOf = (lineup: Lineup, athlete: number) => lineup.find((p) => p.athlete === athlete)?.share ?? 0;
     const ids = [...new Set([...was, ...usual[abbr]].map((p) => Math.abs(p.athlete)))];
+    const restBefore = restValue(after, was), restAfter = restValue(after, usual[abbr]);
     const playedIn = (athlete: number) => { const line = lines?.find((l) => l[0] === athlete); return g ? (lines ? (line ? line[1] : null) : undefined) : undefined; };
     const credited = minuteRows(ids.map((athlete) => ({
       athlete,
       before: shareOf(was, athlete), after: shareOf(usual[abbr], athlete), value: value(after, athlete),
-      gap: (shareOf(usual[abbr], -athlete) - shareOf(was, -athlete)) * value(after, -athlete),
+      gap: (shareOf(usual[abbr], -athlete) * gapValue(after, athlete, restAfter) - shareOf(was, -athlete) * gapValue(after, athlete, restBefore)) * scale,
       sat: playedIn(athlete) === null,
     })));
     const players: PlayerMove[] = held ? [] : ids.flatMap((athlete) => {
@@ -279,33 +280,51 @@ export type RotationChange = { athlete: number; before: number; after: number; v
  * What each player's change in counted minutes did, in rating points, credited to whoever caused it. The rotation
  * always counts 240 minutes, so the minutes some players lose, others take: each pair of a player who gave up minutes
  * and one who took them trades the giver's share in proportion to what each took, worth the taker's value less the
- * giver's. A player who left the rotation or sat out the day's game caused his trades and is credited with all of
- * them; a player who joined it, new or back, caused his; any other trade is split half and half. Against a
- * league-average player, as rows were first counted, a player rated below average who sat showed a gain while the
- * teammates who took his minutes showed the loss. The gap on an absent player's minutes (BACKUP_GAP) is his on the
- * days he leaves and comes back; as it fades with games played without him, it goes to the teammates now counted for
- * his minutes, in proportion to what each took. The rows add up to the change in the rotation's worth, as before. A
- * day whose two rotations count different totals, as when a team's first rotation arrives, counts each player at his
- * own value.
+ * giver's. A player who left the rotation or sat out the day's game is charged with each of his trades that cost his
+ * team, and a player who joined it, new or back, credited with each of his that helped; their other trades, and every
+ * trade between two players who both played, go to the player on the other end, or are split half and half; a gain
+ * between two players who both sat goes to the teammates who played. So a player who sits never shows a gain, even
+ * when his counted minutes rise, nor a player's return a loss: when a player rated below his teammates sits, the
+ * gain is theirs, shown as the minutes they took. On the finished seasons such gains were mostly not there:
+ * teams whose players who sat were rated below those who played beat their ratings by -0.36 [+/- 0.26] of what that
+ * credited, and lost 20 to 30 Elo points per 48 of an absent player's minutes beyond it (docs/model-v2.md). The gap
+ * on an absent player's minutes (gapValue) is his on the days he leaves and comes back; as it fades with games played
+ * without him, it goes to the teammates now counted for his minutes, in proportion to what each took. The rows add up
+ * to the change in the rotation's worth. A day whose two rotations count different totals, as when a team's first
+ * rotation arrives, counts each player at his own value.
  */
 export function minuteRows(changes: readonly RotationChange[]): Map<number, { points: number; backups: number }> {
   const out = new Map(changes.map((c) => [c.athlete, { points: 0, backups: 0 }]));
   const delta = (c: RotationChange) => c.after - c.before;
   const gave = changes.filter((c) => delta(c) < 0), took = changes.filter((c) => delta(c) > 0);
   const given = gave.reduce((s, c) => s - delta(c), 0), taken = took.reduce((s, c) => s + delta(c), 0);
+  const playing = took.filter((j) => !j.sat);
+  const playingTook = playing.reduce((s, j) => s + delta(j), 0);
   if (given > 0 && Math.abs(given - taken) < 1e-9) {
     for (const i of gave) for (const j of took) {
       const worth = ((-delta(i) * delta(j)) / taken) * (j.value - i.value);
-      const toGiver = i.after === 0 || i.sat ? 1 : j.before === 0 ? 0 : 0.5;
+      // An absence answers for what it cost and a return for what it brought; the rest of either goes to the other end.
+      const iOut = i.after === 0 || i.sat, jOut = j.sat, jBack = j.before === 0 && !j.sat;
+      // A gain between two players who both sat goes to the teammates who played, in proportion to what each took.
+      if (worth > 0 && iOut && jOut && playingTook > 0) {
+        for (const k of playing) out.get(k.athlete)!.points += (worth * delta(k)) / playingTook;
+        continue;
+      }
+      const toGiver = worth < 0
+        ? (iOut && !jOut ? 1 : jOut && !iOut ? 0 : jBack ? 1 : 0.5)
+        : (jOut && !iOut ? 1 : iOut && !jOut ? 0 : jBack ? 0 : 0.5);
       out.get(i.athlete)!.points += worth * toGiver;
       out.get(j.athlete)!.points += worth * (1 - toGiver);
     }
   } else for (const c of changes) out.get(c.athlete)!.points += delta(c) * c.value;
   for (const c of changes) {
     if (!c.gap) continue;
-    const own = c.before !== c.after || !taken;
-    for (const j of own ? [c] : took) {
-      const part = own ? c.gap : (c.gap * delta(j)) / taken;
+    // The teammates who played take the fading gap; a player who sat takes no gain.
+    const to = playing.length ? playing : took;
+    const share = to.reduce((s, j) => s + delta(j), 0);
+    const own = c.before !== c.after || !share;
+    for (const j of own ? [c] : to) {
+      const part = own ? c.gap : (c.gap * delta(j)) / share;
       const row = out.get(j.athlete)!;
       row.points += part;
       if (j === c) row.backups += part;
@@ -376,15 +395,13 @@ function playerPhrase(value: number, move: PlayerMove | undefined): string {
     if (move.played == null) return `Expected back${until}`;
     return value >= 0.1 ? "Back from injury, and played well" : value <= -0.1 ? "Back from injury, but played poorly" : "Back from injury";
   }
-  // A player rated below the teammates who took his minutes lifts his team by sitting, and says why.
-  const higher = move && move.points > 0 ? ", his minutes to players rated higher" : "";
   // On a day off only the injury report or a player leaving moves the rotation.
   if (move && move.played === undefined) {
-    if (move.status === "left" && move.injury) return `Out injured${until}${higher}`;
+    if (move.status === "left" && move.injury) return `Out injured${until}`;
     if (move.status === "more") return "Counted for more minutes";
     if (move.status === "fewer") return "Counted for fewer minutes";
   }
-  if (move?.played === null) return move.injury ? `Out injured${until}${higher}` : `Didn't play${higher}`;
+  if (move?.played === null) return move.injury ? `Out injured${until}` : "Didn't play";
   const minutes = move?.points ?? 0;
   const larger = Math.max(Math.abs(value), Math.abs(minutes));
   const named = (x: number) => Math.abs(x) >= 0.1 && Math.abs(x) >= 0.25 * larger;

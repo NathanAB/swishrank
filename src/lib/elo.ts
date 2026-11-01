@@ -10,7 +10,7 @@ export const START = 1000;
  * What the minutes of a player out for weeks are worth below the rest of his team's rotation, per 48, in margin units
  * (29 Elo points at version 3's SIGMA): his teammates play them, and the backups who get them play worse than the
  * regulars (docs/model-v2.md). A shown lineup carries those minutes as a slot with his id negated, at the share the
- * rotation counted him for, beside the rest of the rotation scaled up to take them; the slot counts -BACKUP_GAP.
+ * rotation counted him for, beside the rest of the rotation scaled up to take them; the slot counts gapValue.
  * Version 4 prices a game the same way, with V4.fill in src/lib/v4.ts. ESPN's athlete ids start at 1.
  */
 export const BACKUP_GAP = 0.3;
@@ -124,11 +124,30 @@ export function secondNights(data: SeasonData): Map<string, Sides<boolean>> {
 /** The back-to-back term of a game's expected home margin: the home side gains when only its rival is on a second night. */
 export const b2bTerm = (rule: FitRule, second: Sides<boolean>) => (rule.b2b ? rule.b2b * (Number(second.away) - Number(second.home)) : 0);
 
-/** A lineup slot's value under `fit`: a player's own, or for a negated id, the gap on an absent player's minutes. */
-export const slotValue = (fit: Fit, athlete: Athlete) => (athlete < 0 ? -BACKUP_GAP : fit.v.get(athlete) ?? 0);
+/** The share-weighted mean value of a lineup's players, leaving out its gap slots. */
+export const restValue = (fit: Fit, lineup: Lineup) => {
+  let sum = 0, shares = 0;
+  for (const p of lineup) if (p.athlete > 0) { sum += p.share * (fit.v.get(p.athlete) ?? 0); shares += p.share; }
+  return shares ? sum / shares : 0;
+};
 
-/** A lineup's part of its team's expected margin. */
-export const playerPart = (fit: Fit, lineup: Lineup) => lineup.reduce((s, p) => s + p.share * slotValue(fit, p.athlete), 0);
+/**
+ * The gap slot's value for absent player `athlete`, beside a rest of the rotation worth `rest` a player: BACKUP_GAP
+ * below them, or less, so that his minutes in their hands never count above his own value. A player out for weeks
+ * never raises his team: on the finished seasons, teams fell short of what their ratings credited for the players
+ * who took an absent player's minutes, by 20 to 30 Elo points per 48 of those minutes (docs/model-v2.md).
+ */
+export const gapValue = (fit: Fit, athlete: Athlete, rest: number) => Math.min(-BACKUP_GAP, (fit.v.get(athlete) ?? 0) - rest);
+
+/** A lineup's part of its team's expected margin: its players at their values, and any gap slot at gapValue. */
+export const playerPart = (fit: Fit, lineup: Lineup) => {
+  let part = 0, gaps = false;
+  for (const p of lineup) if (p.athlete > 0) part += p.share * (fit.v.get(p.athlete) ?? 0); else gaps = true;
+  if (!gaps) return part;
+  const rest = restValue(fit, lineup);
+  for (const p of lineup) if (p.athlete < 0) part += p.share * gapValue(fit, -p.athlete, rest);
+  return part;
+};
 
 /** A game's expected home margin under `fit`. */
 export const expected = (fit: Fit, { game, b2b, lineup }: Pregame) =>

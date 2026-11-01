@@ -107,7 +107,7 @@ test(`no game's Result in a finished season runs more than ${AGAINST} points aga
   }
 });
 
-test("minutes that change hands are credited to whoever caused the trade, and the rows still add up", () => {
+test("minutes that change hands are credited to whoever caused the trade, a sitter never gains, and the rows still add up", () => {
   // Player 1, rated -40 a 48, sits 10 of his minutes and 4 (+10) gives up 3; 2 (-60) takes 8, 3 (+20) 2, and 5 (-50),
   // new to the rotation, 3.
   const m = (athlete: number, before: number, after: number, value: number, sat = false) => ({ athlete, before: before / 48, after: after / 48, value, gap: 0, sat });
@@ -115,10 +115,17 @@ test("minutes that change hands are credited to whoever caused the trade, and th
   const rows = minuteRows(changes);
   const total = changes.reduce((s, c) => s + (c.after - c.before) * c.value, 0);
   assert.ok(Math.abs([...rows.values()].reduce((s, r) => s + r.points, 0) - total) < 1e-9, "the rows add up to the rotation's change");
-  assert.ok(rows.get(1)!.points < 0, "the player who sat is charged for the worse player who took most of his minutes");
-  // 5 joined, so his trade with 4 is all his; 4's row holds half of his trades with 2 and 3.
-  const fours = (3 / 48) * (8 / 13) * (-60 - 10) * 0.5 + (3 / 48) * (2 / 13) * (20 - 10) * 0.5;
+  // 1 sat: he answers for the trades to 2 and 5, worse than him; his trade to 3, better, is 3's.
+  const ones = (10 / 48) * (8 / 13) * (-60 + 40) + (10 / 48) * (3 / 13) * (-50 + 40);
+  assert.ok(Math.abs(rows.get(1)!.points - ones) < 1e-9, `1: ${rows.get(1)!.points} against ${ones}`);
+  assert.ok(Math.abs(rows.get(3)!.points - ((10 / 48) * (2 / 13) * 60 + (3 / 48) * (2 / 13) * 10 * 0.5)) < 1e-9, "3 holds the gain of taking 1's minutes");
+  // 5 joined, worse than 4, so that trade's loss is 4's; 4's trades with 2 and 3 are split.
+  const fours = (3 / 48) * (8 / 13) * (-60 - 10) * 0.5 + (3 / 48) * (2 / 13) * (20 - 10) * 0.5 + (3 / 48) * (3 / 13) * (-50 - 10);
   assert.ok(Math.abs(rows.get(4)!.points - fours) < 1e-9, `4: ${rows.get(4)!.points} against ${fours}`);
+  // A player rated below the one who takes his minutes shows nothing for sitting; the taker shows the gain.
+  const low = minuteRows([m(1, 20, 10, -60, true), m(2, 20, 30, 0)]);
+  assert.equal(low.get(1)!.points, 0);
+  assert.ok(Math.abs(low.get(2)!.points - (10 / 48) * 60) < 1e-9);
   // An absent player's gap is his on the day he leaves, and the takers' as it fades.
   const leaving = minuteRows([{ athlete: 9, before: 0.5, after: 0, value: 30, gap: -10, sat: false }, { athlete: 1, before: 4.5, after: 5, value: 0, gap: 0, sat: false }]);
   assert.equal(leaving.get(9)!.backups, -10);
