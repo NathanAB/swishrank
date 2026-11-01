@@ -119,11 +119,11 @@ const extra = standIn(model, 20261101);
 // ---- Players back from injury --------------------------------------------------------------------------------------
 
 const SCALE = ELO_PER_SIGMA / PARAMS.sigma;
-const fit: Fit = fitModel(model.data, inputs.get(current)!).at(-1)!.after;
+const fits = fitModel(model.data, inputs.get(current)!);
 const plain = modelInputs(files.map((f) => (f.data.season === current ? { ...f, injuries: undefined } : f))).get(current)!;
-const usual = shownLineups(model.data, plain.players!.rotation).after.get(today)!;
+const usualLineups = shownLineups(model.data, plain.players!.rotation);
 const archive = parseArchive(read(`injuries/${current}.json`), current);
-const report = archive.days[Object.keys(archive.days).sort().at(-1)!];
+const names = read("players.json") as Record<string, string>;
 
 /** A player's minutes per game for `abbr` this season, or last season's anywhere, from the box scores. */
 function minutesOf(athlete: number, abbr: Abbr): number {
@@ -140,35 +140,46 @@ function minutesOf(athlete: number, abbr: Abbr): number {
 }
 
 type Return = { athlete: number; name: string; date: string; minutes: number };
-const names = read("players.json") as Record<string, string>;
-const returns: Record<Abbr, Return[]> = {};
-for (const e of report.injuries) {
-  if (e.status !== "Out" || !e.returnDate || e.returnDate <= addDays(today, LONG_ABSENCE)) continue;
-  if (e.returnDate > SEASON_END) continue;
-  (returns[e.team] ??= []).push({ athlete: e.athlete, name: names[e.athlete] ?? "", date: e.returnDate, minutes: minutesOf(e.athlete, e.team) });
-}
-const rated = (lineup: Lineup, abbr: Abbr) => START + (fit.r[abbr] + playerPart(fit, lineup)) * SCALE;
 
-/** The usual rotation without `away`, with `back` added at their minutes when it lacks them. */
-function lineupWith(abbr: Abbr, back: Return[], away: Set<number>): Lineup {
-  const players = (usual[abbr] ?? []).filter((s) => !away.has(s.athlete)).map((s) => ({ athlete: s.athlete, min: s.share * 48 }));
-  for (const b of back) if (!players.some((p) => p.athlete === b.athlete) && b.minutes > 0) players.push({ athlete: b.athlete, min: b.minutes });
-  return scaled(players);
-}
-
-const withReturns: Outlook = shownOutlook(model, today);
-const returnRows: { abbr: Abbr; players: Return[]; now: number; full: number }[] = [];
-for (const [abbr, list] of Object.entries(returns)) {
-  const sorted = [...list].sort((x, y) => x.date.localeCompare(y.date));
-  const steps = [{ day: today, rating: model.r[abbr] }];
-  for (let k = 0; k < sorted.length; k++) {
-    const back = sorted.slice(0, k + 1);
-    const still = new Set(sorted.slice(k + 1).map((r) => r.athlete));
-    steps.push({ day: sorted[k].date, rating: rated(lineupWith(abbr, back, still), abbr) });
+/**
+ * Each team's ratings for the games ahead as they stood at the end of `day`: its shown rating, which leaves out
+ * players the report read with that day's rotation (the next morning's, or the latest before) lists out for weeks,
+ * stepping up as each comes back on his listed return date. A day before the first report has none to bring back.
+ */
+function returnsAt(day: string): { outlook: Outlook; rows: { abbr: Abbr; players: Return[]; now: number; full: number }[] } {
+  const outlook = shownOutlook(model, day);
+  const reportDay = Object.keys(archive.days).sort().filter((d) => d <= addDays(day, 1)).at(-1);
+  if (!reportDay) return { outlook, rows: [] };
+  const fit: Fit = fits.filter((f) => f.day <= day).at(-1)?.after ?? fits[0].before;
+  const gameDay = fits.filter((f) => f.day <= day).at(-1)?.day;
+  const usual = (gameDay && usualLineups.after.get(gameDay)) || usualLineups.opening;
+  const rated = (lineup: Lineup, abbr: Abbr) => START + (fit.r[abbr] + playerPart(fit, lineup)) * SCALE;
+  const lineupWith = (abbr: Abbr, back: Return[], away: Set<number>): Lineup => {
+    const players = (usual[abbr] ?? []).filter((s) => !away.has(s.athlete)).map((s) => ({ athlete: s.athlete, min: s.share * 48 }));
+    for (const b of back) if (!players.some((p) => p.athlete === b.athlete) && b.minutes > 0) players.push({ athlete: b.athlete, min: b.minutes });
+    return scaled(players);
+  };
+  const returns: Record<Abbr, Return[]> = {};
+  for (const e of archive.days[reportDay].injuries) {
+    if (e.status !== "Out" || !e.returnDate || e.returnDate <= addDays(day, LONG_ABSENCE) || e.returnDate > SEASON_END) continue;
+    (returns[e.team] ??= []).push({ athlete: e.athlete, name: names[e.athlete] ?? "", date: e.returnDate, minutes: minutesOf(e.athlete, e.team) });
   }
-  withReturns[abbr] = steps;
-  returnRows.push({ abbr, players: sorted, now: model.r[abbr], full: steps.at(-1)!.rating });
+  const rows: { abbr: Abbr; players: Return[]; now: number; full: number }[] = [];
+  for (const [abbr, list] of Object.entries(returns)) {
+    const sorted = [...list].sort((x, y) => x.date.localeCompare(y.date));
+    const now = outlook[abbr][0].rating;
+    const steps = [{ day, rating: now }];
+    for (let k = 0; k < sorted.length; k++) {
+      const still = new Set(sorted.slice(k + 1).map((r) => r.athlete));
+      steps.push({ day: sorted[k].date, rating: rated(lineupWith(abbr, sorted.slice(0, k + 1), still), abbr) });
+    }
+    outlook[abbr] = steps;
+    rows.push({ abbr, players: sorted, now, full: steps.at(-1)!.rating });
+  }
+  return { outlook, rows };
 }
+
+const { outlook: withReturns, rows: returnRows } = returnsAt(today);
 
 // ---- The projection ------------------------------------------------------------------------------------------------
 
@@ -204,13 +215,31 @@ function difficulty(abbr: Abbr, games: { home: Abbr; away: Abbr; day: string }[]
 const playedGames = model.results.filter((r) => stage(r.game.note).standings).map((r) => ({ home: r.game.home, away: r.game.away, day: r.day }));
 const nowOutlook = shownOutlook(model, today);
 
+const swingRows = stakes(p, model.abbrs);
+/** A team's next game in the week ahead, and its playoff chances if it wins and if it loses. */
+function nextGame(abbr: Abbr) {
+  const g = [...weekAhead].sort((x, y) => x.t.localeCompare(y.t)).find((x) => x.home === abbr || x.away === abbr);
+  if (!g) return null;
+  const row = swingRows.get(g.id)!.find((r) => r.abbr === abbr)!;
+  const home = g.home === abbr;
+  const pHome = phi((ratingOn(withReturns, g.home, dayKey(g.t)) - ratingOn(withReturns, g.away, dayKey(g.t)) + (g.neutral ? 0 : model.home) + (model.b2b[g.id] ?? 0)) / ELO_PER_SIGMA);
+  return { day: dayKey(g.t), t: g.t, opp: home ? g.away : g.home, home, pWin: Math.round(1000 * (home ? pHome : 1 - pHome)) / 10, ifWin: pct((home ? row.ifHome : row.ifAway) * RUNS, RUNS), ifLose: pct((home ? row.ifAway : row.ifHome) * RUNS, RUNS) };
+}
+const weekBefore = model.series.at(-1 - 7) ?? model.series[0];
+const lastFive = (abbr: Abbr) => {
+  const games = model.log[abbr].filter(({ result }) => stage(result.game.note).standings).slice(-5);
+  const w = games.filter(({ result, side }) => (side === "h") === (result.game.hs! > result.game.as!)).length;
+  return [w, games.length - w];
+};
+
 const teams = model.abbrs.map((abbr) => {
   const o = p.teams[abbr], b = without.teams[abbr];
   const t = model.data.teams[abbr];
   return {
     abbr, name: t.name, short: t.short, color: t.color, alt: t.alternateColor,
     conf: conferenceOf(abbr), div: divisionOf(abbr),
-    record: record(abbr), rating: Math.round(model.r[abbr]), full: Math.round(withReturns[abbr].at(-1)!.rating), seedRating: Math.round(model.series[0].r[abbr]),
+    record: record(abbr), rank: model.rank[abbr], last5: lastFive(abbr), week: Math.round(model.r[abbr]) - Math.round(weekBefore.r[abbr]), nextGame: nextGame(abbr),
+    rating: Math.round(model.r[abbr]), full: Math.round(withReturns[abbr].at(-1)!.rating), seedRating: Math.round(model.series[0].r[abbr]),
     preseasonTotal: (read(`preseason/${current}.json`) as { totals: Record<Abbr, number> }).totals[abbr],
     wins: { mean: Math.round(meanWins(o.wins) * 10) / 10, p10: winsAt(o.wins, 0.1), p25: winsAt(o.wins, 0.25), p50: winsAt(o.wins, 0.5), p75: winsAt(o.wins, 0.75), p90: winsAt(o.wins, 0.9), hist: o.wins.map((c) => pct(c, RUNS)) },
     seed: o.seed.map((c) => pct(c, RUNS)),
@@ -223,7 +252,6 @@ const teams = model.abbrs.map((abbr) => {
   };
 });
 
-const swingRows = stakes(p, model.abbrs);
 const titleRows = stakes(p, model.abbrs, "title");
 const leverage = weekAhead.map((g) => {
   const rows = swingRows.get(g.id)!;
@@ -243,11 +271,11 @@ const cutLines = Object.fromEntries((["East", "West"] as const).map((c) => [c, O
 }))]));
 
 /** Each team's odds at the end of every day of a season, from that day's shown ratings. */
-function history(m: Season, standIns: Fixture[], runs: number) {
+function history(m: Season, standIns: Fixture[], runs: number, outlookAt?: (day: string) => Outlook) {
   const days = m.series.slice(0).map((s) => s.day);
   const rows = days.map((day, k) => {
     // The eve of opening night stands before every game.
-    const q = simulate(setupAt(m, day, DRIFT, { extra: standIns }), runs, 7 + k);
+    const q = simulate(setupAt(m, day, DRIFT, { extra: standIns, outlook: outlookAt?.(day) }), runs, 7 + k);
     return { day, odds: Object.fromEntries(m.abbrs.map((a) => [a, { po: pct(q.teams[a].playoffs, runs), title: pct(q.teams[a].title, runs), wins: Math.round(meanWins(q.teams[a].wins) * 10) / 10 }])) };
   });
   return rows;
@@ -255,7 +283,7 @@ function history(m: Season, standIns: Fixture[], runs: number) {
 const t0 = Date.now();
 const lastHistory = history(lastModel, [], HISTORY_RUNS);
 console.error(`${last} history: ${lastHistory.length} days in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
-const currentHistory = history(model, extra, HISTORY_RUNS * 2);
+const currentHistory = history(model, extra, HISTORY_RUNS * 2, (day) => returnsAt(day).outlook);
 
 const lastTeams = lastModel.abbrs.map((a) => ({ abbr: a, short: lastModel.data.teams[a].short, color: model.data.teams[a]?.color ?? lastModel.data.teams[a].color, conf: conferenceOf(a) }));
 const champion = (() => {
