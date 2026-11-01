@@ -1,0 +1,45 @@
+# Saves the NBA's injury report onto every game still to come, every half hour through each game day, so each game
+# keeps the latest report saved before its tip-off (docs/model-v4.md, scripts/fetch-nba-report.ts). Nothing is built
+# or deployed: the site runs version 3, which reads ESPN's report in the deploy. A push made with this workflow's
+# token starts no other workflow, so these commits never start a deploy.
+name: Save the NBA injury report
+
+on:
+  schedule:
+    # :13 and :43 past each hour from 15:13 to 04:43 UTC: 10:13 AM to 11:43 PM Eastern in winter, 11:13 AM to
+    # 12:43 AM in summer, so the last runs before the earliest and latest tip-offs both fall inside. GitHub can
+    # delay or drop a scheduled run; the next one, half an hour later, saves the report then.
+    - cron: "13,43 15-23 * * *"
+    - cron: "13,43 0-4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nba-report
+  cancel-in-progress: false
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install pdftotext
+        run: command -v pdftotext || { sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends poppler-utils; }
+      - name: Save the latest report onto the games still to come
+        run: node scripts/fetch-nba-report.ts
+      - name: Commit the report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/nba-reports
+          git diff --cached --quiet && exit 0
+          git commit -m "Save the NBA injury report"
+          # The deploy may have pushed since this run checked out.
+          for attempt in 1 2 3; do git pull --rebase && git push && exit 0; sleep 10; done
+          exit 1

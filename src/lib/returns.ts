@@ -53,6 +53,8 @@ export function returnsOutlook({ model, fits, usual, archive, minutes, end }: Re
   }
   for (const [abbr, list] of out) {
     const sorted = [...list].sort((x, y) => x.date.localeCompare(y.date));
+    // Those still out keep the gap on their minutes (elo.ts gapValue), as the shown rating counts them, so each
+    // step is one player's return alone.
     const lineup = (back: number): Lineup => {
       const away = new Set(sorted.slice(back).map((r) => r.athlete));
       const players = (rotation[abbr] ?? []).filter((s) => !away.has(s.athlete)).map((s) => ({ athlete: s.athlete, min: s.share * 48 }));
@@ -60,7 +62,8 @@ export function returnsOutlook({ model, fits, usual, archive, minutes, end }: Re
         const min = minutes(r.athlete, abbr);
         if (min > 0 && !players.some((p) => p.athlete === r.athlete)) players.push({ athlete: r.athlete, min });
       }
-      return players.length ? scaled(players) : [];
+      const gaps = (rotation[abbr] ?? []).filter((s) => away.has(s.athlete)).map((s) => ({ athlete: -s.athlete, share: s.share }));
+      return players.length ? [...scaled(players), ...gaps] : [];
     };
     const steps = [outlook[abbr][0]];
     sorted.forEach((r, k) => steps.push({ day: r.date, rating: START + (fit.r[abbr] + playerPart(fit, lineup(k + 1))) * scale }));

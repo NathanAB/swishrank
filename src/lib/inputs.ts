@@ -3,10 +3,10 @@
 // rating, the season's rookies, and the lineups games are priced with, less the players the morning's injury report
 // lists as out. The shown rotation also leaves out the players the report lists as out for weeks. A box rating reads every earlier season, a home edge the seasons before, and a team without a total
 // is seeded from its rating at the end of the season before, so the seasons are walked together, oldest first.
-import { addDays, dayKey, finalDays, fitModel, NEWCOMER, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
+import { addDays, dayKey, finalDays, fitModel, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
 import { trailingHomeEdges } from "./home.ts";
 import { parseArchive, type InjuryArchive, type Report } from "./injuries.ts";
-import { boxRatings, lineups, parseBox, scaled, usualRotations, type Athlete, type BoxLine, type Lineup, type Lineups, type SeasonBox, type SeasonRotations } from "./players.ts";
+import { boxRatings, lineups, parseBox, usualRotations, type Athlete, type Lineup, type Lineups, type SeasonBox, type SeasonRotations } from "./players.ts";
 import { parsePreseason } from "./preseason.ts";
 import { OUT_STATUSES, reportLineups, reportNext } from "./report-lineup.ts";
 import { newcomers } from "./rookies.ts";
@@ -41,24 +41,24 @@ function withReports(data: SeasonData, seasonLineups: Lineups, archive: InjuryAr
 export const LONG_ABSENCE = 21;
 
 /**
- * A rotation without players out for weeks: the minutes a game the team gave out in those of its last 10 games, with
- * box scores, that none of them played, when it has played 2 or more; otherwise the rest of the rotation, with their
- * minutes left to NEWCOMER, a player with no appearances. On the finished seasons, for team-days with a rotation
- * player who missed the next 10 games, this missed those games' margins by 1.3025 in root mean square against 1.3253
- * keeping him, 1.3063 handing his minutes to the rest of the rotation, 1.3026 always to NEWCOMER and 1.3049 to the
- * players who played more in the games he missed, the only one without a bias (mean miss -0.0008, against -0.1063
- * keeping him).
+ * A rotation without players out for weeks: the rest of it scaled up to take their minutes, and beside it, for each
+ * of them, a slot with his id negated at the share the rotation counted him for, which counts BACKUP_GAP below the
+ * rest (src/lib/elo.ts). As the team plays without him, his share of its last 10 games, and so the slot, shrinks to
+ * nothing, and the players who took his minutes count for them. On the finished seasons, for 8,885 team-days with a
+ * rotation player who missed the next 10 games, the shown rating missed those games' margins by 1.3008 in root mean
+ * square, against 1.3253 keeping him, 1.3063 handing his minutes to the rest of the rotation at their own worth, and
+ * 1.3025 under the rule before this one, which gave them to a replacement-level player until the team had played 2
+ * games without him; a gap of 0.2 also scored 1.3008, and 0.4 1.3027 (docs/model-v2.md).
  */
-function withoutLongAbsent(lineup: Lineup, gone: ReadonlySet<Athlete>, recent: readonly BoxLine[][]): Lineup {
-  const without = recent.filter((lines) => !lines.some((l) => gone.has(l[0])));
-  if (without.length >= 2) {
-    const minutes = new Map<Athlete, number>();
-    for (const lines of without) for (const l of lines) minutes.set(l[0], (minutes.get(l[0]) ?? 0) + l[1] / without.length);
-    return scaled([...minutes].map(([athlete, min]) => ({ athlete, min })));
-  }
+function withoutLongAbsent(lineup: Lineup, gone: ReadonlySet<Athlete>): Lineup {
   const kept = lineup.filter((p) => !gone.has(p.athlete));
-  const missing = lineup.reduce((s, p) => s + (gone.has(p.athlete) ? p.share : 0), 0);
-  return [...kept.map((p) => ({ ...p })), { athlete: NEWCOMER, share: missing }];
+  const left = kept.reduce((s, p) => s + p.share, 0);
+  const total = lineup.reduce((s, p) => s + p.share, 0);
+  if (left <= 0) return [];
+  return [
+    ...kept.map((p) => ({ athlete: p.athlete, share: (p.share * total) / left })),
+    ...lineup.filter((p) => gone.has(p.athlete)).map((p) => ({ athlete: -p.athlete, share: p.share })),
+  ];
 }
 
 /**
@@ -70,17 +70,12 @@ function withoutLongAbsent(lineup: Lineup, gone: ReadonlySet<Athlete>, recent: r
  */
 function withLongAbsences(data: SeasonData, box: SeasonBox, rotation: SeasonRotations, archive: InjuryArchive): SeasonRotations {
   const reportDays = Object.keys(archive.days).sort();
-  const games = new Map<Abbr, BoxLine[][]>();
   const out: SeasonRotations = new Map();
   let usual: Partial<Record<Abbr, Lineup>> = {};
   const adjusted = new Set<Abbr>();
   const lastPlayed = new Map<string, string>();
   for (const { day, games: today } of finalDays(data)) {
-    for (const g of today) for (const abbr of [g.home, g.away]) {
-      const lines = box.games[g.id]?.[abbr];
-      if (lines) games.set(abbr, [...(games.get(abbr) ?? []), lines].slice(-10));
-      for (const l of lines ?? []) lastPlayed.set(`${abbr}:${l[0]}`, day);
-    }
+    for (const g of today) for (const abbr of [g.home, g.away]) for (const l of box.games[g.id]?.[abbr] ?? []) lastPlayed.set(`${abbr}:${l[0]}`, day);
     const entries = rotation.get(day) ?? {};
     usual = { ...usual, ...entries };
     // The report saved the morning after the day's games, as the team's history reads it, or the latest before.
@@ -94,7 +89,7 @@ function withLongAbsences(data: SeasonData, box: SeasonBox, rotation: SeasonRota
     for (const [abbr, lineup] of Object.entries(usual)) {
       const g = gone.get(abbr);
       if (lineup && g && lineup.some((p) => g.has(p.athlete))) {
-        shown[abbr] = withoutLongAbsent(lineup, g, games.get(abbr) ?? []);
+        shown[abbr] = withoutLongAbsent(lineup, g);
         adjusted.add(abbr);
       } else if (adjusted.delete(abbr)) shown[abbr] = lineup;
     }

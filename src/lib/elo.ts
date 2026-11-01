@@ -7,11 +7,13 @@ import type { Athlete, BoxRatings, Lineup, Lineups, SeasonBox, SeasonRotations, 
 
 export const START = 1000;
 /**
- * A placeholder in a lineup for minutes no known player is counted for, the minutes of players out for weeks when
- * the team has too few games without them to say who takes them. Every fit values it as a player with no
- * appearances: `a` times the box rating every newcomer starts from. ESPN's athlete ids start at 1.
+ * What the minutes of a player out for weeks are worth below the rest of his team's rotation, per 48, in margin units
+ * (29 Elo points at version 3's SIGMA): his teammates play them, and the backups who get them play worse than the
+ * regulars (docs/model-v2.md). A shown lineup carries those minutes as a slot with his id negated, at the share the
+ * rotation counted him for, beside the rest of the rotation scaled up to take them; the slot counts gapValue.
+ * Version 4 prices a game the same way, with V4.fill in src/lib/v4.ts. ESPN's athlete ids start at 1.
  */
-export const NEWCOMER = 0;
+export const BACKUP_GAP = 0.3;
 export const TZ = "America/New_York";
 
 export type Abbr = string;
@@ -79,14 +81,19 @@ export function counted(margin: number, rule: MarginRule): number {
 
 /** One fit: each team's rating, the home edge and each player's value, in the margin rule's units. */
 export type Fit = { r: Record<Abbr, number>; home: number; v: ReadonlyMap<Athlete, number> };
-/** A final game as its prediction saw it: the back-to-back term, in margin units, and each side's lineup. */
+/** A final game as its prediction saw it: the back-to-back term, with any SeasonInputs `extra`, in margin units, and each side's lineup. */
 export type Pregame = { game: FinalGame; b2b: number; lineup: Sides<Lineup> };
 /** A game day: its games, the fit they were predicted from, and the fit after them. */
 export type FitDay = { day: string; games: Pregame[]; before: Fit; after: Fit };
-/** What a season's fit reads beyond its games: each team's prior centre, and its players' lines, ratings and lineups. */
+/**
+ * What a season's fit reads beyond its games: each team's prior centre, its players' lines, ratings and lineups, and,
+ * for version 4 (docs/model-v4.md), a term by game id added to the back-to-back term: in the expected margin, and
+ * taken out of the margin in the fit.
+ */
 export type SeasonInputs = {
   centres?: Record<Abbr, number>;
   players?: { box: SeasonBox; ratings: BoxRatings; lineups: ReadonlyMap<string, Sides<Lineup>>; rookies?: ReadonlySet<Athlete> };
+  extra?: ReadonlyMap<string, number>;
 };
 
 /** A season's final, scored games grouped by US Eastern day, in date order. */
@@ -117,8 +124,30 @@ export function secondNights(data: SeasonData): Map<string, Sides<boolean>> {
 /** The back-to-back term of a game's expected home margin: the home side gains when only its rival is on a second night. */
 export const b2bTerm = (rule: FitRule, second: Sides<boolean>) => (rule.b2b ? rule.b2b * (Number(second.away) - Number(second.home)) : 0);
 
-/** A lineup's part of its team's expected margin. */
-export const playerPart = (fit: Fit, lineup: Lineup) => lineup.reduce((s, p) => s + p.share * (fit.v.get(p.athlete) ?? 0), 0);
+/** The share-weighted mean value of a lineup's players, leaving out its gap slots. */
+export const restValue = (fit: Fit, lineup: Lineup) => {
+  let sum = 0, shares = 0;
+  for (const p of lineup) if (p.athlete > 0) { sum += p.share * (fit.v.get(p.athlete) ?? 0); shares += p.share; }
+  return shares ? sum / shares : 0;
+};
+
+/**
+ * The gap slot's value for absent player `athlete`, beside a rest of the rotation worth `rest` a player: BACKUP_GAP
+ * below them, or less, so that his minutes in their hands never count above his own value. A player out for weeks
+ * never raises his team: on the finished seasons, teams fell short of what their ratings credited for the players
+ * who took an absent player's minutes, by 20 to 30 Elo points per 48 of those minutes (docs/model-v2.md).
+ */
+export const gapValue = (fit: Fit, athlete: Athlete, rest: number) => Math.min(-BACKUP_GAP, (fit.v.get(athlete) ?? 0) - rest);
+
+/** A lineup's part of its team's expected margin: its players at their values, and any gap slot at gapValue. */
+export const playerPart = (fit: Fit, lineup: Lineup) => {
+  let part = 0, gaps = false;
+  for (const p of lineup) if (p.athlete > 0) part += p.share * (fit.v.get(p.athlete) ?? 0); else gaps = true;
+  if (!gaps) return part;
+  const rest = restValue(fit, lineup);
+  for (const p of lineup) if (p.athlete < 0) part += p.share * gapValue(fit, -p.athlete, rest);
+  return part;
+};
 
 /** A game's expected home margin under `fit`. */
 export const expected = (fit: Fit, { game, b2b, lineup }: Pregame) =>
@@ -185,7 +214,7 @@ export function fitSeason(data: SeasonData, rule: FitRule, inputs: SeasonInputs 
   const days = finalDays(data);
   const first = days.length ? Date.parse(days[0].day) : 0;
   const strength = (day: string) => (rule.seed ? rule.n0 * Math.exp(-Math.round((Date.parse(day) - first) / 86_400_000) / rule.seed.fade) : rule.n0);
-  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
+  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!) + (inputs.extra?.get(game.id) ?? 0), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
   const solver = players ? playerSolver(abbrs, rule, centres, players) : teamSolver(abbrs, rule, centres);
   let fit = solver.start;
   const out: FitDay[] = [];
@@ -218,7 +247,7 @@ export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonIn
   const days = finalDays(data);
   const start = days.length ? Date.parse(days[0].day) : 0;
   const strength = (day: string) => (rule.seed ? rule.n0 * Math.exp(-Math.round((Date.parse(day) - start) / 86_400_000) / rule.seed.fade) : rule.n0);
-  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
+  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!) + (inputs.extra?.get(game.id) ?? 0), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
   const solver = players ? playerSolver(abbrs, rule, inputs.centres, players) : teamSolver(abbrs, rule, inputs.centres);
   const ratings = players?.ratings;
   const index = new Map(ratings?.athletes.map((a, j) => [a, j]) ?? []);
@@ -314,12 +343,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
       for (let k = offs[g]; k < offs[g + 1]; k++) out[idx[k]] += d * val[k];
     }
   };
-  const snapshot = (day?: string): Fit => {
-    const v = new Map(athletes.map((a, j) => [a, x[p0 + j]]));
-    const fresh = day === undefined ? players.ratings.newcomer?.start : players.ratings.newcomer?.after.get(day);
-    if (fresh !== undefined && !v.has(NEWCOMER)) v.set(NEWCOMER, players.rule.a * fresh);
-    return { r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])), home: fitted ? x[n] : home.value, v };
-  };
+  const snapshot = (): Fit => ({ r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])), home: fitted ? x[n] : home.value, v: new Map(athletes.map((a, j) => [a, x[p0 + j]])) });
   return {
     start: snapshot(),
     add({ game: g, b2b }) {
@@ -356,7 +380,7 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
         rz = rz2;
         for (let k = 0; k < dim; k++) q[k] = z[k] + beta * q[k];
       }
-      return snapshot(day);
+      return snapshot();
     },
   };
 }

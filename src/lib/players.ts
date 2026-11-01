@@ -46,54 +46,50 @@ export const REPLACEMENT = 8.49;
 /** Minutes of replacement-level play every box rating starts from. */
 export const PSEUDO_MINUTES = 400;
 
-/**
- * Each of a season's players' box rating, in `athletes` order: before its first game day, then after each game day.
- * `newcomer` is the box rating of a player with no appearances on the same days, replacement level less the mean.
- */
-export type BoxRatings = { athletes: Athlete[]; start: Float64Array; after: Map<string, Float64Array>; newcomer?: { start: number; after: Map<string, number> } };
+/** Each of a season's players' box rating, in `athletes` order: before its first game day, then after each game day. */
+export type BoxRatings = { athletes: Athlete[]; start: Float64Array; after: Map<string, Float64Array> };
 
 const epochDay = (day: string) => Date.parse(day) / 86_400_000;
 const linesOf = (box: SeasonBox, id: string): BoxLine[][] => Object.values(box.games[id] ?? {}).flatMap((lines) => (lines ? [lines] : []));
 
 /**
- * Every season's box ratings for `halfLife`. A rating is 36 * (G + REPLACEMENT * PSEUDO_MINUTES / 36) /
- * (M + PSEUDO_MINUTES), minus the minutes-weighted mean of every player seen so far, where G and M are his Game
- * Score and minutes over every earlier appearance, each weighted by 0.5^(days since / halfLife).
+ * Every season's box ratings for `halfLife`. A rating is 36 * (G + L * PSEUDO_MINUTES / 36) / (M + PSEUDO_MINUTES),
+ * minus the minutes-weighted mean of every player seen so far, where G and M are his Game Score and minutes over
+ * every earlier appearance, each weighted by 0.5^(days since / halfLife), and L, his starting level, is REPLACEMENT,
+ * or what `level` gives for him in the season of his first appearance (version 4's top-three picks), fixed then.
  */
-export function boxRatings(seasons: readonly SeasonPlayers[], halfLife: number): Map<string, BoxRatings> {
+export function boxRatings(seasons: readonly SeasonPlayers[], halfLife: number, level?: (athlete: Athlete, season: string) => number | undefined): Map<string, BoxRatings> {
   const index = new Map<Athlete, number>();
-  const G: number[] = [], M: number[] = [], last: number[] = [];
+  const G: number[] = [], M: number[] = [], last: number[] = [], L: number[] = [];
   const out = new Map<string, BoxRatings>();
   for (const { data, box } of seasons) {
     const days = finalDays(data);
     const athletes = [...new Set(Object.keys(box.games).flatMap((id) => linesOf(box, id).flatMap((lines) => lines.map((l) => l[0]))))];
-    let fresh = 0;
+    const startOf = (a: Athlete) => level?.(a, data.season) ?? REPLACEMENT;
     const snapshot = (now: number) => {
       const rel = new Float64Array(G.length);
       let sw = 0, sr = 0;
       for (let i = 0; i < G.length; i++) {
         const f = 0.5 ** ((now - last[i]) / halfLife), m = f * M[i];
-        rel[i] = (36 * (f * G[i] + (REPLACEMENT * PSEUDO_MINUTES) / 36)) / (m + PSEUDO_MINUTES);
+        rel[i] = (36 * (f * G[i] + (L[i] * PSEUDO_MINUTES) / 36)) / (m + PSEUDO_MINUTES);
         sw += m; sr += m * rel[i];
       }
       const mean = sw ? sr / sw : REPLACEMENT;
-      fresh = REPLACEMENT - mean;
       return Float64Array.from(athletes, (a) => {
         const i = index.get(a);
-        return (i === undefined ? REPLACEMENT : rel[i]) - mean;
+        return (i === undefined ? startOf(a) : rel[i]) - mean;
       });
     };
-    const ratings: BoxRatings = { athletes, start: snapshot(days.length ? epochDay(days[0].day) : 0), after: new Map(), newcomer: { start: fresh, after: new Map() } };
+    const ratings: BoxRatings = { athletes, start: snapshot(days.length ? epochDay(days[0].day) : 0), after: new Map() };
     for (const { day, games } of days) {
       const now = epochDay(day);
       for (const g of games) for (const lines of linesOf(box, g.id)) for (const l of lines) {
         let i = index.get(l[0]);
-        if (i === undefined) { i = G.length; index.set(l[0], i); G.push(0); M.push(0); last.push(now); }
+        if (i === undefined) { i = G.length; index.set(l[0], i); G.push(0); M.push(0); last.push(now); L.push(startOf(l[0])); }
         const f = 0.5 ** ((now - last[i]) / halfLife);
         G[i] = f * G[i] + gameScore(l); M[i] = f * M[i] + l[1]; last[i] = now;
       }
       ratings.after.set(day, snapshot(now));
-      ratings.newcomer!.after.set(day, fresh);
     }
     out.set(data.season, ratings);
   }
@@ -110,11 +106,11 @@ export type Lineups = {
 /** A lineup's minutes: everyone's expected minutes scaled so the team's total is 240. */
 const MINUTES = 240;
 /** Expected minutes a player needs to count in a lineup. */
-const ROTATION = 10;
+export const ROTATION = 10;
 /** Appearances a player's expected minutes average over. */
-const RECENT = 10;
+export const RECENT = 10;
 /** Expected minutes of a player with no appearances. */
-const UNKNOWN = 15;
+export const UNKNOWN = 15;
 /** A team's games its usual rotation reads. */
 const USUAL = 10;
 /**
@@ -133,13 +129,13 @@ export const scaled = (players: readonly { athlete: Athlete; min: number }[]): L
 /**
  * Every season's lineups. A game's `previous` lineup is the players who played in the team's latest game this
  * season with lines; `atTip` is the players who played in the game itself, or `previous` for a side without lines.
- * Either keeps those whose expected minutes, the mean of their last 10 appearances on any team, are at least 10.
- * A team's first game has none.
+ * Either keeps those whose expected minutes, the mean of their last `recent` appearances on any team (10, or 5 for
+ * version 4), are at least 10. A team's first game has none.
  */
-export function lineups(seasons: readonly SeasonPlayers[]): Map<string, Lineups> {
-  const recent = new Map<Athlete, number[]>();
+export function lineups(seasons: readonly SeasonPlayers[], recent = RECENT): Map<string, Lineups> {
+  const minutes = new Map<Athlete, number[]>();
   const expected = (a: Athlete) => {
-    const r = recent.get(a);
+    const r = minutes.get(a);
     return r ? mean(r) : UNKNOWN;
   };
   const lineup = (lines: readonly BoxLine[] | undefined): Lineup =>
@@ -160,7 +156,7 @@ export function lineups(seasons: readonly SeasonPlayers[]): Map<string, Lineups>
         if (!lines) continue;
         latest.set(abbr, lines);
         played.push(abbr);
-        for (const l of lines) recent.set(l[0], [...(recent.get(l[0]) ?? []), l[1]].slice(-RECENT));
+        for (const l of lines) minutes.set(l[0], [...(minutes.get(l[0]) ?? []), l[1]].slice(-recent));
       }
       season.next.set(day, Object.fromEntries(played.map((abbr) => [abbr, lineup(latest.get(abbr))])));
     }
