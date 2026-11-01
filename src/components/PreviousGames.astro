@@ -4,7 +4,8 @@
 // rating changes stand either side of a rule down the middle. The card's title sits between the two team names
 // in its first row, and each team's colour runs down the card's edge on its side. A win's row is in ink and a
 // loss's in grey; an upset win carries the upset badge, with its rating gain in the accent. Each row opens
-// that game (TeamGames). Below 1024px the two lists stack.
+// that game (TeamGames). Below 1024px the two lists stack, and the card's edges give way to a dot in each team's
+// colour by its name, as the rating chart's lines end in.
 import TeamGames from "./TeamGames.astro";
 import type { GameView } from "../lib/game.ts";
 import { record } from "../lib/format.ts";
@@ -28,7 +29,7 @@ const n = Math.max(...sides.map((s) => s.previous.length));
   <div class="cols">
     <h2 id="h-prev">{n > 1 ? `Previous ${n} games` : n === 1 ? "Previous game" : "Previous games"}</h2>
     {sides.map((s) => (
-      <div class:list={["side", s.side]}>
+      <div class:list={["side", s.side]} style={paint[s.abbr]}>
         <p class="head"><b>{team(season, s.abbr).short}</b><span class="num">{s.previous.length ? record(...recordOf(s.previous)) : "No games yet."}</span></p>
         <TeamGames season={season} games={[...s.previous].reverse()} mirror={s.side === "home"} />
       </div>
@@ -64,9 +65,13 @@ const n = Math.max(...sides.map((s) => s.previous.length));
     .cols::after { content: none; }
     .side.away, .side.home { padding: 0; }
     .away .head, .home .head { flex-direction: row; margin: 0; padding-left: 0; padding-right: 0; }
+    .prev { padding: var(--card-pad); }
+    .edge { display: none; }
+    .head b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--tint); vertical-align: middle; }
   }
+  /* A phone's card titles read as every other card's (Panel.astro). */
   @media (max-width: 640px) {
-    .prev { padding: var(--card-pad) calc(var(--card-pad) + 2px); }
-    h2, .head, .home .head { font-size: 18px; line-height: 24px; }
+    h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
+    .head, .home .head { font-size: 18px; line-height: 24px; }
   }
 </style>

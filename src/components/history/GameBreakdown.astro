@@ -4,7 +4,8 @@
 // each team's colour down its edge. Side by side, where each half is wide enough for a walk's two columns, the
 // away team's is mirrored, so both charts sit on the outside and both sets of labels by the rule; the rating still
 // rises to the right on both. In a narrower half both walks stack their labels over their bars, as on a phone, and
-// below 1024px the halves stack and both read from the left.
+// below 1024px the halves stack and both read from the left; there the card's edges, which mark its two sides, give
+// way to a dot in each team's colour by its name, as the rating chart's lines end in.
 import { signed } from "../../lib/format.ts";
 import type { Game } from "../../lib/elo.ts";
 import { ledger, walk } from "../../lib/ledger.ts";
@@ -25,7 +26,7 @@ const sides = [game.away, game.home].flatMap((abbr) => {
     <h2 id="h-moved">How the ratings moved</h2>
     <div class="cols">
     {sides.map(({ abbr, row, walk: w }, i) => (
-      <div class:list={["side", i ? "home" : "away"]}>
+      <div class:list={["side", i ? "home" : "away"]} style={paint[abbr]}>
         <p class="head">
           <b>{team(season, abbr).short}</b>
           <span class="num chg">{signed(row.change)}</span>
@@ -49,6 +50,17 @@ const sides = [game.away, game.home].flatMap((abbr) => {
   .head b { color: var(--text); font-weight: 600; }
   .num { font-variant-numeric: tabular-nums; }
   .chg { margin-left: auto; color: var(--text); font-weight: 600; }
+  @media (max-width: 1023px) {
+    .card { padding: var(--card-pad); }
+    .edge { display: none; }
+    h2 { text-align: left; }
+    .head b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--tint); vertical-align: middle; }
+  }
+  /* A phone's card titles read as every other card's (Panel.astro). */
+  @media (max-width: 640px) {
+    h2 { font-size: var(--fs-card); line-height: 24px; font-weight: 600; }
+    .head { font-size: 18px; line-height: 24px; }
+  }
   @media (min-width: 1024px) {
     .cols { --half: 28px; position: relative; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: calc(2 * var(--half)); }
     /* The rule runs the full height, between the two changes in the headings and on through the walks; the headings'

@@ -1,0 +1,65 @@
+---
+// The two teams' figures from their blocks (TeamBlock.astro) on a phone, where a block is too narrow to hold them:
+// one table under the blocks, a row to a figure, the away team's on the left and the home team's on the right, so
+// they read from each block's outer edge in, as the blocks do, with the figure's name between them. A played game
+// adds each team's chance at tip-off, and an upset winner carries the upset badge with its rating gain in the
+// accent. The record is the regular season's in a regular-season game and the postseason's after it. Wider, the
+// blocks hold their own figures and this table is not drawn.
+import UpsetBadge from "./UpsetBadge.astro";
+import type { GameView } from "../lib/game.ts";
+import { pct, rating, record, signed } from "../lib/format.ts";
+import { team, type SeasonView } from "../lib/season.ts";
+
+interface Props { season: SeasonView; view: GameView }
+const { season, view } = Astro.props;
+const sides = [view.away, view.home];
+const rows = [
+  ...(view.played ? (["chance"] as const) : []),
+  "rating",
+  "rank",
+  "record",
+] as const;
+const names = { chance: "Win chance", rating: "Rating", rank: "Rank", record: view.stage.phase === "regular" ? "Record" : "Postseason" };
+---
+
+<table class="figs">
+  <thead><tr><th scope="col"><span class="sr">{team(season, view.away.abbr).short}</span></th><td class="mid" /><th scope="col"><span class="sr">{team(season, view.home.abbr).short}</span></th></tr></thead>
+  <tbody>
+    {rows.map((r) => (
+      <tr>
+        {sides.map((s, i) => (
+          <>
+            {i === 1 && <th scope="row">{names[r]}</th>}
+            <td class:list={["num", s.side]}><span class="v">
+              {r === "chance" && <>{pct(s.chance)}{s.upset && <UpsetBadge compact />}</>}
+              {r === "rating" && <>{rating(s.rating)}{s.line && <span class:list={["chg", { paid: s.upset }]}>{signed(s.line.change)}</span>}</>}
+              {r === "rank" && s.place}
+              {r === "record" && record(...s.record)}
+            </span></td>
+          </>
+        ))}
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+<style>
+  .figs { display: none; }
+  @media (max-width: 640px) {
+    /* A step under the blocks, as the blocks are a step from each other, and the card's corners at its foot. */
+    .figs {
+      display: table; width: 100%; margin-top: 2px; table-layout: fixed; border-collapse: separate; border-spacing: 0;
+      background: var(--surface); border: var(--panel-edge); border-top: 0; border-radius: 0 0 var(--radius-card) var(--radius-card);
+    }
+    thead :is(th, td) { height: 0; padding: 0; }
+    thead .mid { width: 96px; }
+    .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    tbody tr + tr > * { border-top: 1px solid var(--rule); }
+    td { padding: 10px 17px; font-size: 16px; line-height: 24px; font-weight: 600; white-space: nowrap; }
+    tbody th { padding: 10px 0; text-align: center; font-size: var(--fs-small); line-height: 16px; font-weight: 400; color: var(--muted); }
+    .v { display: inline-flex; align-items: center; gap: 6px; }
+    .home { text-align: right; }
+    .chg { font-size: var(--fs-body); }
+    .chg:not(.paid) { font-weight: 400; }
+  }
+</style>
