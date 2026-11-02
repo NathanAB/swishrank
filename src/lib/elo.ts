@@ -153,10 +153,10 @@ export const playerPart = (fit: Fit, lineup: Lineup) => {
 };
 
 /**
- * One slot of a lineup, in Elo points: `minutes` a game it counts him for, his value per 48 and what he adds to the
- * rating. A player out for weeks (`out`) is his gap slot, which counts gapValue for the backups who play his minutes.
+ * One slot of a lineup: `minutes` a game it counts him for and what he `adds` to the rating, in Elo points. A player
+ * out for weeks (`out`) is his gap slot, which counts gapValue for the backups who play his minutes.
  */
-export type SlotPart = { athlete: Athlete; minutes: number; per48: number; adds: number; out: boolean };
+export type SlotPart = { athlete: Athlete; minutes: number; adds: number; out: boolean };
 /**
  * A slot of the lineup a team's shown rating counts: its `adds`, the team part and 1000 make up the rating. `weekAgo`
  * is what he added 7 days before the team's rating day, with that day's lineup, or 0 when it did not count him.
@@ -171,7 +171,7 @@ export function playerParts(fit: Fit, lineup: Lineup, scale: number): SlotPart[]
   const rest = restValue(fit, lineup);
   return lineup.map((p) => {
     const per48 = (p.athlete > 0 ? (fit.v.get(p.athlete) ?? 0) : gapValue(fit, -p.athlete, rest)) * scale;
-    return { athlete: Math.abs(p.athlete), minutes: p.share * 48, per48, adds: p.share * per48, out: p.athlete < 0 };
+    return { athlete: Math.abs(p.athlete), minutes: p.share * 48, adds: p.share * per48, out: p.athlete < 0 };
   });
 }
 

@@ -7,7 +7,7 @@ import { binOf, CUTS, FIGURE, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE
 // A rotation from a 36-minute starter down to a player who barely plays, one of them out for weeks.
 const ids = Object.keys(names).map(Number);
 const MINUTES = [36, 34, 32, 30, 26, 22, 18, 14, 8, 3, 0.6];
-const part = (athlete: number, minutes: number, out: boolean): PlayerPart => ({ athlete, minutes, per48: 12 - minutes / 2, adds: (minutes / 48) * (12 - minutes / 2), out, weekAgo: 3 });
+const part = (athlete: number, minutes: number, out: boolean): PlayerPart => ({ athlete, minutes, adds: (minutes / 48) * (12 - minutes / 2), out, weekAgo: 3 });
 const players = MINUTES.map((m, j) => part(ids[j], m, j === 3));
 
 test("a tile's colour takes a stronger step at each cut point, either way from neutral", () => {
