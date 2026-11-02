@@ -1,8 +1,9 @@
 ---
-// One team's season: its name and headline figures, the players its rating counts, how its rating moved against the
-// other 29, the games it has next and every day its rating moved. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/ every other
-// one. In a season under way the next five games run down a side column as the games page shows them, with the
-// chart and the history beside them; a finished season has nothing ahead, so the chart and the history take the width.
+// One team's season: its name and headline figures, the games it has next, the players its rating counts, how its
+// rating moved against the other 29 and every day its rating moved. /teams/<abbr>/ is the current season,
+// /<id>/teams/<abbr>/ every other one. A side column holds the next five games in a season under way, as the games
+// page shows them, and the players heatmap under them, with the chart and the history beside it. A page with neither
+// gives the chart and the history the width.
 import Empty from "../../../components/Empty.astro";
 import FixtureList from "../../../components/FixtureList.astro";
 import Heatmap from "../../../components/Heatmap.astro";
@@ -43,6 +44,7 @@ const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 const odds = season.current ? currentOdds() : null;
 const wide = teamMap(m.players[abbr], TEAM_WIDE);
 const tall = teamMap(m.players[abbr], TEAM_TALL);
+const map = wide && tall ? { wide, tall } : null;
 ---
 
 <Base
@@ -56,24 +58,23 @@ const tall = teamMap(m.players[abbr], TEAM_TALL);
 
   {odds && odds.teams[abbr] && <div class="projections"><Projections season={season} abbr={abbr} odds={odds} /></div>}
 
-  {wide && tall && (
-    <div class="players">
-      <Panel title="Players" meta="Tile size is minutes a game.">
-        <Heatmap wide={{ canvas: TEAM_WIDE, tiles: wide }} tall={{ canvas: TEAM_TALL, tiles: tall }} label={`${me.short} players`} />
-      </Panel>
-    </div>
-  )}
-
-  <div class:list={["cols", { solo: !ahead }]}>
-    {ahead && (
+  <div class:list={["cols", { solo: !ahead && !map }]}>
+    {(ahead || map) && (
       <aside class="side">
-        <Panel title="Coming up">
-          {ahead.length === 0 ? (
-            <Empty>No games scheduled.</Empty>
-          ) : (
-            <div class="days">{ahead.map((day) => <div><FixtureList season={season} day={day} /></div>)}</div>
-          )}
-        </Panel>
+        {ahead && (
+          <Panel title="Coming up">
+            {ahead.length === 0 ? (
+              <Empty>No games scheduled.</Empty>
+            ) : (
+              <div class="days">{ahead.map((day) => <div><FixtureList season={season} day={day} /></div>)}</div>
+            )}
+          </Panel>
+        )}
+        {map && (
+          <Panel title="Players" meta="Tile size is minutes a game.">
+            <Heatmap wide={{ canvas: TEAM_WIDE, tiles: map.wide }} tall={{ canvas: TEAM_TALL, tiles: map.tall }} label={`${me.short} players`} />
+          </Panel>
+        )}
       </aside>
     )}
     <div class="main">
@@ -88,18 +89,16 @@ const tall = teamMap(m.players[abbr], TEAM_TALL);
 </Base>
 
 <style>
-  /* The next games down a side column, sticking as the log scrolls past. Under 1024px everything stacks, and on
-     a tablet the days of games sit side by side, as on the games page, so they don't fill the screen above the
-     chart. */
+  /* The next games and the players down a side column, which scrolls with the page: the two together run taller
+     than a screen, so a sticky column would hide its foot. Under 1024px everything stacks, and on a tablet the days
+     of games sit side by side, as on the games page, so they don't fill the screen above the chart. */
   .cols { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: var(--gap); align-items: start; margin-top: var(--gap); }
   .solo { grid-template-columns: minmax(0, 1fr); }
-  .projections, .players { margin-top: var(--gap); }
-  .side { position: sticky; top: var(--gap); }
-  .main > :global(* + *) { margin-top: var(--gap); }
+  .projections { margin-top: var(--gap); }
+  .side > :global(* + *), .main > :global(* + *) { margin-top: var(--gap); }
   .days { display: grid; gap: 16px; }
   @media (max-width: 1023px) {
     .cols { grid-template-columns: minmax(0, 1fr); }
-    .side { position: static; }
     .days { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px 8px; }
   }
 
