@@ -42,13 +42,12 @@ export type Tile = Rect & {
   /** His full name, for the tooltip and the table. */
   name: string;
   label: Label | null;
-  bins: Record<Mode, Bin>;
+  /** The step each figure's colour is in, or "out" for his win chance while he is out, which is striped. */
+  bins: { game: Bin | "out"; week: Bin };
   /** His win chance added and its 7-day move, as the tooltip and the table print them. */
   text: Record<Mode, string>;
   /** The tile's figure in each mode: the text, or "out" for his win chance while he is out. */
   figures: Record<Mode, string>;
-  /** The tooltip: his name, a row for each figure with the step its key is drawn in, and his minutes or that he is out. */
-  tip: { name: string; rows: readonly { value: string; label: string; bin: Bin; out: boolean }[]; note: string };
 };
 // Public Sans Bold's advance widths in thousandths of an em for ASCII from the space to the tilde, read from the face
 // the site serves by scripts/glyph-widths.mjs; labels are bold or lighter, and lighter weights run narrower. Kerning
@@ -135,24 +134,14 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
     const figures = { game: part.out ? "out" : text.game, week: text.week };
     // A hyphenated name too long for its tile falls back to its first half.
     const tries = shown[i].includes("-") ? [shown[i], shown[i].split("-")[0]] : [shown[i]];
-    const minutes = Math.round(part.minutes);
-    const bins = { game: part.out ? 0 : binOf(game * 100, CUTS.game), week: binOf(week * 100, CUTS.week) } as const;
     return {
       ...t,
       part,
       name: names[i],
       label: fitLabel(t.w, t.h, tries, [figures.game, figures.week], canvas.scale),
-      bins,
+      bins: { game: part.out ? "out" : binOf(game * 100, CUTS.game), week: binOf(week * 100, CUTS.week) },
       text,
       figures,
-      tip: {
-        name: names[i],
-        rows: [
-          { value: text.game, label: part.out ? "win chance per game while out" : "win chance per game", bin: bins.game, out: part.out },
-          { value: text.week, label: "7 day change", bin: bins.week, out: false },
-        ],
-        note: part.out ? `Out for weeks · backups play his ${minutes} min` : `${minutes} min a game`,
-      },
     };
   });
 }
