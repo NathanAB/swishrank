@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { addDays, compute, dayKey, ELO_PER_SIGMA, finalDays, fitModel, PARAMS, START, type Abbr, type SeasonData } from "./elo.ts";
+import { addDays, compute, ELO_PER_SIGMA, fitModel, PARAMS, START, type Abbr, type SeasonData } from "./elo.ts";
 import { modelInputs } from "./inputs.ts";
 
 // Every season the site shows, read and rated as src/lib/season.ts does, injury reports included, so that players out
@@ -16,13 +16,11 @@ const inputs = modelInputs(files);
 const scale = ELO_PER_SIGMA / PARAMS.sigma;
 const seasons = files.map(({ data }) => {
   const days = fitModel(data, inputs.get(data.season)!);
-  const played = new Set(finalDays(data).map((d) => d.day));
-  const lastDay = new Map<Abbr, string>();
-  for (const g of data.games) for (const a of [g.home, g.away]) if (dayKey(g.t) > (lastDay.get(a) ?? "")) lastDay.set(a, dayKey(g.t));
-  // A team's rating holds from its last game day in the file, when that day has been played, and is the latest fit's otherwise.
-  const ratingDay = (a: Abbr) => (played.has(lastDay.get(a)!) ? lastDay.get(a)! : days.at(-1)!.day);
+  const model = compute(data, inputs.get(data.season));
+  // A team's rating holds from its last game when the file has no game left for it, and is the latest fit's otherwise.
+  const ratingDay = (a: Abbr) => (model.upcoming.some((g) => g.home === a || g.away === a) ? days.at(-1)!.day : model.log[a].at(-1)!.result.day);
   const fitOn = (day: string) => days.find((d) => d.day === day)!.after;
-  return { id: data.season, model: compute(data, inputs.get(data.season)), days, ratingDay, fitOn };
+  return { id: data.season, model, days, ratingDay, fitOn };
 });
 
 test("every team's shown rating is 1000, its team part and what each player its rating counts adds", () => {

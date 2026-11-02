@@ -5,7 +5,7 @@
 // here fits on every screen. Labels are measured with Public Sans Bold's own glyph widths, so none is ever clipped:
 // one shrinks to fit its tile, and a tile too small for any gets none.
 import type { Abbr, PlayerPart, Season } from "./elo.ts";
-import { rating, signed } from "./format.ts";
+import { rating, signed, signedTenth } from "./format.ts";
 import { playerName } from "./names.ts";
 import { inset, squarify, type Rect } from "./treemap.ts";
 
@@ -44,12 +44,14 @@ export type Tile = Rect & {
   label: Label | null;
   bins: Record<Mode, Bin>;
   figures: Record<Mode, string>;
+  /** His per 48, what he adds and his week, as the tooltip and the table print them. */
+  text: { per48: string; adds: string; week: string };
   /** The tooltip: his name, then a line each for his team and minutes, his value and what it adds, and the week. */
   tip: readonly [string, string, string, string];
 };
 /** A team's header strip: its short name and its rating, the rating dropped where both do not fit. */
 export type Head = Rect & { short: string; rating: string | null; size: number };
-export type Group = Rect & { abbr: Abbr; short: string; rating: number; head: Head | null; tiles: Tile[] };
+export type Group = Rect & { abbr: Abbr; short: string; head: Head | null; tiles: Tile[] };
 
 /** What the layout reads of a season. */
 export type Rated = Pick<Season, "data" | "r" | "order" | "players">;
@@ -87,8 +89,8 @@ const MAX_FONT = 24;
 /** Headroom for the face's fallback, which draws until the face loads. */
 const SAFETY = 1.05;
 const TILE_GAP = 1;
-const HEAD_TRACKING = 0.03;
-const HEAD_GAP = 4;
+export const HEAD_TRACKING = 0.03;
+export const HEAD_GAP = 4;
 export const HEAD_PAD = 4;
 
 /**
@@ -128,8 +130,6 @@ export function tileNames(names: readonly string[]): string[] {
   });
 }
 
-const tenth = (v: number) => signed(Math.round(v * 10) / 10);
-
 function tiles(model: Rated, abbr: Abbr, box: Rect, scale: number): Tile[] {
   const parts = [...model.players[abbr]].sort((x, y) => y.minutes - x.minutes);
   const names = parts.map((p) => playerName(p.athlete) ?? `#${p.athlete}`);
@@ -138,7 +138,8 @@ function tiles(model: Rated, abbr: Abbr, box: Rect, scale: number): Tile[] {
   return squarify(parts.map((p) => p.minutes), box).map((r, i) => {
     const part = parts[i];
     const t = inset(r, TILE_GAP);
-    const figures = { value: part.out ? "out" : signed(Math.round(part.per48)), week: part.out ? "out" : tenth(part.week) };
+    const text = { per48: signed(Math.round(part.per48)), adds: signed(Math.round(part.adds)), week: signedTenth(part.week) };
+    const figures = { value: part.out ? "out" : text.per48, week: part.out ? "out" : text.week };
     // A hyphenated name too long for its tile falls back to its first half.
     const tries = shown[i].includes("-") ? [shown[i], shown[i].split("-")[0]] : [shown[i]];
     const minutes = Math.round(part.minutes);
@@ -149,11 +150,12 @@ function tiles(model: Rated, abbr: Abbr, box: Rect, scale: number): Tile[] {
       label: fitLabel(t.w, t.h, tries, [figures.value, figures.week], scale),
       bins: { value: part.out ? 0 : binOf(part.per48, CUTS.value), week: part.out ? 0 : binOf(part.week, CUTS.week) },
       figures,
+      text,
       tip: [
         names[i],
         part.out ? `${short} · out for weeks · his ${minutes} min to backups` : `${short} · ${minutes} min a game`,
-        `${signed(Math.round(part.per48))} per 48 · adds ${signed(Math.round(part.adds))}`,
-        `${tenth(part.week)} this week`,
+        `${text.per48} per 48 · adds ${text.adds}`,
+        `${text.week} this week`,
       ],
     };
   });
@@ -172,12 +174,11 @@ function head(strip: Rect, short: string, shown: string, scale: number): Head | 
 
 function group(model: Rated, abbr: Abbr, block: Rect, canvas: Canvas): Group {
   const { short } = model.data.teams[abbr];
-  const r = model.r[abbr];
   const strip = { x: block.x, y: block.y, w: block.w, h: Math.min(canvas.head, block.h) };
   const body = inset({ x: block.x, y: block.y + strip.h, w: block.w, h: block.h - strip.h }, canvas.head ? 1 : 0);
   return {
-    ...block, abbr, short, rating: r,
-    head: canvas.head ? head(strip, short, rating(r), canvas.scale) : null,
+    ...block, abbr, short,
+    head: canvas.head ? head(strip, short, rating(model.r[abbr]), canvas.scale) : null,
     tiles: tiles(model, abbr, body, canvas.scale),
   };
 }

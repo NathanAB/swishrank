@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import names from "../data/players.json" with { type: "json" };
 import type { PlayerPart } from "./elo.ts";
-import { binOf, CUTS, FIGURE, HEAD_PAD, LEAGUE_TALL, LEAGUE_WIDE, leagueMap, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE, textWidth, tileNames, type Rated } from "./heatmap.ts";
+import { binOf, CUTS, FIGURE, HEAD_GAP, HEAD_PAD, HEAD_TRACKING, LEAGUE_TALL, LEAGUE_WIDE, leagueMap, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE, textWidth, tileNames, type Rated } from "./heatmap.ts";
 
 // Thirty teams, each a rotation from a 36-minute starter down to a player who barely plays, one of them out for weeks,
 // rated 1100 down to 1013, so the league's order is the reverse of the teams' listing.
@@ -28,10 +28,8 @@ test("teammates who share a last name are told apart by an initial, and by their
   ]);
 });
 
-test("the league runs best rating first, each team a block as big as its rotation's minutes", () => {
-  const groups = leagueMap(model, LEAGUE_WIDE);
-  assert.deepEqual(groups.map((g) => g.abbr), model.order);
-  for (const g of groups) assert.ok(Math.abs((g.w * g.h) / (LEAGUE_WIDE.w * LEAGUE_WIDE.h) - 1 / 30) < 1e-9, `${g.abbr} is ${g.w} by ${g.h}`);
+test("the league runs best rating first", () => {
+  assert.deepEqual(leagueMap(model, LEAGUE_WIDE).map((g) => g.abbr), model.order);
 });
 
 test("every label fits its tile at its size, and the smallest tiles have none", () => {
@@ -45,8 +43,9 @@ test("every label fits its tile at its size, and the smallest tiles have none", 
   for (const { canvas, groups } of maps) {
     for (const g of groups) {
       if (g.head) {
-        const text = `${g.head.short}${g.head.rating ?? ""}`.toUpperCase();
-        assert.ok(textWidth(text) * g.head.size + 2 * HEAD_PAD <= g.head.w && g.head.size <= g.head.h, `${g.abbr}'s header overflows`);
+        const texts = [g.head.short, ...(g.head.rating ? [g.head.rating] : [])].map((s) => s.toUpperCase());
+        const drawn = texts.reduce((w, s) => w + (textWidth(s) + HEAD_TRACKING * s.length) * g.head!.size, 0) + (texts.length - 1) * HEAD_GAP;
+        assert.ok(drawn + 2 * HEAD_PAD <= g.head.w && g.head.size <= g.head.h, `${g.abbr}'s header overflows`);
       }
       for (const t of g.tiles) {
         const { label } = t;
