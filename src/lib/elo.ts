@@ -152,6 +152,29 @@ export const playerPart = (fit: Fit, lineup: Lineup) => {
   return part;
 };
 
+/**
+ * One slot of a lineup: `minutes` a game it counts him for and what he `adds` to the rating, in Elo points. A player
+ * out for weeks (`out`) is his gap slot, which counts gapValue for the backups who play his minutes.
+ */
+export type SlotPart = { athlete: Athlete; minutes: number; adds: number; out: boolean };
+/**
+ * A slot of the lineup a team's shown rating counts: its `adds`, the team part and 1000 make up the rating. `weekAgo`
+ * is what he added 7 days before the team's rating day, with that day's lineup, or 0 when it did not count him.
+ */
+export type PlayerPart = SlotPart & { weekAgo: number };
+
+/**
+ * playerPart() split by slot and scaled by `scale` to Elo points. Each slot counts as playerPart() counts it, so the
+ * slots' `adds` sum to playerPart(fit, lineup) * scale.
+ */
+export function playerParts(fit: Fit, lineup: Lineup, scale: number): SlotPart[] {
+  const rest = restValue(fit, lineup);
+  return lineup.map((p) => {
+    const per48 = (p.athlete > 0 ? (fit.v.get(p.athlete) ?? 0) : gapValue(fit, -p.athlete, rest)) * scale;
+    return { athlete: Math.abs(p.athlete), minutes: p.share * 48, adds: p.share * per48, out: p.athlete < 0 };
+  });
+}
+
 /** A game's expected home margin under `fit`. */
 export const expected = (fit: Fit, { game, b2b, lineup }: Pregame) =>
   fit.r[game.home] - fit.r[game.away] + (game.neutral ? 0 : fit.home) + b2b + playerPart(fit, lineup.home) - playerPart(fit, lineup.away);
@@ -482,6 +505,8 @@ export type Season = {
   upcoming: Game[];
   /** What the back-to-back adds to each game's home edge, in Elo points: the chances use it, the ratings never do. */
   b2b: Record<string, number>;
+  /** The lineup each team's shown rating counts, slot by slot: 1000, its team part and their `adds` make up `r`. */
+  players: Record<Abbr, PlayerPart[]>;
 };
 
 /**
@@ -613,10 +638,23 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const second = secondNights(data);
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
   const pricing = rated(latest, next);
+  // Each slot of a team's lineup as of `day`, from the fit and lineup of the last game day on or before it, or the
+  // opening night's.
+  const partsOn = (a: Abbr, day: string | undefined) => {
+    const then = day === undefined ? undefined : days.findLast((d) => d.day <= day);
+    return playerParts(then?.after ?? start, then ? shown.after.get(then.day)![a] : shown.opening[a], scale);
+  };
+  const parts = Object.fromEntries(abbrs.map((a) => {
+    // A held team's rating, and so its split, is its last game day's.
+    const day = held.has(a) ? lastDay.get(a) : days.at(-1)?.day;
+    const before = new Map(partsOn(a, day && addDays(day, -7)).map((p) => [p.athlete, p.adds]));
+    return [a, partsOn(a, day).map((p): PlayerPart => ({ ...p, weekAgo: before.get(p.athlete) ?? 0 }))];
+  }));
   return {
     data, abbrs, r, pricing, home: latest.home * scale, rank: ranksOf(r), log, results, series, stats, order,
     upcoming: data.games.filter((g) => !g.final),
     b2b: Object.fromEntries(data.games.map((g) => [g.id, b2bTerm(PARAMS, second.get(g.id)!) * scale])),
+    players: parts,
   };
 }
 

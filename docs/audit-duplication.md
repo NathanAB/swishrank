@@ -19,6 +19,8 @@ Two independent reviews checked an earlier draft of this audit against the code.
 - **Fixtures.** The team page prices its next games with `fixture()` and groups them with `fixtureDays`, which `nextDays` also uses.
 - **Empty states and notes.** A list or chart with nothing in it is one `Empty`, "No games yet." unless the page says otherwise. Small print under a table or a game is one global `.note`.
 - **Page titles.** One h1 style, in `global.css`.
+- **Readout boxes.** Every box that reads out what the pointer is on is placed by `scripts/tip.ts`: the rating charts', the title race's, the season fan's, the odds page's season results, a team's seeds and the heatmap's tiles. It keeps 24px from a finger and 12px from a mouse everywhere, and its arithmetic (`tipAt`) is under test. Where a box sits differs only by an option: beside the pointer for a chart, centred for the seeds and the heatmap.
+- **Table chrome.** The league table, the seasons and the heatmap's values take their headings, row rules and open last row from one global `.ruled` class, and keep only their own padding, heights and widths. The headings' 11px is `--fs-tiny`; the seasons keep 12px.
 
 ## Still to do
 
@@ -32,22 +34,22 @@ The chance bars (`tint.ts` `pairStyles`, RGB distance), the home chart (`lineCol
 
 **Fix:** global `.ink`, `a.nm:hover` and prose-link rules.
 
-### 3. Table chrome and whole-row links (medium)
+### 3. Whole-row links (medium)
 
-The header cell, row rule and last-row rules are repeated in LeagueTable and `seasons.astro`, with header rows 18px and 32px tall. `seasons.astro` makes its own stretched-link rows rather than using the one the game tiles use.
+`seasons.astro` makes its own stretched-link rows rather than using the one the game tiles use.
 
 ### 4. Cards, tabs and breakpoints (medium)
 
 - `PreviousGames` re-implements Panel's card to get its team-colour edges. An edge option on Panel would end that.
-- The selected-tab style (the site nav and the games-page month switch) is written twice, as is the 8px control radius.
+- The underline that marks the current tab (the site nav and the games-page month switch) is written twice, as is the 8px control radius.
 - 640px appears in 11 media queries, and 1023/1024px media queries are in four files. CSS `@custom-media` would name them once, but browsers don't support it yet without a build step.
-- 11px, and most of the game and team pages' large type (40, 48, 64px), have no token.
+- 11px is `--fs-tiny` only in the tables' headings; its other uses, and most of the game and team pages' large type (40, 48, 64px), have no token.
 
 ### 5. How it works' own copies (medium)
 
 - Step 5 (`explain/Matchup.astro`) draws its game's names row with a copy of `FixtureTile`'s styles, and its script redraws `ChanceBar` by reaching into its markup.
 - Step 4 (`explain/DayOff.astro`) draws its two games itself, side by side, rather than as `ResultTile`s.
-- Step 1 (`explain/SeasonFan.astro`) repeats the chart readout in `scripts/highlight.ts`, and has drifted from it: its readout keeps 24px from a fingertip, the original 12px.
+- Step 1 (`explain/SeasonFan.astro`) builds its readout's contents itself rather than with `scripts/highlight.ts`'s, though both now place it with `scripts/tip.ts`. Its readout alone may rise above its chart for a finger.
 
 **Fix:** a client-side update for `FixtureTile` and `ChanceBar`, a side-by-side `ResultTile`, and one readout both charts use.
 

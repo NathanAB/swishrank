@@ -1,10 +1,12 @@
 ---
-// One team's season: its name and headline figures, how its rating moved against the other 29, the games it
-// has next and every day its rating moved. /teams/<abbr>/ is the current season, /<id>/teams/<abbr>/ every other
-// one. In a season under way the next five games run down a side column as the games page shows them, with the
-// chart and the history beside them; a finished season has nothing ahead, so the chart and the history take the width.
+// One team's season: its name and headline figures, how its rating moved against the other 29, the players its rating
+// counts, the games it has next and every day its rating moved. /teams/<abbr>/ is the current season,
+// /<id>/teams/<abbr>/ every other one. In a season under way the next five games run down a side column as the games
+// page shows them, with the chart, the players heatmap and the history beside them; a finished season has nothing
+// ahead, so those take the width.
 import Empty from "../../../components/Empty.astro";
 import FixtureList from "../../../components/FixtureList.astro";
+import Heatmap from "../../../components/Heatmap.astro";
 import Projections from "../../../components/Projections.astro";
 import Panel from "../../../components/Panel.astro";
 import RatingChart from "../../../components/RatingChart.astro";
@@ -68,6 +70,11 @@ const odds = season.current ? currentOdds() : null;
       <Panel title="Rating this season">
         <RatingChart season={season} focus={[abbr]} paint={{ [abbr]: paint }} />
       </Panel>
+      {m.players[abbr].length > 0 && (
+        <Panel title="Players">
+          <Heatmap players={m.players[abbr]} label={`${me.short} players`} />
+        </Panel>
+      )}
       <Panel title="History">
         {rows.length === 0 ? <Empty /> : <History season={season} rows={rows} games={log} aria-label={`Rating changes for the ${me.short}, newest first`} />}
       </Panel>

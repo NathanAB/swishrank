@@ -65,22 +65,22 @@ const seeds = o.seed.map((p, i) => ({ seed: i + 1, p, height: (p / most) * 100, 
 </Panel>
 
 <script>
+  import { placeTip, type Pointer } from "../scripts/tip.ts";
+
   for (const root of document.querySelectorAll<HTMLElement>("[data-seeds]")) {
     const tip = root.querySelector<HTMLElement>("[data-seed-tip]")!;
-    const show = (col: HTMLElement, x: number, finger: boolean) => {
+    // Above the seed's column, wherever on it the pointer is.
+    const show = (col: HTMLElement, at: Pointer) => {
       tip.textContent = col.dataset.text ?? "";
       tip.hidden = false;
-      const area = root.getBoundingClientRect();
-      const top = col.querySelector(".track")!.getBoundingClientRect().top - area.top;
-      const w = tip.offsetWidth, h = tip.offsetHeight;
-      const left = Math.max(0, Math.min(x - area.left - w / 2, area.width - w));
-      tip.style.transform = `translate(${left}px, ${Math.max(0, top - h - (finger ? 16 : 8))}px)`;
+      const clientY = col.querySelector(".track")!.getBoundingClientRect().top;
+      placeTip({ tip, area: root, at: { clientX: at.clientX, clientY, pointerType: at.pointerType }, side: "above" });
     };
     for (const col of root.querySelectorAll<HTMLElement>("[data-text]")) {
-      col.addEventListener("pointerenter", (e) => show(col, e.clientX, e.pointerType === "touch"));
-      col.addEventListener("pointerdown", (e) => show(col, e.clientX, e.pointerType === "touch"));
+      col.addEventListener("pointerenter", (e) => show(col, e));
+      col.addEventListener("pointerdown", (e) => show(col, e));
       col.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") tip.hidden = true; });
-      col.addEventListener("focus", () => { const r = col.getBoundingClientRect(); show(col, r.left + r.width / 2, false); });
+      col.addEventListener("focus", () => { const r = col.getBoundingClientRect(); show(col, { clientX: r.left + r.width / 2, clientY: r.top }); });
       col.addEventListener("blur", () => (tip.hidden = true));
     }
     document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Node && root.contains(e.target))) tip.hidden = true; });

@@ -20,7 +20,7 @@ const rows = allSeasons().map((s) => {
   ownHeading
 >
   <Panel level={1} class="seasons" title="Seasons">
-    <table>
+    <table class="ruled">
       <thead>
         <tr>
           <th scope="col">Season</th>
@@ -45,11 +45,9 @@ const rows = allSeasons().map((s) => {
 
 <style>
   .seasons { max-width: 760px; }
-  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th { height: 32px; padding: 0 12px 0 0; text-align: left; font-size: var(--fs-small); font-weight: 400; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
-  td { height: 40px; padding: 0 12px 0 0; border-bottom: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+  th { height: 32px; padding: 0 12px 0 0; font-size: var(--fs-small); }
+  td { height: 40px; padding: 0 12px 0 0; }
   th:last-child, td:last-child { padding-right: 0; }
-  tbody tr:last-child td { border-bottom: 0; }
   .num { text-align: right; }
   th:first-child { width: 120px; }
   .team { color: var(--text); }

@@ -74,7 +74,7 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
 
 <div class:list={["lt", { charted }]} style={`--rows: ${n}; --row-view: ${ROW}px; --name: ${longest}ch`}>
   <div class="stacked"><RatingChart season={season} teams={order} height={400} /></div>
-  <table>
+  <table class="ruled">
     <thead>
       <tr>
         <th class="lad" scope="col" aria-label="Rating chart">
@@ -181,14 +181,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   /* A conference's rows are as much taller as it has fewer teams, so every view is the league's height and a
      rating sits at the same place in each; switching All, East and West moves nothing. */
   .lt { --row: var(--row-view); --tl: 38px; --cv: 56px; }
-  table { width: 100%; border-collapse: collapse; }
-  th {
-    height: 18px; padding: 0 8px 2px; vertical-align: bottom; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted);
-    text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border);
-  }
+  th { height: 18px; padding: 0 8px 2px; vertical-align: bottom; }
   th abbr { text-decoration: none; }
-  td { height: var(--row); padding: 0 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; color: var(--muted); }
-  tbody tr:last-child td { border-bottom: 0; }
+  td { height: var(--row); padding: 0 8px; }
   .num { text-align: right; }
   th:last-child, td:last-child { padding-right: 0; }
   .rank { width: 32px; }

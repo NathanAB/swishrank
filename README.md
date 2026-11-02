@@ -35,6 +35,7 @@ npm run dev     # http://localhost:4321/
 - `scripts/fetch-season.mjs` turns ESPN's scoreboard into `src/data/games/<season>.json`.
 - `src/pages/` holds the routes, and `src/components/` the table, chart and game lists they share.
 - `src/lib/project.ts` plays out the rest of a season; `src/lib/season-odds.ts` runs it for the pages, with the schedule past the games file's two weeks from `src/data/schedule/` and each finished season's title race from `src/data/odds/`.
+- `src/lib/heatmap.ts` lays out each team page's players: compute()'s `players` split of every shown rating, as a treemap from `src/lib/treemap.ts`.
 - `src/pages/share/` draws each season's and each team's link-preview picture at build time; `src/lib/meta.ts` holds the site's name and each page's title and description.
 
 ## Each new season

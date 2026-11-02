@@ -18,6 +18,12 @@ export const points = (n: number) => `${int(n)} ${n === 1 ? "point" : "points"}`
 /** A change with its sign and a real minus: +5, −5, 0. */
 export const signed = (n: number) => (n > 0 ? `+${int(n)}` : n < 0 ? `${MINUS}${int(-n)}` : "0");
 
+/** A signed figure to a tenth, with a real minus: +1.5, −0.3, +2.0. */
+export const signedTenth = (n: number) => `${n < 0 ? MINUS : "+"}${Math.abs(n).toFixed(1)}`;
+
+/** A signed share as percentage points to a tenth: +9.6%, −0.4%. */
+export const signedPercent = (p: number) => `${signedTenth(p * 100)}%`;
+
 /** A figure in a sum, with a real minus and no plus: 202, −83. */
 export const figure = (n: number) => (n < 0 ? `${MINUS}${-n}` : String(n));
 

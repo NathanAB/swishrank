@@ -27,6 +27,11 @@
   --result-top6: #9ec5f4;
   --result-playin: #3987e5;
   --result-lottery: #184f95;
+  /* A team's players heatmap (components/Heatmap.astro): the diverging pair mixed into a dark grey in four steps each
+     way, the grey of a value near 0, and a player out for weeks striped in two greys. */
+  --heat-base: #262626;
+  --heat-0: #3a3a3a;
+  --heat-out: #2a2a2a;
   /* How much of a team's colour its line carries at rest, mixed into the grey of an ordinary line. A previewed
      team draws in its full colour. */
   --tint-mix: 50%;
@@ -48,6 +53,7 @@
   --fs-card: 16px;
   --fs-body: 14px;
   --fs-small: 12px;
+  --fs-tiny: 11px;
 
   --col: 1400px;
   /* Gutters grow with the screen, so a wide page does not crowd its edges. */
@@ -116,6 +122,14 @@ svg { display: block; }
 .tip strong { margin-left: 8px; color: var(--text); font-weight: 600; }
 .tip i { margin-left: 6px; font-style: normal; }
 .tip > span { display: block; }
+/* A readout's row of a figure (the odds page's season results, a team's players): a colour key, the figure, and what
+   it is. A heatmap tile's readout heads its rows with the player (.who) and ends them with his minutes (.foot). */
+.tip .part { display: grid; grid-template-columns: 10px var(--tip-figure, 36px) auto; align-items: center; gap: 6px; }
+.tip .part i { width: 10px; height: 10px; border-radius: 2px; }
+.tip .part strong { margin: 0; text-align: right; }
+.tip .part b { font-weight: 400; color: var(--muted); }
+.tip .who { margin-bottom: 4px; color: var(--text); font-weight: 600; }
+.tip .foot { margin-top: 4px; }
 
 /* A link over the whole of a game's tile (.cover), which opens the game's page; the team names' own links in it
    sit above it. */
@@ -126,6 +140,17 @@ svg { display: block; }
 /* A game's tile, on the games page and How it works, lighter under the pointer. */
 .tile { position: relative; min-width: 0; padding: 8px 12px 10px; background: var(--raised); border-radius: 4px; transition: background-color 120ms ease; }
 .tile:has(> .cover:hover) { background: color-mix(in oklab, var(--text) 10%, var(--raised)); }
+
+/* A table of figures (class="ruled"): the league table, the seasons and the heatmap's values. Small grey headings sit
+   over a rule and the rows are ruled apart, but for the last. The class sits in :where(), so a table's own th and td
+   rules, such as its padding, heights and widths, outweigh these, all but the open last row. */
+:where(table.ruled) { width: 100%; border-collapse: collapse; }
+:where(.ruled) th {
+  font-size: var(--fs-tiny); line-height: 16px; font-weight: 400; color: var(--muted); text-align: left; white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+:where(.ruled) td { border-bottom: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+:where(.ruled) tbody tr:last-child td { border-bottom: 0; }
 
 /* A line of small print under a table or a game. */
 .note { margin-top: 10px; font-size: var(--fs-small); line-height: 18px; color: var(--muted); }
