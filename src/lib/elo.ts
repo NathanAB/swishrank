@@ -583,8 +583,7 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const endOfDay = new Map<string, Record<Abbr, number>>();
   const lastDay = new Map<Abbr, string>();
   for (const g of data.games) for (const a of [g.home, g.away]) if (dayKey(g.t) > (lastDay.get(a) ?? "")) lastDay.set(a, dayKey(g.t));
-  // A held team keeps the rating, and so the fit and lineup, of its last game day in the file.
-  const held = new Map<Abbr, { r: number; day: string; fit: Fit; lineup: Lineup }>();
+  const held = new Map<Abbr, number>();
 
   for (const { day, games, before, after } of days) {
     const priced = games.map((pg) => ({
@@ -596,8 +595,8 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
     const now = rated(after, usual);
     for (const a of abbrs) {
       const h = held.get(a);
-      if (h !== undefined) now[a] = h.r;
-      else if (lastDay.get(a) === day) held.set(a, { r: now[a], day, fit: after, lineup: usual[a] });
+      if (h !== undefined) now[a] = h;
+      else if (lastDay.get(a) === day) held.set(a, now[a]);
     }
     const prev = r;
     r = now;
@@ -639,15 +638,17 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const second = secondNights(data);
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
   const pricing = rated(latest, next);
-  // Each slot of a team's lineup 7 days before `day`, from that day's fit and lineup, or the opening night's.
-  const weekAgo = (a: Abbr, day: string | undefined) => {
-    const then = day === undefined ? undefined : days.findLast((d) => d.day <= addDays(day, -7));
-    return new Map(playerParts(then?.after ?? start, then ? shown.after.get(then.day)![a] : shown.opening[a], scale).map((p) => [p.athlete, p.adds]));
+  // Each slot of a team's lineup as of `day`, from the fit and lineup of the last game day on or before it, or the
+  // opening night's.
+  const partsOn = (a: Abbr, day: string | undefined) => {
+    const then = day === undefined ? undefined : days.findLast((d) => d.day <= day);
+    return playerParts(then?.after ?? start, then ? shown.after.get(then.day)![a] : shown.opening[a], scale);
   };
   const parts = Object.fromEntries(abbrs.map((a) => {
-    const { day, fit, lineup } = held.get(a) ?? { day: days.at(-1)?.day, fit: latest, lineup: usual[a] };
-    const before = weekAgo(a, day);
-    return [a, playerParts(fit, lineup, scale).map((p): PlayerPart => ({ ...p, weekAgo: before.get(p.athlete) ?? 0 }))];
+    // A held team's rating, and so its split, is its last game day's.
+    const day = held.has(a) ? lastDay.get(a) : days.at(-1)?.day;
+    const before = new Map(partsOn(a, day && addDays(day, -7)).map((p) => [p.athlete, p.adds]));
+    return [a, partsOn(a, day).map((p): PlayerPart => ({ ...p, weekAgo: before.get(p.athlete) ?? 0 }))];
   }));
   return {
     data, abbrs, r, pricing, home: latest.home * scale, rank: ranksOf(r), log, results, series, stats, order,
