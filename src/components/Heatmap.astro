@@ -83,7 +83,7 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
 
   <details class="table">
     <summary>Every value</summary>
-    <table aria-label={label}>
+    <table class="ruled" aria-label={label}>
       <thead>
         <tr>
           {many && <th scope="col">Team</th>}
@@ -203,9 +203,9 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
   .table { margin-top: 12px; }
   summary { width: max-content; color: var(--muted); cursor: pointer; }
   summary:hover { color: var(--text); }
-  table { width: 100%; margin-top: 8px; border-collapse: collapse; }
-  th { padding: 0 8px 2px; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
-  td { height: 28px; padding: 0 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; color: var(--muted); }
+  table { margin-top: 8px; }
+  th { padding: 0 8px 2px; }
+  td { height: 28px; padding: 0 8px; }
   th:first-child, td:first-child { padding-left: 0; }
   th:last-child, td:last-child { padding-right: 0; }
   .num { text-align: right; }
