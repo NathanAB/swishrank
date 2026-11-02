@@ -11,7 +11,7 @@ const MINUTES = [36, 34, 32, 30, 26, 22, 18, 14, 8, 3, 0.6];
 const abbrs = Array.from({ length: 30 }, (_, i) => `T${i}`);
 const part = (athlete: number, minutes: number, out: boolean): PlayerPart => ({ athlete, minutes, per48: 12 - minutes / 2, adds: 0, out, week: 0.8 });
 const model: Rated = {
-  data: { season: "2026-27", games: [], teams: Object.fromEntries(abbrs.map((a) => [a, { name: a, short: `Team ${a}`, color: "000000", alternateColor: "ffffff" }])) },
+  data: { season: "2026-27", games: [], teams: Object.fromEntries(abbrs.map((a) => [a, { name: a, short: `Team ${a} of the Western Conference`, color: "000000", alternateColor: "ffffff" }])) },
   r: Object.fromEntries(abbrs.map((a, i) => [a, 1013 + 3 * i])),
   order: [...abbrs].reverse(),
   players: Object.fromEntries(abbrs.map((a, i) => [a, MINUTES.map((m, j) => part(ids[i * MINUTES.length + j], m, j === 3))])),
