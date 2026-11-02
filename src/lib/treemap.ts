@@ -1,4 +1,4 @@
-// A squarified treemap (Bruls, Huizing and van Wijk, "Squarified Treemaps", 2000), the players page's layout: rects
+// A squarified treemap (Bruls, Huizing and van Wijk, "Squarified Treemaps", 2000), the players heatmap's layout: rects
 // for a list of weights that fill a box, each as big as its weight's share, laid in rows along the box's shorter side
 // and each row grown while that keeps its rects closer to square. Callers sort the weights largest first, which is
 // what keeps the rects squarest.

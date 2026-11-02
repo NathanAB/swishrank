@@ -1,12 +1,12 @@
 ---
 // A team's players heatmap (src/lib/heatmap.ts): a tile per player as big as his minutes, drawn in percentages of its
 // canvas, with labels and gaps in container units against the canvas's own width, so a layout scales with its card
-// and keeps every label inside its tile. A heatmap 640px wide or narrower, on a phone or in a page's side column, gets
-// the tall layout, a wider one the wide; both are on the page and a container query on the heatmap's own width shows
-// one. The switch shows each player's win chance added per game, or how far it moved over the past 7 days, on the
-// tiles and in their colour, blue up and orange down, with no legend: the figure is on the tile. A tile's tooltip, on
-// hover or a tap, has his minutes and both figures, and the table under it every value. The table is what a keyboard
-// or a screen reader reads, so the tiles, which repeat it, are hidden from both.
+// and keeps every label inside its tile. A heatmap 640px wide or narrower, as on a phone, gets the tall layout, a wider
+// one the wide; both are on the page and a container query on the heatmap's own width shows one. The switch shows each
+// player's win chance added per game, or how far it moved over the past 7 days, on the tiles and in their colour, blue
+// up and orange down, with no legend: the figure is on the tile. A tile's tooltip, on hover or a tap, has his minutes
+// and both figures, and the table under it every value. The table is what a keyboard or a screen reader reads, so the
+// tiles, which repeat it, are hidden from both.
 import Segmented from "./Segmented.astro";
 import { MODES, type Bin, type Canvas, type Mode, type Tile } from "../lib/heatmap.ts";
 

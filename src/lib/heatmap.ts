@@ -1,8 +1,9 @@
 // A team's players heatmap, laid out at build time like a stock market map: each player its rating counts a tile as
 // big as the minutes it counts him for, coloured by how much he raises his team's chance of winning a game, or by how
-// far that moved over the past 7 days (Season.players in src/lib/elo.ts). Everything is in a canvas's own px, which the page draws in percentages and container units, so a
-// layout scales with its card and a label that fits here fits on every screen. Labels are measured with Public Sans
-// Bold's own glyph widths, so none is ever clipped: one shrinks to fit its tile, and a tile too small for any gets none.
+// far that moved over the past 7 days (Season.players in src/lib/elo.ts). Everything is in a canvas's own px, which the
+// page draws in percentages and container units, so a layout scales with its card and a label that fits here fits on
+// every screen. Labels are measured with Public Sans Bold's own glyph widths, so none is ever clipped: one shrinks to
+// fit its tile, and a tile too small for any gets none.
 import { winProb, type PlayerPart } from "./elo.ts";
 import { signedPercent } from "./format.ts";
 import { playerName } from "./names.ts";
@@ -26,9 +27,9 @@ export const binOf = (v: number, cuts: readonly number[]): Bin => (v < 0 ? DOWN 
 
 /**
  * A layout's size in its own px, and how many times MIN_FONT its smallest label is. A heatmap 640px wide or narrower,
- * on a phone or in a page's side column, draws on the tall canvas rather than shrinking the wide one. Each scale keeps
- * every label at about 7px or more on screen at its layout's narrowest: the tall one at the side column's 278px, the
- * wide one at 641px, as on a tablet.
+ * as on a phone, draws on the tall canvas rather than shrinking the wide one. Each scale keeps every label at about 7px
+ * or more on screen at its layout's narrowest: the tall one at a 320px phone's 256px, the wide one at 641px, as on a
+ * tablet.
  */
 export type Canvas = { w: number; h: number; scale: number };
 export const TEAM_WIDE: Canvas = { w: 1200, h: 420, scale: 1.5 };
