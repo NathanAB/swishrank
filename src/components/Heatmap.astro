@@ -6,6 +6,7 @@
 // week's change, with that mode's legend; a tile's tooltip, on hover or a tap, has his figures, and the table under
 // it every value. The table is what a keyboard or a screen reader reads: hundreds of tiles as tab stops would bury
 // the page, so the tiles are hidden from both.
+import Segmented from "./Segmented.astro";
 import { BINS, CUTS, MODES, type Bin, type Canvas, type Group, type Mode } from "../lib/heatmap.ts";
 import { signed } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
@@ -38,9 +39,7 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
 
 <div class="hm" data-heatmap data-mode="value">
   <div class="bar">
-    <div class="switch" role="group" aria-label="Colour by">
-      {MODES.map((m) => <button type="button" data-set={m} aria-pressed={String(m === "value")}>{MODE_LABEL[m]}</button>)}
-    </div>
+    <Segmented label="Colour by" options={MODES.map((m) => ({ label: MODE_LABEL[m], value: m, pressed: m === "value" }))} />
     {MODES.map((m) => (
       <p class="legend" data-for={m}>
         {legend(m).map((l) => <span style={`background: ${fill(l.bin)}`}>{l.text}</span>)}
@@ -115,10 +114,10 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
   const isTips = (v: unknown): v is string[][] => Array.isArray(v) && v.every((t) => Array.isArray(t) && t.every((s) => typeof s === "string"));
 
   for (const root of document.querySelectorAll<HTMLElement>("[data-heatmap]")) {
-    const buttons = [...root.querySelectorAll<HTMLButtonElement>("button[data-set]")];
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>("button[data-value]")];
     for (const b of buttons) {
       b.addEventListener("click", () => {
-        root.dataset.mode = b.dataset.set;
+        root.dataset.mode = b.dataset.value;
         for (const o of buttons) o.setAttribute("aria-pressed", String(o === b));
       });
     }
@@ -172,15 +171,6 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
     --stripes: repeating-linear-gradient(135deg, var(--heat-out) 0 4px, var(--heat-0) 4px 8px);
   }
   .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-  .switch { display: inline-flex; border-radius: 8px; background: var(--seg-track); }
-  /* As Segmented.astro's links: the transparent border insets the pill inside its button. */
-  .switch button {
-    height: var(--control-h); padding: 0 12px; border: 3px solid transparent; border-radius: 8px; background-clip: padding-box;
-    color: var(--muted); font-weight: 500; white-space: nowrap; transition: color 150ms ease, background-color 150ms ease;
-  }
-  .switch button:hover { color: var(--text); }
-  .switch button[aria-pressed="true"] { background-color: var(--seg-pill); box-shadow: var(--seg-lift); color: var(--text); }
-  .switch button:focus-visible { outline-offset: -1px; }
   .legend { display: flex; flex-wrap: wrap; gap: 2px; }
   .legend span { min-width: 34px; padding: 2px 4px; border-radius: 2px; text-align: center; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
   .legend .out { margin-left: 6px; background: var(--stripes); color: var(--muted); }
