@@ -24,7 +24,7 @@ test("teammates who share a last name are told apart by an initial, and by their
 test("every label fits its tile at its size, and the smallest tiles have none", () => {
   let bare = 0;
   for (const canvas of [TEAM_WIDE, TEAM_TALL]) {
-    for (const t of teamMap(players, canvas)!) {
+    for (const t of teamMap(players, canvas)) {
       const { label } = t;
       if (!label) {
         bare++;

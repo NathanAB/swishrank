@@ -16,7 +16,6 @@ import { ledger } from "../../../lib/ledger.ts";
 import Base from "../../../layouts/Base.astro";
 import type { Abbr } from "../../../lib/elo.ts";
 import { fixtureDays } from "../../../lib/fixtures.ts";
-import { TEAM_TALL, TEAM_WIDE, teamMap } from "../../../lib/heatmap.ts";
 import { teamDescription } from "../../../lib/meta.ts";
 import type { Route } from "../../../lib/routes.ts";
 import { TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
@@ -42,9 +41,6 @@ const log = teamGames(m, abbr).reverse();
 const rows = ledger(season, abbr);
 const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 const odds = season.current ? currentOdds() : null;
-const wide = teamMap(m.players[abbr], TEAM_WIDE);
-const tall = teamMap(m.players[abbr], TEAM_TALL);
-const map = wide && tall ? { wide, tall } : null;
 ---
 
 <Base
@@ -74,9 +70,9 @@ const map = wide && tall ? { wide, tall } : null;
       <Panel title="Rating this season">
         <RatingChart season={season} focus={[abbr]} paint={{ [abbr]: paint }} />
       </Panel>
-      {map && (
+      {m.players[abbr].length > 0 && (
         <Panel title="Players">
-          <Heatmap wide={{ canvas: TEAM_WIDE, tiles: map.wide }} tall={{ canvas: TEAM_TALL, tiles: map.tall }} label={`${me.short} players`} />
+          <Heatmap players={m.players[abbr]} label={`${me.short} players`} />
         </Panel>
       )}
       <Panel title="History">

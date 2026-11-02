@@ -121,9 +121,8 @@ export function tileNames(names: readonly string[]): string[] {
   });
 }
 
-/** A team's players as tiles over the whole canvas; null when its rating counts none. */
-export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] | null {
-  if (players.length === 0) return null;
+/** A team's players as tiles over the whole canvas, largest first. */
+export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] {
   const parts = [...players].sort((x, y) => y.minutes - x.minutes);
   const names = parts.map((p) => playerName(p.athlete) ?? `#${p.athlete}`);
   const shown = tileNames(names);
