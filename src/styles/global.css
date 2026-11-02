@@ -122,6 +122,14 @@ svg { display: block; }
 .tip strong { margin-left: 8px; color: var(--text); font-weight: 600; }
 .tip i { margin-left: 6px; font-style: normal; }
 .tip > span { display: block; }
+/* A readout's row of a figure (the odds page's season results, a team's players): a colour key, the figure, and what
+   it is. A heatmap tile's readout heads its rows with the player (.who) and ends them with his minutes (.foot). */
+.tip .part { display: grid; grid-template-columns: 10px var(--tip-figure, 36px) auto; align-items: center; gap: 6px; }
+.tip .part i { width: 10px; height: 10px; border-radius: 2px; }
+.tip .part strong { margin: 0; text-align: right; }
+.tip .part b { font-weight: 400; color: var(--muted); }
+.tip .who { margin-bottom: 4px; color: var(--text); font-weight: 600; }
+.tip .foot { margin-top: 4px; }
 
 /* A link over the whole of a game's tile (.cover), which opens the game's page; the team names' own links in it
    sit above it. */

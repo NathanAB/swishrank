@@ -173,10 +173,6 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   .legend span { display: inline-flex; align-items: center; gap: 8px; }
   .legend i { width: 14px; height: 14px; border-radius: 3px; flex: none; }
   .views { position: relative; }
-  .tip :global(.part) { display: grid; grid-template-columns: 10px 36px auto; align-items: center; gap: 6px; }
-  .tip :global(.part i) { width: 10px; height: 10px; border-radius: 2px; }
-  .tip :global(.part strong) { margin: 0; text-align: right; }
-  .tip :global(.part b) { font-weight: 400; color: var(--muted); }
   @media (max-width: 640px) {
     .lead { font-size: 15px; }
   }

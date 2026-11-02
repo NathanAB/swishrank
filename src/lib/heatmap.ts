@@ -46,8 +46,8 @@ export type Tile = Rect & {
   text: Record<Mode, string>;
   /** The tile's figure in each mode: the text, or "out" for his win chance while he is out. */
   figures: Record<Mode, string>;
-  /** The tooltip: his name, his minutes and win chance added, and its 7-day move. */
-  tip: readonly [string, string, string];
+  /** The tooltip: his name, a row for each figure with the step its key is drawn in, and his minutes or that he is out. */
+  tip: { name: string; rows: readonly { value: string; label: string; bin: Bin; out: boolean }[]; note: string };
 };
 // Public Sans Bold's advance widths in thousandths of an em for ASCII from the space to the tilde, read from the face
 // the site serves by scripts/glyph-widths.mjs; labels are bold or lighter, and lighter weights run narrower. Kerning
@@ -136,19 +136,23 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
     // A hyphenated name too long for its tile falls back to its first half.
     const tries = shown[i].includes("-") ? [shown[i], shown[i].split("-")[0]] : [shown[i]];
     const minutes = Math.round(part.minutes);
+    const bins = { game: part.out ? 0 : binOf(game * 100, CUTS.game), week: binOf(week * 100, CUTS.week) } as const;
     return {
       ...t,
       part,
       name: names[i],
       label: fitLabel(t.w, t.h, tries, [figures.game, figures.week], canvas.scale),
-      bins: { game: part.out ? 0 : binOf(game * 100, CUTS.game), week: binOf(week * 100, CUTS.week) },
+      bins,
       text,
       figures,
-      tip: [
-        names[i],
-        part.out ? `Out · backups ${text.game} win chance` : `${minutes} min · ${text.game} win chance`,
-        `${text.week} past 7 days`,
-      ],
+      tip: {
+        name: names[i],
+        rows: [
+          { value: text.game, label: part.out ? "win chance per game while out" : "win chance per game", bin: bins.game, out: part.out },
+          { value: text.week, label: "7 day change", bin: bins.week, out: false },
+        ],
+        note: part.out ? `Out for weeks · backups play his ${minutes} min` : `${minutes} min a game`,
+      },
     };
   });
 }

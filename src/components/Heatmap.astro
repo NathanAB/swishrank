@@ -25,7 +25,7 @@ const pct = (v: number, of: number) => `${((v / of) * 100).toFixed(2)}%`;
 const box = (r: { x: number; y: number; w: number; h: number }, canvas: Canvas) =>
   `left: ${pct(r.x, canvas.w)}; top: ${pct(r.y, canvas.h)}; width: ${pct(r.w, canvas.w)}; height: ${pct(r.h, canvas.h)}`;
 const fill = (b: Bin) => (b === 0 ? "var(--heat-0)" : `var(--heat-${b > 0 ? "up" : "down"}-${Math.abs(b)})`);
-const MODE_LABEL: Record<Mode, string> = { game: "Win % per game", week: "Past 7 days" };
+const MODE_LABEL: Record<Mode, string> = { game: "Win % per game", week: "7 day change" };
 const rows = wide.tiles;
 // Both layouts hold the same tiles in a different place: each points at its row here, so the tooltips' text is written once.
 const row = new Map(rows.map((t, i) => [t.part.athlete, i]));
@@ -49,7 +49,11 @@ const row = new Map(rows.map((t, i) => [t.part.athlete, i]));
     </div>
   ))}
   <div class="tip" data-heatmap-tip hidden></div>
-  <script type="application/json" data-heatmap-tips set:html={JSON.stringify(rows.map((t) => t.tip)).replace(/</g, "\\u003c")} />
+  <script
+    type="application/json"
+    data-heatmap-tips
+    set:html={JSON.stringify(rows.map(({ tip }) => ({ ...tip, rows: tip.rows.map((r) => [r.value, r.label, r.out ? "var(--stripes)" : fill(r.bin)]) }))).replace(/</g, "\\u003c")}
+  />
 
   <details class="table">
     <summary>Every value</summary>
@@ -60,7 +64,7 @@ const row = new Map(rows.map((t, i) => [t.part.athlete, i]));
             <th scope="col">Player</th>
             <th class="num" scope="col">Min</th>
             <th class="num" scope="col">Win %</th>
-            <th class="num" scope="col">7 days</th>
+            <th class="num" scope="col">7 day change</th>
           </tr>
         </thead>
         <tbody>
@@ -81,7 +85,18 @@ const row = new Map(rows.map((t, i) => [t.part.athlete, i]));
 <script>
   import { placeTip } from "../scripts/tip.ts";
 
-  const isTips = (v: unknown): v is string[][] => Array.isArray(v) && v.every((t) => Array.isArray(t) && t.every((s) => typeof s === "string"));
+  /** A tooltip as the page writes it: his name, a row each of [figure, what it is, its key's fill], and a note. */
+  type Tip = { name: string; rows: [string, string, string][]; note: string };
+  const isText = (v: unknown): v is string => typeof v === "string";
+  const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+  const isTips = (v: unknown): v is Tip[] =>
+    Array.isArray(v) && v.every((t) => isRecord(t) && isText(t.name) && isText(t.note) && Array.isArray(t.rows) && t.rows.every((r) => Array.isArray(r) && r.every(isText)));
+  const el = (tag: string, text: string, className?: string) => {
+    const e = document.createElement(tag);
+    e.textContent = text;
+    if (className) e.className = className;
+    return e;
+  };
 
   for (const root of document.querySelectorAll<HTMLElement>("[data-heatmap]")) {
     const buttons = [...root.querySelectorAll<HTMLButtonElement>("button[data-value]")];
@@ -99,15 +114,16 @@ const row = new Map(rows.map((t, i) => [t.part.athlete, i]));
     let shown: HTMLElement | null = null;
     const show = (cell: HTMLElement, at: PointerEvent) => {
       if (cell !== shown) {
-        tip.replaceChildren(...(tips[Number(cell.dataset.cell)] ?? []).map((text, i) => {
-          const line = document.createElement("span");
-          if (i === 0) {
-            const name = document.createElement("b");
-            name.textContent = text;
-            line.append(name);
-          } else line.textContent = text;
-          return line;
-        }));
+        const t = tips[Number(cell.dataset.cell)];
+        if (!t) return;
+        const rows = t.rows.map(([value, label, fill]) => {
+          const row = el("span", "", "part");
+          const key = el("i", "");
+          key.style.background = fill;
+          row.append(key, el("strong", value), el("b", label));
+          return row;
+        });
+        tip.replaceChildren(el("span", t.name, "who"), ...rows, el("span", t.note, "foot"));
         shown = cell;
       }
       tip.hidden = false;
@@ -136,6 +152,7 @@ const row = new Map(rows.map((t, i) => [t.part.athlete, i]));
     --stripes: repeating-linear-gradient(135deg, var(--heat-out) 0 4px, var(--heat-0) 4px 8px);
   }
   .bar { margin-bottom: 12px; }
+  .tip { --tip-figure: 40px; }
   .canvas { position: relative; width: 100%; container-type: inline-size; background: var(--ground); border-radius: 4px; overflow: hidden; }
   .tall { display: none; }
   @container heatmap (max-width: 640px) {
