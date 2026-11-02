@@ -99,10 +99,6 @@ const tips = rows.map(({ name, part, text, bins }) => {
 
   /** A tooltip as the page writes it: his name, a row each of [figure, what it is, its key's fill], and a note. */
   type Tip = { name: string; rows: [string, string, string][]; note: string };
-  const isText = (v: unknown): v is string => typeof v === "string";
-  const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
-  const isTips = (v: unknown): v is Tip[] =>
-    Array.isArray(v) && v.every((t) => isRecord(t) && isText(t.name) && isText(t.note) && Array.isArray(t.rows) && t.rows.every((r) => Array.isArray(r) && r.every(isText)));
   const el = (tag: string, text: string, className?: string) => {
     const e = document.createElement(tag);
     e.textContent = text;
@@ -120,8 +116,8 @@ const tips = rows.map(({ name, part, text, bins }) => {
     }
 
     const tip = root.querySelector<HTMLElement>("[data-heatmap-tip]");
-    const tips: unknown = JSON.parse(root.querySelector("[data-heatmap-tips]")?.textContent ?? "[]");
-    if (!tip || !isTips(tips)) continue;
+    const tips = JSON.parse(root.querySelector("[data-heatmap-tips]")?.textContent ?? "[]") as Tip[];
+    if (!tip) continue;
     const cellOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<HTMLElement>("[data-cell]") : null);
     let shown: HTMLElement | null = null;
     const show = (cell: HTMLElement, at: PointerEvent) => {
