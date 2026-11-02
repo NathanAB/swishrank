@@ -83,30 +83,32 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
 
   <details class="table">
     <summary>Every value</summary>
-    <table class="ruled" aria-label={label}>
-      <thead>
-        <tr>
-          {many && <th scope="col">Team</th>}
-          <th scope="col">Player</th>
-          <th class="num" scope="col">Min</th>
-          <th class="num" scope="col">Per 48</th>
-          <th class="num" scope="col">Adds</th>
-          <th class="num" scope="col">Week</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map(({ g, t }) => (
+    <div class="scroll">
+      <table class="ruled" aria-label={label}>
+        <thead>
           <tr>
-            {many && <td>{g.short}</td>}
-            <td class="who">{t.name}{t.part.out && <span class="flag"> · out</span>}</td>
-            <td class="num">{Math.round(t.part.minutes)}</td>
-            <td class="num">{t.text.per48}</td>
-            <td class="num">{t.text.adds}</td>
-            <td class="num">{t.text.week}</td>
+            {many && <th scope="col">Team</th>}
+            <th scope="col">Player</th>
+            <th class="num" scope="col">Min</th>
+            <th class="num" scope="col">Per 48</th>
+            <th class="num" scope="col">Adds</th>
+            <th class="num" scope="col">Week</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map(({ g, t }) => (
+            <tr>
+              {many && <td>{g.short}</td>}
+              <td class="who">{t.name}{t.part.out && <span class="flag"> · out</span>}</td>
+              <td class="num">{Math.round(t.part.minutes)}</td>
+              <td class="num">{t.text.per48}</td>
+              <td class="num">{t.text.adds}</td>
+              <td class="num">{t.text.week}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </details>
 </div>
 
@@ -203,7 +205,9 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
   .table { margin-top: 12px; }
   summary { width: max-content; color: var(--muted); cursor: pointer; }
   summary:hover { color: var(--text); }
-  table { margin-top: 8px; }
+  /* A name with no space to break at, such as Gilgeous-Alexander, can leave the league's table wider than a phone:
+     it scrolls in its own box rather than the page sideways. */
+  .scroll { margin-top: 8px; overflow-x: auto; }
   th { padding: 0 8px 2px; }
   td { height: 28px; padding: 0 8px; }
   th:first-child, td:first-child { padding-left: 0; }
