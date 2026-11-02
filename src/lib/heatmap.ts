@@ -71,7 +71,7 @@ export function textWidth(text: string): number {
   return w / 1000;
 }
 
-// The page's tile box model, in canvas px and em: keep in step with Heatmap.astro's styles.
+// The page's tile box model, in canvas px and em, which Heatmap.astro's styles draw with.
 export const PAD = { x: 3, y: 2 };
 export const LINE = 1.15;
 /** The figure under a name, as a share of the name's size. */
