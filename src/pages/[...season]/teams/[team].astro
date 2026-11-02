@@ -75,7 +75,7 @@ const map = wide && tall ? { wide, tall } : null;
         <RatingChart season={season} focus={[abbr]} paint={{ [abbr]: paint }} />
       </Panel>
       {map && (
-        <Panel title="Players" meta="Wins added">
+        <Panel title="Players">
           <Heatmap wide={{ canvas: TEAM_WIDE, tiles: map.wide }} tall={{ canvas: TEAM_TALL, tiles: map.tall }} label={`${me.short} players`} />
         </Panel>
       )}

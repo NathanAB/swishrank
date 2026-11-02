@@ -1,16 +1,23 @@
 // A team's players heatmap, laid out at build time like a stock market map: each player its rating counts a tile as
-// big as the minutes it counts him for, coloured by the wins he adds over a season (Season.players in src/lib/elo.ts). Everything is in a canvas's own px, which the page draws in percentages and container units, so a
+// big as the minutes it counts him for, coloured by how much he raises his team's chance of winning a game, or by how
+// far that moved over the past 7 days (Season.players in src/lib/elo.ts). Everything is in a canvas's own px, which the page draws in percentages and container units, so a
 // layout scales with its card and a label that fits here fits on every screen. Labels are measured with Public Sans
 // Bold's own glyph widths, so none is ever clipped: one shrinks to fit its tile, and a tile too small for any gets none.
-import { WINS_PER_POINT, type PlayerPart } from "./elo.ts";
-import { signedTenth } from "./format.ts";
+import { winProb, type PlayerPart } from "./elo.ts";
+import { signedPercent } from "./format.ts";
 import { playerName } from "./names.ts";
 import { inset, squarify, type Rect } from "./treemap.ts";
 
 /** A colour step on the site's diverging pair: 0 the neutral grey, 1 to 4 stronger rises, −1 to −4 stronger drops. */
 export type Bin = -4 | -3 | -2 | -1 | 0 | 1 | 2 | 3 | 4;
-/** Where each step starts, in wins over a season: within half a win of an average player is neutral. */
-export const CUTS = [0.5, 1, 2, 4] as const;
+/**
+ * What a tile shows: how much he raises his team's chance of winning a game against an average team, over an average
+ * player in his minutes, or how far that moved over the past 7 days.
+ */
+export type Mode = "game" | "week";
+export const MODES: readonly Mode[] = ["game", "week"];
+/** Where each step starts, in percentage points of a game's win chance. */
+export const CUTS: Record<Mode, readonly [number, number, number, number]> = { game: [0.5, 1, 2.5, 5], week: [0.1, 0.25, 0.5, 1] };
 
 const UP: readonly Bin[] = [0, 1, 2, 3, 4];
 const DOWN: readonly Bin[] = [0, -1, -2, -3, -4];
@@ -27,20 +34,20 @@ export type Canvas = { w: number; h: number; scale: number };
 export const TEAM_WIDE: Canvas = { w: 1200, h: 420, scale: 1.5 };
 export const TEAM_TALL: Canvas = { w: 600, h: 640, scale: 2 };
 
-/** A tile's label in canvas px: its name alone, or its name over his wins. */
+/** A tile's label in canvas px: its name alone, or its name over the figure the colour shows. */
 export type Label = { name: string; size: number; lines: 1 | 2 };
 export type Tile = Rect & {
   part: PlayerPart;
   /** His full name, for the tooltip and the table. */
   name: string;
   label: Label | null;
-  bin: Bin;
-  /** The wins he adds over a season, to a tenth, or what his backups do while he is out. */
-  wins: string;
-  /** The tile's figure: his wins, or "out". */
-  figure: string;
-  /** The tooltip: his name, then his minutes and his wins. */
-  tip: readonly [string, string];
+  bins: Record<Mode, Bin>;
+  /** His win chance added and its 7-day move, as the tooltip and the table print them. */
+  text: Record<Mode, string>;
+  /** The tile's figure in each mode: the text, or "out" for his win chance while he is out. */
+  figures: Record<Mode, string>;
+  /** The tooltip: his name, his minutes and win chance added, and its 7-day move. */
+  tip: readonly [string, string, string];
 };
 // Public Sans Bold's advance widths in thousandths of an em for ASCII from the space to the tilde, read from the face
 // the site serves by scripts/glyph-widths.mjs; labels are bold or lighter, and lighter weights run narrower. Kerning
@@ -80,11 +87,11 @@ const TILE_GAP = 1;
  * The largest label that fits a `w` by `h` tile, up to a size that grows with the tile, trying each name in turn;
  * null when none fits at the smallest size.
  */
-function fitLabel(w: number, h: number, names: readonly string[], figure: string, scale: number): Label | null {
+function fitLabel(w: number, h: number, names: readonly string[], figures: readonly string[], scale: number): Label | null {
   const inner = w - 2 * PAD.x;
   const min = MIN_FONT * scale;
   const natural = scale * Math.min(MAX_FONT, Math.sqrt(w * h) / 5);
-  const byFigure = inner / (SAFETY * FIGURE * textWidth(figure));
+  const byFigure = inner / (SAFETY * FIGURE * Math.max(...figures.map(textWidth)));
   for (const name of names) {
     const across = Math.min(natural, inner / (SAFETY * textWidth(name)));
     const two = Math.min(across, byFigure, (h - 2 * PAD.y) / (LINE * (1 + FIGURE)));
@@ -122,8 +129,10 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
   return squarify(parts.map((p) => p.minutes), { x: 0, y: 0, w: canvas.w, h: canvas.h }).map((r, i) => {
     const part = parts[i];
     const t = inset(r, TILE_GAP);
-    const wins = part.adds * WINS_PER_POINT;
-    const figure = part.out ? "out" : signedTenth(wins);
+    const game = winProb(part.adds) - 0.5;
+    const week = game - (winProb(part.weekAgo) - 0.5);
+    const text = { game: signedPercent(game), week: signedPercent(week) };
+    const figures = { game: part.out ? "out" : text.game, week: text.week };
     // A hyphenated name too long for its tile falls back to its first half.
     const tries = shown[i].includes("-") ? [shown[i], shown[i].split("-")[0]] : [shown[i]];
     const minutes = Math.round(part.minutes);
@@ -131,13 +140,14 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
       ...t,
       part,
       name: names[i],
-      label: fitLabel(t.w, t.h, tries, figure, canvas.scale),
-      bin: part.out ? 0 : binOf(wins, CUTS),
-      wins: signedTenth(wins),
-      figure,
+      label: fitLabel(t.w, t.h, tries, [figures.game, figures.week], canvas.scale),
+      bins: { game: part.out ? 0 : binOf(game * 100, CUTS.game), week: binOf(week * 100, CUTS.week) },
+      text,
+      figures,
       tip: [
         names[i],
-        part.out ? `Out · backups ${signedTenth(wins)} wins` : `${minutes} min · ${signedTenth(wins)} wins`,
+        part.out ? `Out · backups ${text.game} win chance` : `${minutes} min · ${text.game} win chance`,
+        `${text.week} past 7 days`,
       ],
     };
   });
