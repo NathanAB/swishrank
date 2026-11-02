@@ -111,6 +111,8 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
 </div>
 
 <script>
+  import { placeTip } from "../scripts/tip.ts";
+
   const isTips = (v: unknown): v is string[][] => Array.isArray(v) && v.every((t) => Array.isArray(t) && t.every((s) => typeof s === "string"));
 
   for (const root of document.querySelectorAll<HTMLElement>("[data-heatmap]")) {
@@ -127,7 +129,7 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
     if (!tip || !isTips(tips)) continue;
     const cellOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<HTMLElement>("[data-cell]") : null);
     let shown: HTMLElement | null = null;
-    const show = (cell: HTMLElement, x: number, y: number, gap: number) => {
+    const show = (cell: HTMLElement, at: PointerEvent) => {
       if (cell !== shown) {
         tip.replaceChildren(...(tips[Number(cell.dataset.cell)] ?? []).map((text, i) => {
           const line = document.createElement("span");
@@ -141,17 +143,12 @@ const row = new Map(rows.map(({ g, t }, i) => [`${g.abbr} ${t.part.athlete}`, i]
         shown = cell;
       }
       tip.hidden = false;
-      const area = root.getBoundingClientRect();
-      const w = tip.offsetWidth, h = tip.offsetHeight;
-      const px = x - area.left, py = y - area.top;
-      const left = Math.max(0, Math.min(px - w / 2, area.width - w));
-      const top = py - h - gap >= 0 ? py - h - gap : py + gap;
-      tip.style.transform = `translate(${left}px, ${top}px)`;
+      placeTip({ tip, area: root, at, side: "above-or-below" });
     };
     const hide = () => (tip.hidden = true);
     const onPointer = (e: PointerEvent) => {
       const cell = cellOf(e.target);
-      if (cell) show(cell, e.clientX, e.clientY, e.pointerType === "touch" ? 24 : 12);
+      if (cell) show(cell, e);
       else if (e.type === "pointermove") hide();
     };
     root.addEventListener("pointermove", onPointer);

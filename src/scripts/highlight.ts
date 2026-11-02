@@ -14,6 +14,7 @@ import { addDays } from "../lib/elo.ts";
 import { placeLabel, weekdayDay } from "../lib/format.ts";
 import { dayAt, nearestLine, type PlotLine } from "../lib/pick.ts";
 import { parseRanks, parseScale, readout, type Place, type Scale } from "../lib/readout.ts";
+import { placeTip } from "./tip.ts";
 
 const closestOf = (t: EventTarget | null, selector: string) => (t instanceof Element ? t.closest<HTMLElement | SVGElement>(selector) : null);
 const chartOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<SVGSVGElement>("svg[data-chart]") : null);
@@ -106,15 +107,8 @@ function showReadout(e: MouseEvent, svg: SVGSVGElement, c: Chart, team: string |
   c.tip.replaceChildren(when, line);
   c.tip.hidden = false;
 
-  const area = c.tip.offsetParent?.getBoundingClientRect();
-  if (!area) return;
-  const px = e.clientX - area.left;
-  const py = e.clientY - area.top;
-  const w = c.tip.offsetWidth;
-  const h = c.tip.offsetHeight;
-  const left = px + 12 + w > area.width ? px - 12 - w : px + 12;
-  const top = Math.min(Math.max(0, py - h - 12), Math.max(0, area.height - h));
-  c.tip.style.transform = `translate(${Math.max(0, left)}px, ${top}px)`;
+  const area = c.tip.offsetParent;
+  if (area) placeTip({ tip: c.tip, area, at: e });
 }
 
 function onChart(e: PointerEvent, svg: SVGSVGElement) {

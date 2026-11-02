@@ -96,6 +96,8 @@ const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name
 </Panel>
 
 <script>
+  import { placeTip } from "../scripts/tip.ts";
+
   type Race = { days: string[]; names: Record<string, string>; named: string[]; colours: string[]; yMax: number; series: Record<string, number[]> };
   for (const root of document.querySelectorAll<HTMLElement>("[data-race]")) {
     const race = JSON.parse(root.dataset.race ?? "{}") as Race;
@@ -145,13 +147,7 @@ const label = `Title chances by day, ${season.label}. ${named.map((a) => `${name
       });
       tip.replaceChildren(day, ...rows);
       tip.hidden = false;
-      const area = root.getBoundingClientRect();
-      const px = e.clientX - area.left;
-      const gap = e.pointerType === "touch" ? 24 : 12;
-      const w = tip.offsetWidth, h = tip.offsetHeight;
-      const left = px + gap + w > area.width ? px - gap - w : px + gap;
-      const top = Math.min(Math.max(0, e.clientY - area.top - h - gap), area.height - h);
-      tip.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, top)}px)`;
+      placeTip({ tip, area: root, at: e });
     }
 
     field.addEventListener("pointermove", read);

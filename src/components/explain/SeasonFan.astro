@@ -113,12 +113,11 @@ const fan = n > 1 && (() => {
   import { shortDay, weekdayDay } from "../../lib/format.ts";
   import { dayAt, nearestLine } from "../../lib/pick.ts";
   import { parseScale, ratingAt } from "../../lib/readout.ts";
+  import { placeTip } from "../../scripts/tip.ts";
 
   const SWEEP: KeyframeAnimationOptions = { duration: 1600, easing: "linear", fill: "forwards" };
   const FEEDBACK: KeyframeAnimationOptions = { duration: 150, easing: "cubic-bezier(0.2, 0, 0, 1)" };
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  /** How far the readout keeps from the pointer, in px: further from a fingertip, which covers more. */
-  const CLEAR = { pointer: 12, finger: 24 };
 
   type Phase = "waiting" | "sweeping" | "rest";
 
@@ -173,20 +172,6 @@ const fan = n > 1 && (() => {
       tip.hidden = true;
     }
 
-    function place(e: PointerEvent) {
-      const area = root.getBoundingClientRect();
-      const px = e.clientX - area.left;
-      const py = e.clientY - area.top;
-      const w = tip.offsetWidth;
-      const h = tip.offsetHeight;
-      const touch = e.pointerType === "touch";
-      const gap = touch ? CLEAR.finger : CLEAR.pointer;
-      const highest = touch ? -h : 0;
-      const left = px + gap + w > area.width ? px - gap - w : px + gap;
-      const top = Math.min(Math.max(highest, py - h - gap), area.height - h);
-      tip.style.transform = `translate(${Math.max(0, left)}px, ${top}px)`;
-    }
-
     function read(e: PointerEvent) {
       if (phase !== "rest" || !scale) return;
       const box = field.getBoundingClientRect();
@@ -219,7 +204,7 @@ const fan = n > 1 && (() => {
         tip.replaceChildren(date, row);
         tip.hidden = false;
       }
-      place(e);
+      placeTip({ tip, area: root, at: e, rise: true });
     }
 
     field.addEventListener("pointermove", read);

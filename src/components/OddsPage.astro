@@ -71,6 +71,8 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
 </Base>
 
 <script>
+  import { placeTip, type Pointer } from "../scripts/tip.ts";
+
   const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
   const links = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Conference"] a')];
   const heading = document.querySelector("h1");
@@ -130,7 +132,7 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   const tip = document.querySelector<HTMLElement>("[data-odds-tip]");
   const box = tip?.parentElement;
   const KEYS = ["var(--result-top6)", "var(--result-playin)", "var(--result-lottery)"];
-  function readout(bar: HTMLElement, x: number, y: number, finger: boolean) {
+  function readout(bar: HTMLElement, at: Pointer) {
     if (!tip || !box) return;
     const [name, ...parts] = JSON.parse(bar.dataset.readout ?? "[]") as [string, ...[string, string][]];
     const head = document.createElement("span");
@@ -151,19 +153,14 @@ const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
     seed.textContent = `Likeliest seed: ${bar.dataset.seed ?? ""}`;
     tip.replaceChildren(head, ...lines, seed);
     tip.hidden = false;
-    const area = box.getBoundingClientRect();
-    const gap = finger ? 24 : 12;
-    const w = tip.offsetWidth, h = tip.offsetHeight;
-    const px = x - area.left, py = y - area.top;
-    const left = px + gap + w > area.width ? px - gap - w : px + gap;
-    tip.style.transform = `translate(${Math.max(0, Math.min(left, area.width - w))}px, ${Math.max(0, py - h - gap)}px)`;
+    placeTip({ tip, area: box, at });
   }
   const hide = () => tip && (tip.hidden = true);
   for (const bar of document.querySelectorAll<HTMLElement>("[data-readout]")) {
-    bar.addEventListener("pointermove", (e) => readout(bar, e.clientX, e.clientY, e.pointerType === "touch"));
-    bar.addEventListener("pointerdown", (e) => readout(bar, e.clientX, e.clientY, e.pointerType === "touch"));
+    bar.addEventListener("pointermove", (e) => readout(bar, e));
+    bar.addEventListener("pointerdown", (e) => readout(bar, e));
     bar.addEventListener("pointerleave", (e) => e.pointerType !== "touch" && hide());
-    bar.addEventListener("focus", () => { const r = bar.getBoundingClientRect(); readout(bar, r.left + r.width / 2, r.top, false); });
+    bar.addEventListener("focus", () => { const r = bar.getBoundingClientRect(); readout(bar, { clientX: r.left + r.width / 2, clientY: r.top }); });
     bar.addEventListener("blur", hide);
   }
   document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Element && e.target.closest("[data-readout]"))) hide(); });
