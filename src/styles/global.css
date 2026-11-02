@@ -27,7 +27,7 @@
   --result-top6: #9ec5f4;
   --result-playin: #3987e5;
   --result-lottery: #184f95;
-  /* The players heatmap (components/Heatmap.astro): the diverging pair mixed into a dark grey in four steps each
+  /* A team's players heatmap (components/Heatmap.astro): the diverging pair mixed into a dark grey in four steps each
      way, the grey of a value near 0, and a player out for weeks striped in two greys. */
   --heat-base: #262626;
   --heat-0: #3a3a3a;

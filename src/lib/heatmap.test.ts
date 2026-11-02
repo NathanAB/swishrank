@@ -2,20 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import names from "../data/players.json" with { type: "json" };
 import type { PlayerPart } from "./elo.ts";
-import { binOf, CUTS, FIGURE, HEAD_GAP, HEAD_PAD, HEAD_TRACKING, LEAGUE_TALL, LEAGUE_WIDE, leagueMap, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE, textWidth, tileNames, type Rated } from "./heatmap.ts";
+import { binOf, CUTS, FIGURE, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE, textWidth, tileNames } from "./heatmap.ts";
 
-// Thirty teams, each a rotation from a 36-minute starter down to a player who barely plays, one of them out for weeks,
-// rated 1100 down to 1013, so the league's order is the reverse of the teams' listing.
+// A rotation from a 36-minute starter down to a player who barely plays, one of them out for weeks.
 const ids = Object.keys(names).map(Number);
 const MINUTES = [36, 34, 32, 30, 26, 22, 18, 14, 8, 3, 0.6];
-const abbrs = Array.from({ length: 30 }, (_, i) => `T${i}`);
 const part = (athlete: number, minutes: number, out: boolean): PlayerPart => ({ athlete, minutes, per48: 12 - minutes / 2, adds: 0, out, week: 0.8 });
-const model: Rated = {
-  data: { season: "2026-27", games: [], teams: Object.fromEntries(abbrs.map((a) => [a, { name: a, short: `Team ${a} of the Western Conference`, color: "000000", alternateColor: "ffffff" }])) },
-  r: Object.fromEntries(abbrs.map((a, i) => [a, 1013 + 3 * i])),
-  order: [...abbrs].reverse(),
-  players: Object.fromEntries(abbrs.map((a, i) => [a, MINUTES.map((m, j) => part(ids[i * MINUTES.length + j], m, j === 3))])),
-};
+const players = MINUTES.map((m, j) => part(ids[j], m, j === 3));
 
 test("a tile's colour takes a stronger step at each cut point, either way from neutral", () => {
   assert.deepEqual([2.9, 3, 9.9, 10, 20, 30, 45].map((v) => binOf(v, CUTS.value)), [0, 1, 1, 2, 3, 4, 4]);
@@ -28,36 +21,19 @@ test("teammates who share a last name are told apart by an initial, and by their
   ]);
 });
 
-test("the league runs best rating first", () => {
-  assert.deepEqual(leagueMap(model, LEAGUE_WIDE).map((g) => g.abbr), model.order);
-});
-
 test("every label fits its tile at its size, and the smallest tiles have none", () => {
-  const maps = [
-    { canvas: LEAGUE_WIDE, groups: leagueMap(model, LEAGUE_WIDE) },
-    { canvas: LEAGUE_TALL, groups: leagueMap(model, LEAGUE_TALL) },
-    { canvas: TEAM_WIDE, groups: [teamMap(model, "T0", TEAM_WIDE)!] },
-    { canvas: TEAM_TALL, groups: [teamMap(model, "T0", TEAM_TALL)!] },
-  ];
   let bare = 0;
-  for (const { canvas, groups } of maps) {
-    for (const g of groups) {
-      if (g.head) {
-        const texts = [g.head.short, ...(g.head.rating ? [g.head.rating] : [])].map((s) => s.toUpperCase());
-        const drawn = texts.reduce((w, s) => w + (textWidth(s) + HEAD_TRACKING * s.length) * g.head!.size, 0) + (texts.length - 1) * HEAD_GAP;
-        assert.ok(drawn + 2 * HEAD_PAD <= g.head.w && g.head.size <= g.head.h, `${g.abbr}'s header overflows`);
+  for (const canvas of [TEAM_WIDE, TEAM_TALL]) {
+    for (const t of teamMap(players, canvas)!) {
+      const { label } = t;
+      if (!label) {
+        bare++;
+        continue;
       }
-      for (const t of g.tiles) {
-        const { label } = t;
-        if (!label) {
-          bare++;
-          continue;
-        }
-        const widest = Math.max(textWidth(label.name), label.lines === 2 ? FIGURE * Math.max(textWidth(t.figures.value), textWidth(t.figures.week)) : 0);
-        assert.ok(label.size >= MIN_FONT * canvas.scale, `${t.name} at ${label.size}`);
-        assert.ok(widest * label.size + 2 * PAD.x <= t.w, `${t.name} runs past its tile's sides`);
-        assert.ok(label.size * LINE * (label.lines === 2 ? 1 + FIGURE : 1) + 2 * PAD.y <= t.h, `${t.name} runs past its tile's top and bottom`);
-      }
+      const widest = Math.max(textWidth(label.name), label.lines === 2 ? FIGURE * Math.max(textWidth(t.figures.value), textWidth(t.figures.week)) : 0);
+      assert.ok(label.size >= MIN_FONT * canvas.scale, `${t.name} at ${label.size}`);
+      assert.ok(widest * label.size + 2 * PAD.x <= t.w, `${t.name} runs past its tile's sides`);
+      assert.ok(label.size * LINE * (label.lines === 2 ? 1 + FIGURE : 1) + 2 * PAD.y <= t.h, `${t.name} runs past its tile's top and bottom`);
     }
   }
   assert.ok(bare > 0, "the 0.6-minute tiles are too small for a label");

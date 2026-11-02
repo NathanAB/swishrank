@@ -17,7 +17,7 @@ import type { Abbr } from "../../../lib/elo.ts";
 import { fixtureDays } from "../../../lib/fixtures.ts";
 import { TEAM_TALL, TEAM_WIDE, teamMap } from "../../../lib/heatmap.ts";
 import { teamDescription } from "../../../lib/meta.ts";
-import { href, type Route } from "../../../lib/routes.ts";
+import type { Route } from "../../../lib/routes.ts";
 import { TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
 import { nextGames, teamGames } from "../../../lib/teams.ts";
 import { currentOdds } from "../../../lib/season-odds.ts";
@@ -41,8 +41,8 @@ const log = teamGames(m, abbr).reverse();
 const rows = ledger(season, abbr);
 const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 const odds = season.current ? currentOdds() : null;
-const wide = teamMap(m, abbr, TEAM_WIDE);
-const tall = teamMap(m, abbr, TEAM_TALL);
+const wide = teamMap(m.players[abbr], TEAM_WIDE);
+const tall = teamMap(m.players[abbr], TEAM_TALL);
 ---
 
 <Base
@@ -59,8 +59,7 @@ const tall = teamMap(m, abbr, TEAM_TALL);
   {wide && tall && (
     <div class="players">
       <Panel title="Players" meta="Tile size is minutes a game.">
-        <a slot="aside" class="every" href={href({ kind: "players", season })}>Every team</a>
-        <Heatmap wide={{ canvas: TEAM_WIDE, groups: [wide] }} tall={{ canvas: TEAM_TALL, groups: [tall] }} season={season} label={`${me.short} players`} />
+        <Heatmap wide={{ canvas: TEAM_WIDE, tiles: wide }} tall={{ canvas: TEAM_TALL, tiles: tall }} label={`${me.short} players`} />
       </Panel>
     </div>
   )}
@@ -95,8 +94,6 @@ const tall = teamMap(m, abbr, TEAM_TALL);
   .cols { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: var(--gap); align-items: start; margin-top: var(--gap); }
   .solo { grid-template-columns: minmax(0, 1fr); }
   .projections, .players { margin-top: var(--gap); }
-  .every { color: var(--muted); }
-  .every:hover { color: var(--text); }
   .side { position: sticky; top: var(--gap); }
   .main > :global(* + *) { margin-top: var(--gap); }
   .days { display: grid; gap: 16px; }
