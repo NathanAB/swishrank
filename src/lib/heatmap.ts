@@ -17,6 +17,8 @@ export type Bin = -4 | -3 | -2 | -1 | 0 | 1 | 2 | 3 | 4;
 /** Where each step starts, in Elo points per 48: within 3 of an average player is neutral, and a week's move within 0.5. */
 export const CUTS: Record<Mode, readonly [number, number, number, number]> = { value: [3, 10, 20, 30], week: [0.5, 1.5, 3, 5] };
 
+/** Every step, strongest drop to strongest rise, as a legend runs. */
+export const BINS: readonly Bin[] = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
 const UP: readonly Bin[] = [0, 1, 2, 3, 4];
 const DOWN: readonly Bin[] = [0, -1, -2, -3, -4];
 /** The step a value falls in: a value on a cut point takes the step that starts there. */
@@ -74,7 +76,7 @@ export function textWidth(text: string): number {
 }
 
 // The page's tile and header box model, in canvas px and em: keep in step with Heatmap.astro's styles.
-export const PAD = { x: 4, y: 3 };
+export const PAD = { x: 3, y: 2 };
 export const LINE = 1.15;
 /** The figure under a name, as a share of the name's size. */
 export const FIGURE = 0.85;
@@ -86,6 +88,7 @@ const SAFETY = 1.05;
 const TILE_GAP = 1;
 const HEAD_TRACKING = 0.03;
 const HEAD_GAP = 4;
+export const HEAD_PAD = 4;
 
 /**
  * The largest label that fits a `w` by `h` tile, up to a size that grows with the tile, trying each name in turn;
@@ -160,9 +163,9 @@ function head(strip: Rect, short: string, shown: string, scale: number): Head | 
   const base = (strip.h * 11) / 18;
   const min = MIN_FONT * scale;
   const width = (text: string) => SAFETY * (textWidth(text.toUpperCase()) + HEAD_TRACKING * text.length);
-  const both = Math.min(base, (strip.w - 2 * PAD.x - HEAD_GAP) / (width(short) + width(shown)));
+  const both = Math.min(base, (strip.w - 2 * HEAD_PAD - HEAD_GAP) / (width(short) + width(shown)));
   if (both >= min) return { ...strip, short, rating: shown, size: both };
-  const alone = Math.min(base, (strip.w - 2 * PAD.x) / width(short));
+  const alone = Math.min(base, (strip.w - 2 * HEAD_PAD) / width(short));
   return alone >= min ? { ...strip, short, rating: null, size: alone } : null;
 }
 

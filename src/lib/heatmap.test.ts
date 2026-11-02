@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import names from "../data/players.json" with { type: "json" };
 import type { PlayerPart } from "./elo.ts";
-import { binOf, CUTS, FIGURE, LEAGUE_TALL, LEAGUE_WIDE, leagueMap, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE, textWidth, tileNames, type Rated } from "./heatmap.ts";
+import { binOf, CUTS, FIGURE, HEAD_PAD, LEAGUE_TALL, LEAGUE_WIDE, leagueMap, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE, textWidth, tileNames, type Rated } from "./heatmap.ts";
 
 // Thirty teams, each a rotation from a 36-minute starter down to a player who barely plays, one of them out for weeks,
 // rated 1100 down to 1013, so the league's order is the reverse of the teams' listing.
@@ -46,7 +46,7 @@ test("every label fits its tile at its size, and the smallest tiles have none", 
     for (const g of groups) {
       if (g.head) {
         const text = `${g.head.short}${g.head.rating ?? ""}`.toUpperCase();
-        assert.ok(textWidth(text) * g.head.size + 2 * PAD.x <= g.head.w && g.head.size <= g.head.h, `${g.abbr}'s header overflows`);
+        assert.ok(textWidth(text) * g.head.size + 2 * HEAD_PAD <= g.head.w && g.head.size <= g.head.h, `${g.abbr}'s header overflows`);
       }
       for (const t of g.tiles) {
         const { label } = t;
