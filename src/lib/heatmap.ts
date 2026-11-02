@@ -1,9 +1,8 @@
 // A team's players heatmap, laid out at build time like a stock market map: each player its rating counts a tile as
 // big as the minutes it counts him for, coloured by his value per 48 or by its move over the week (Season.players in
-// src/lib/elo.ts). Everything is in a canvas's own
-// px, which the page draws in percentages and container units, so a layout scales with its card and a label that fits
-// here fits on every screen. Labels are measured with Public Sans Bold's own glyph widths, so none is ever clipped:
-// one shrinks to fit its tile, and a tile too small for any gets none.
+// src/lib/elo.ts). Everything is in a canvas's own px, which the page draws in percentages and container units, so a
+// layout scales with its card and a label that fits here fits on every screen. Labels are measured with Public Sans
+// Bold's own glyph widths, so none is ever clipped: one shrinks to fit its tile, and a tile too small for any gets none.
 import type { PlayerPart } from "./elo.ts";
 import { signed, signedTenth } from "./format.ts";
 import { playerName } from "./names.ts";
@@ -25,13 +24,14 @@ const DOWN: readonly Bin[] = [0, -1, -2, -3, -4];
 export const binOf = (v: number, cuts: readonly number[]): Bin => (v < 0 ? DOWN : UP)[cuts.filter((c) => Math.abs(v) >= c).length] ?? 0;
 
 /**
- * A layout's size in its own px, and how much larger than the wide layout's its labels run. A phone draws on a tall,
- * narrow canvas rather than shrinking the wide one, and its canvas px are smaller on screen, so its labels run larger
- * to stay as readable.
+ * A layout's size in its own px, and how much larger than the wide layout's its labels run. A narrow heatmap, on a
+ * phone or in a page's side column, draws on a tall canvas rather than shrinking the wide one, and its canvas px are
+ * smaller on screen, so its labels run larger to stay as readable: twice as large keeps every name at 8px or more and
+ * every figure at 7px or more in a page's side column.
  */
 export type Canvas = { w: number; h: number; scale: number };
 export const TEAM_WIDE: Canvas = { w: 1200, h: 420, scale: 1 };
-export const TEAM_TALL: Canvas = { w: 600, h: 560, scale: 1.5 };
+export const TEAM_TALL: Canvas = { w: 600, h: 640, scale: 2 };
 
 /** A tile's label in canvas px: its name alone, or its name over the figure the colour shows. */
 export type Label = { name: string; size: number; lines: 1 | 2 };

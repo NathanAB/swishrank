@@ -1,17 +1,18 @@
 ---
 // A team's players heatmap (src/lib/heatmap.ts): a tile per player as big as his minutes, drawn in percentages of its
 // canvas, with labels and gaps in container units against the canvas's own width, so a layout scales with its card
-// and keeps every label inside its tile. A phone gets the tall layout, everything wider the wide one; both are on the
-// page and a media query shows one. The switch colours the tiles by value per 48 or by the week's change, with that
-// mode's legend; a tile's tooltip, on hover or a tap, has his figures, and the table under it every value. The table
-// is what a keyboard or a screen reader reads, so the tiles, which repeat it, are hidden from both.
+// and keeps every label inside its tile. A heatmap 640px wide or narrower, on a phone or in a page's side column, gets
+// the tall layout, a wider one the wide; both are on the page and a container query on the heatmap's own width shows
+// one. The switch colours the tiles by value per 48 or by the week's change, with that mode's legend; a tile's
+// tooltip, on hover or a tap, has his figures, and the table under it every value. The table is what a keyboard or a
+// screen reader reads, so the tiles, which repeat it, are hidden from both.
 import Segmented from "./Segmented.astro";
 import { BINS, CUTS, MODES, type Bin, type Canvas, type Mode, type Tile } from "../lib/heatmap.ts";
 import { signed } from "../lib/format.ts";
 
 type Layout = { canvas: Canvas; tiles: Tile[] };
 interface Props {
-  /** The same players laid out for a wide screen and for a phone. */
+  /** The same players laid out for a wide card and for a narrow one. */
   wide: Layout;
   tall: Layout;
   /** What the table view lists, as its accessible name: "Thunder players". */
@@ -140,7 +141,7 @@ const row = new Map(rows.map((t, i) => [t.part.athlete, i]));
 
 <style>
   .hm {
-    position: relative;
+    position: relative; container: heatmap / inline-size;
     --heat-up-1: color-mix(in oklab, var(--rise) 35%, var(--heat-base)); --heat-up-2: color-mix(in oklab, var(--rise) 58%, var(--heat-base));
     --heat-up-3: color-mix(in oklab, var(--rise) 80%, var(--heat-base)); --heat-up-4: var(--rise);
     --heat-down-1: color-mix(in oklab, var(--drop) 35%, var(--heat-base)); --heat-down-2: color-mix(in oklab, var(--drop) 58%, var(--heat-base));
@@ -155,9 +156,12 @@ const row = new Map(rows.map((t, i) => [t.part.athlete, i]));
 
   .canvas { position: relative; width: 100%; container-type: inline-size; background: var(--ground); border-radius: 4px; overflow: hidden; }
   .tall { display: none; }
-  @media (max-width: 640px) {
+  /* A narrow heatmap's legend runs its steps across one row. */
+  @container heatmap (max-width: 640px) {
     .wide { display: none; }
     .tall { display: block; }
+    .legend { flex: 1 1 100%; }
+    .legend span { flex: 1 1 0; min-width: 0; padding-inline: 0; }
   }
   /* Canvas px to the screen: n canvas px are n * 100cqw / W. */
   .cell {
