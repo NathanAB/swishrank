@@ -3,8 +3,9 @@
 // percentages of its canvas, with labels and gaps in container units against the canvas's own width, so a layout
 // scales with its card and keeps every label inside its tile. A phone gets the tall layout, everything wider the wide
 // one; both are on the page and a media query shows one. The switch colours the tiles by value per 48 or by the
-// week's change, with that mode's legend; a tile's tooltip, on hover, a tap or keyboard focus, has his figures, and
-// the table under it every value.
+// week's change, with that mode's legend; a tile's tooltip, on hover or a tap, has his figures, and the table under
+// it every value. The table is what a keyboard or a screen reader reads: hundreds of tiles as tab stops would bury
+// the page, so the tiles are hidden from both.
 import { BINS, CUTS, MODES, type Bin, type Canvas, type Group, type Mode } from "../lib/heatmap.ts";
 import { signed } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
@@ -61,9 +62,7 @@ const rows = wide.groups.flatMap((g) => g.tiles.map((t) => ({ g, t })));
           {g.tiles.map((t) => (
             <div
               class:list={["cell", { out: t.part.out }]}
-              tabindex="0"
-              role="img"
-              aria-label={t.tip.join(". ")}
+              aria-hidden="true"
               data-cell={JSON.stringify(t.tip)}
               style={`left: ${pct(t.x, canvas.w)}; top: ${pct(t.y, canvas.h)}; width: ${pct(t.w, canvas.w)}; height: ${pct(t.h, canvas.h)}; --fs: ${(t.label?.size ?? 0).toFixed(2)}; --c-value: ${fill(t.bins.value)}; --c-week: ${fill(t.bins.week)}`}
             >
@@ -152,13 +151,6 @@ const rows = wide.groups.flatMap((g) => g.tiles.map((t) => ({ g, t })));
       if (cell) show(cell, e.clientX, e.clientY, e.pointerType === "touch" ? 24 : 12);
     });
     root.addEventListener("pointerleave", (e) => e.pointerType !== "touch" && hide());
-    root.addEventListener("focusin", (e) => {
-      const cell = cellOf(e.target);
-      if (!cell) return hide();
-      const r = cell.getBoundingClientRect();
-      show(cell, r.left + r.width / 2, r.top, 8);
-    });
-    root.addEventListener("focusout", hide);
     document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Node && root.contains(e.target))) hide(); });
   }
 </script>
@@ -210,7 +202,7 @@ const rows = wide.groups.flatMap((g) => g.tiles.map((t) => ({ g, t })));
   }
   .hm[data-mode="week"] .cell { background: var(--c-week); }
   .cell.out, .hm[data-mode="week"] .cell.out { background: var(--stripes); color: var(--muted); }
-  .cell:hover, .cell:focus-visible { box-shadow: inset 0 0 0 2px var(--text); outline: none; z-index: 1; }
+  .cell:hover { box-shadow: inset 0 0 0 2px var(--text); z-index: 1; }
   .nm { font-weight: 700; }
   .fig { font-size: 0.85em; font-weight: 500; font-variant-numeric: tabular-nums; }
 

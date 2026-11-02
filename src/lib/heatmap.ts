@@ -55,7 +55,8 @@ export type Group = Rect & { abbr: Abbr; short: string; rating: number; head: He
 export type Rated = Pick<Season, "data" | "r" | "order" | "players">;
 
 // Public Sans Bold's advance widths in thousandths of an em for ASCII from the space to the tilde, read from the face
-// the site serves; labels are bold or lighter, and lighter weights run narrower. Kerning only narrows a word.
+// the site serves by scripts/glyph-widths.mjs; labels are bold or lighter, and lighter weights run narrower. Kerning
+// only narrows a word.
 const BOLD = [
   226, 282, 480, 616, 681, 939, 784, 261, 333, 337, 473, 589, 277, 393, 270, 381, 645, 428, 635, 665, 656, 675, 661, 626, 671, 659, 270, 279,
   578, 589, 578, 535, 828, 727, 685, 718, 720, 635, 614, 759, 770, 308, 402, 717, 578, 918, 782, 761, 653, 773, 696, 692, 616, 724, 704, 969,
