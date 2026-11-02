@@ -130,7 +130,7 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
   return squarify(parts.map((p) => p.minutes), { x: 0, y: 0, w: canvas.w, h: canvas.h }).map((r, i) => {
     const part = parts[i];
     const t = inset(r, TILE_GAP);
-    const text = { game: signed(Math.round(part.adds)), week: signed(Math.round(part.adds) - Math.round(part.weekAgo)) };
+    const text = { game: signed(Math.round(part.adds)), week: signed(Math.round(part.adds - part.weekAgo)) };
     const figures = { game: part.out ? "out" : text.game, week: text.week };
     // A hyphenated name too long for its tile falls back to its first half.
     const tries = shown[i].includes("-") ? [shown[i], shown[i].split("-")[0]] : [shown[i]];

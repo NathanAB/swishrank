@@ -16,9 +16,13 @@ test("a tile's colour takes a stronger step at each cut point, either way from n
 });
 
 test("a tile's figures are whole rating points, a slip under a point showing 0, and its colour comes from the unrounded points", () => {
-  const [t] = teamMap([{ athlete: ids[0], minutes: 30, adds: -0.3, out: false, weekAgo: -1.6 }], TEAM_WIDE);
-  assert.deepEqual(t.text, { game: "0", week: "+2" });
-  assert.deepEqual(t.bins, { game: 0, week: 1 });
+  const [a, b] = teamMap([
+    { athlete: ids[0], minutes: 30, adds: -0.3, out: false, weekAgo: -0.7 },
+    { athlete: ids[1], minutes: 20, adds: 10, out: false, weekAgo: 9.5 },
+  ], TEAM_WIDE);
+  assert.deepEqual(a.text, { game: "0", week: "0" });
+  assert.deepEqual(b.text, { game: "+10", week: "+1" });
+  assert.deepEqual(b.bins, { game: 2, week: 0 });
 });
 
 test("teammates who share a last name are told apart by an initial, and by their whole names when that is shared too", () => {
