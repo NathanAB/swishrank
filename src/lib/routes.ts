@@ -16,6 +16,8 @@ export type Route =
   | { kind: "team"; season: SeasonRef; abbr: string }
   /** Every team's projected record and chances, for the whole league or one conference; the season in progress only. */
   | { kind: "odds"; season: SeasonRef; conference?: Conference }
+  /** Every team's rotation as a heatmap of what each player adds to its rating. */
+  | { kind: "players"; season: SeasonRef }
   /** One game, played or to come: its day and its two teams name it, as no two teams meet twice in a day. */
   | { kind: "game"; season: SeasonRef; game: GameRef }
   /** Every season as a plain link to its home: the season menu's fallback without script. */
@@ -47,6 +49,8 @@ export function routePath(route: Route): string {
       return `${prefix(route.season)}/teams/${teamSlug(route.abbr)}/`;
     case "odds":
       return `${prefix(route.season)}/odds/${route.conference ? `${conferenceSlug(route.conference)}/` : ""}`;
+    case "players":
+      return `${prefix(route.season)}/players/`;
     case "game": {
       const { day, matchup } = gameSlug(route.game);
       return `${prefix(route.season)}/games/${day}/${matchup}/`;
@@ -78,6 +82,7 @@ export function shareImage(route: Route | undefined, current: SeasonRef): ShareI
     case "games":
     case "game":
     case "odds":
+    case "players":
       return { kind: "season", season: route.season };
     case "seasons":
     case "about":
@@ -131,6 +136,8 @@ export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string
       return hasTeam(route.abbr) ? { kind: "team", season: to, abbr: route.abbr } : { kind: "home", season: to };
     case "odds":
       return to.current ? { ...route, season: to } : { kind: "home", season: to, conference: route.conference };
+    case "players":
+      return { kind: "players", season: to };
     default: {
       const _exhaustive: never = route;
       return _exhaustive;

@@ -36,6 +36,7 @@ const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route
   { label: "Games", kinds: ["games", "game"], to: (s) => ({ kind: "games", season: s }) },
   // Only the season in progress has odds, so from a finished season the tab goes to the current one's.
   { label: "Odds", kinds: ["odds"], to: (s) => ({ kind: "odds", season: s.current ? s : currentSeason() }) },
+  { label: "Players", kinds: ["players"], to: (s) => ({ kind: "players", season: s }) },
 ];
 const home = href({ kind: "home", season: currentSeason() });
 

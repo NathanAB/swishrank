@@ -1,0 +1,50 @@
+---
+// Every team's players as one heatmap, like a stock market map: each team a block of its rotation's minutes, best
+// rating first, and each player its shown rating counts a tile as big as the minutes it counts him for (Heatmap.astro).
+// /players/ is the current season, /<id>/players/ every other one.
+import Empty from "../../components/Empty.astro";
+import Heatmap from "../../components/Heatmap.astro";
+import Panel from "../../components/Panel.astro";
+import SeasonMenu from "../../components/SeasonMenu.astro";
+import Base from "../../layouts/Base.astro";
+import { shortDay } from "../../lib/format.ts";
+import { LEAGUE_TALL, LEAGUE_WIDE, leagueMap } from "../../lib/heatmap.ts";
+import { playersDescription, playersTitle } from "../../lib/meta.ts";
+import type { Route } from "../../lib/routes.ts";
+import { seasonPaths, type SeasonView } from "../../lib/season.ts";
+
+export function getStaticPaths() {
+  return seasonPaths();
+}
+
+interface Props {
+  season: SeasonView;
+}
+
+const { season } = Astro.props;
+const route: Route = { kind: "players", season };
+const m = season.model;
+const wide = leagueMap(m, LEAGUE_WIDE);
+const tall = leagueMap(m, LEAGUE_TALL);
+const latest = m.results.at(-1)?.day;
+const asOf = season.current ? (latest ? `After ${shortDay(latest)}.` : "") : "Each team's rotation at its last game.";
+const heading = `${season.label} players`;
+---
+
+<Base title={heading} docTitle={playersTitle(season)} description={playersDescription(season)} route={route} ownHeading>
+  <Panel level={1} title={heading} meta={`${asOf} Tile size is minutes a game.`.trim()}>
+    <Fragment slot="aside"><SeasonMenu route={route} /></Fragment>
+    {wide.length === 0 ? (
+      <Empty>No rotations yet.</Empty>
+    ) : (
+      <>
+        <p class="lead">Each team's block holds the players its rating counts, best team first. A player's value per 48 is in Elo points against an average player, and what he adds to his team's rating is that value times his share of its 48 minutes.</p>
+        <Heatmap wide={{ canvas: LEAGUE_WIDE, groups: wide }} tall={{ canvas: LEAGUE_TALL, groups: tall }} season={season} label="Every team's players" />
+      </>
+    )}
+  </Panel>
+</Base>
+
+<style>
+  .lead { margin: -4px 0 16px; color: var(--muted); }
+</style>

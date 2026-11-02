@@ -2,8 +2,9 @@
 // and description, built from the season model the page shows. Ranks, records and ratings come from the
 // helpers the tables use, so a description never disagrees with the page under it.
 import type { Abbr } from "./elo.ts";
-import { longDay, matchup, pct, rating, record } from "./format.ts";
+import { longDay, matchup, pct, rating, record, signed } from "./format.ts";
 import type { GameView } from "./game.ts";
+import { playerName } from "./names.ts";
 import type { SeasonView } from "./season.ts";
 import { place, standings, standingsRecord, type Conference } from "./teams.ts";
 
@@ -54,6 +55,19 @@ export function oddsDescription(season: Shown, title: Record<Abbr, number>, conf
   const who = conference ? `Every ${conference}ern Conference team's` : "Every NBA team's";
   const lead = best ? ` The ${season.model.data.teams[best].short} have the best title chance${conference ? ` in the ${conference}` : ""}, at ${Math.round(title[best])}%.` : "";
   return `${who} projected record and its chances to make the playoffs and win the title.${lead}`;
+}
+
+/** The players page's document title, led by the words people search for. */
+export const playersTitle = (season: Pick<SeasonView, "label">) => `NBA player values ${season.label}`;
+
+/** What the players page holds, and who adds the most: "Shai Gilgeous-Alexander adds the most to a team's rating, +16 for the Thunder." */
+export function playersDescription(season: Shown): string {
+  const m = season.model;
+  const lede = "What every NBA rotation player adds to his team's Elo rating, and his value per 48 minutes.";
+  const top = m.abbrs.flatMap((a) => m.players[a].filter((p) => !p.out).map((p) => ({ a, p }))).sort((x, y) => y.p.adds - x.p.adds)[0];
+  const name = top && playerName(top.p.athlete);
+  if (!top || !name) return lede;
+  return `${lede} ${name} ${season.current ? "adds" : "added"} the most to a team's rating, ${signed(Math.round(top.p.adds))} for the ${m.data.teams[top.a].short}.`;
 }
 
 /** "The Celtics are 9th of 30 at 1032 with a 3–1 record." and what the page holds. */

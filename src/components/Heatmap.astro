@@ -1,0 +1,229 @@
+---
+// The players heatmap (src/lib/heatmap.ts): a block per team and a tile per player as big as his minutes, drawn in
+// percentages of its canvas, with labels and gaps in container units against the canvas's own width, so a layout
+// scales with its card and keeps every label inside its tile. A phone gets the tall layout, everything wider the wide
+// one; both are on the page and a media query shows one. The switch colours the tiles by value per 48 or by the
+// week's change, with that mode's legend; a tile's tooltip, on hover, a tap or keyboard focus, has his figures, and
+// the table under it every value.
+import { BINS, CUTS, MODES, type Bin, type Canvas, type Group, type Mode } from "../lib/heatmap.ts";
+import { signed } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
+import type { SeasonView } from "../lib/season.ts";
+
+type Layout = { canvas: Canvas; groups: Group[] };
+interface Props {
+  /** The same teams laid out for a wide screen and for a phone. */
+  wide: Layout;
+  tall: Layout;
+  season: SeasonView;
+  /** What the table view lists, as its accessible name: "Every team's players". */
+  label: string;
+}
+
+const { wide, tall, season, label } = Astro.props;
+const pct = (v: number, of: number) => `${((v / of) * 100).toFixed(3)}%`;
+const fill = (b: Bin) => (b === 0 ? "var(--heat-0)" : `var(--heat-${b > 0 ? "up" : "down"}-${Math.abs(b)})`);
+const MODE_LABEL: Record<Mode, string> = { value: "Value per 48", week: "Change this week" };
+// Each step labelled with where it starts: −30 −20 −10 −3 0 +3 +10 +20 +30.
+const legend = (mode: Mode) => BINS.map((bin) => ({ bin, text: bin === 0 ? "0" : signed(Math.sign(bin) * CUTS[mode][Math.abs(bin) - 1]) }));
+const many = wide.groups.length > 1;
+const rows = wide.groups.flatMap((g) => g.tiles.map((t) => ({ g, t })));
+---
+
+<div class="hm" data-heatmap data-mode="value">
+  <div class="bar">
+    <div class="switch" role="group" aria-label="Colour by">
+      {MODES.map((m) => <button type="button" data-set={m} aria-pressed={String(m === "value")}>{MODE_LABEL[m]}</button>)}
+    </div>
+    {MODES.map((m) => (
+      <p class="legend" data-for={m}>
+        {legend(m).map((l) => <span style={`background: ${fill(l.bin)}`}>{l.text}</span>)}
+        <span class="out">Out</span>
+      </p>
+    ))}
+  </div>
+
+  {[{ name: "wide", ...wide }, { name: "tall", ...tall }].map(({ name, canvas, groups }) => (
+    <div class:list={["canvas", name]} style={`aspect-ratio: ${canvas.w} / ${canvas.h}; --W: ${canvas.w}`}>
+      {groups.map((g) => (
+        <>
+          {g.head && (
+            <a
+              class="head"
+              href={href({ kind: "team", season, abbr: g.abbr })}
+              aria-label={season.model.data.teams[g.abbr].name}
+              style={`left: ${pct(g.head.x, canvas.w)}; top: ${pct(g.head.y, canvas.h)}; width: ${pct(g.head.w, canvas.w)}; height: ${pct(g.head.h, canvas.h)}; --fs: ${g.head.size.toFixed(2)}`}
+            >
+              <span>{g.head.short}</span>
+              {g.head.rating && <span class="r">{g.head.rating}</span>}
+            </a>
+          )}
+          {g.tiles.map((t) => (
+            <div
+              class:list={["cell", { out: t.part.out }]}
+              tabindex="0"
+              role="img"
+              aria-label={t.tip.join(". ")}
+              data-cell={JSON.stringify(t.tip)}
+              style={`left: ${pct(t.x, canvas.w)}; top: ${pct(t.y, canvas.h)}; width: ${pct(t.w, canvas.w)}; height: ${pct(t.h, canvas.h)}; --fs: ${(t.label?.size ?? 0).toFixed(2)}; --c-value: ${fill(t.bins.value)}; --c-week: ${fill(t.bins.week)}`}
+            >
+              {t.label && <span class="nm">{t.label.name}</span>}
+              {t.label?.lines === 2 && MODES.map((m) => <span class="fig" data-for={m}>{t.figures[m]}</span>)}
+            </div>
+          ))}
+        </>
+      ))}
+    </div>
+  ))}
+  <div class="tip" data-heatmap-tip hidden></div>
+
+  <details class="table">
+    <summary>Every value</summary>
+    <table aria-label={label}>
+      <thead>
+        <tr>
+          {many && <th scope="col">Team</th>}
+          <th scope="col">Player</th>
+          <th class="num" scope="col">Min</th>
+          <th class="num" scope="col">Per 48</th>
+          <th class="num" scope="col">Adds</th>
+          <th class="num" scope="col">Week</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(({ g, t }) => (
+          <tr>
+            {many && <td>{g.short}</td>}
+            <td class="who">{t.name}{t.part.out && <span class="flag"> · out</span>}</td>
+            <td class="num">{Math.round(t.part.minutes)}</td>
+            <td class="num">{signed(Math.round(t.part.per48))}</td>
+            <td class="num">{signed(Math.round(t.part.adds))}</td>
+            <td class="num">{signed(Math.round(t.part.week * 10) / 10)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </details>
+</div>
+
+<script>
+  const isLines = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === "string");
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-heatmap]")) {
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>("button[data-set]")];
+    for (const b of buttons) {
+      b.addEventListener("click", () => {
+        root.dataset.mode = b.dataset.set;
+        for (const o of buttons) o.setAttribute("aria-pressed", String(o === b));
+      });
+    }
+
+    const tip = root.querySelector<HTMLElement>("[data-heatmap-tip]");
+    if (!tip) continue;
+    const cellOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<HTMLElement>("[data-cell]") : null);
+    const show = (cell: HTMLElement, x: number, y: number, gap: number) => {
+      const lines: unknown = JSON.parse(cell.dataset.cell ?? "[]");
+      if (!isLines(lines)) return;
+      tip.replaceChildren(...lines.map((text, i) => {
+        const line = document.createElement("span");
+        if (i === 0) {
+          const name = document.createElement("b");
+          name.textContent = text;
+          line.append(name);
+        } else line.textContent = text;
+        return line;
+      }));
+      tip.hidden = false;
+      const area = root.getBoundingClientRect();
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      const px = x - area.left, py = y - area.top;
+      const left = Math.max(0, Math.min(px - w / 2, area.width - w));
+      const top = py - h - gap >= 0 ? py - h - gap : py + gap;
+      tip.style.transform = `translate(${left}px, ${top}px)`;
+    };
+    const hide = () => (tip.hidden = true);
+    root.addEventListener("pointermove", (e) => {
+      const cell = cellOf(e.target);
+      if (cell) show(cell, e.clientX, e.clientY, e.pointerType === "touch" ? 24 : 12);
+      else hide();
+    });
+    root.addEventListener("pointerdown", (e) => {
+      const cell = cellOf(e.target);
+      if (cell) show(cell, e.clientX, e.clientY, e.pointerType === "touch" ? 24 : 12);
+    });
+    root.addEventListener("pointerleave", (e) => e.pointerType !== "touch" && hide());
+    root.addEventListener("focusin", (e) => {
+      const cell = cellOf(e.target);
+      if (!cell) return hide();
+      const r = cell.getBoundingClientRect();
+      show(cell, r.left + r.width / 2, r.top, 8);
+    });
+    root.addEventListener("focusout", hide);
+    document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Node && root.contains(e.target))) hide(); });
+  }
+</script>
+
+<style>
+  .hm {
+    position: relative;
+    --heat-up-1: color-mix(in oklab, var(--rise) 35%, var(--heat-base)); --heat-up-2: color-mix(in oklab, var(--rise) 58%, var(--heat-base));
+    --heat-up-3: color-mix(in oklab, var(--rise) 80%, var(--heat-base)); --heat-up-4: var(--rise);
+    --heat-down-1: color-mix(in oklab, var(--drop) 35%, var(--heat-base)); --heat-down-2: color-mix(in oklab, var(--drop) 58%, var(--heat-base));
+    --heat-down-3: color-mix(in oklab, var(--drop) 80%, var(--heat-base)); --heat-down-4: var(--drop);
+    --stripes: repeating-linear-gradient(135deg, var(--heat-out) 0 4px, var(--heat-0) 4px 8px);
+  }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .switch { display: inline-flex; border-radius: 8px; background: var(--seg-track); }
+  /* As Segmented.astro's links: the transparent border insets the pill inside its button. */
+  .switch button {
+    height: var(--control-h); padding: 0 12px; border: 3px solid transparent; border-radius: 8px; background-clip: padding-box;
+    color: var(--muted); font-weight: 500; white-space: nowrap; transition: color 150ms ease, background-color 150ms ease;
+  }
+  .switch button:hover { color: var(--text); }
+  .switch button[aria-pressed="true"] { background-color: var(--seg-pill); box-shadow: var(--seg-lift); color: var(--text); }
+  .switch button:focus-visible { outline-offset: -1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 2px; }
+  .legend span { min-width: 34px; padding: 2px 4px; border-radius: 2px; text-align: center; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .legend .out { margin-left: 6px; background: var(--stripes); color: var(--muted); }
+  .hm[data-mode="value"] [data-for="week"], .hm[data-mode="week"] [data-for="value"] { display: none; }
+
+  .canvas { position: relative; width: 100%; container-type: inline-size; background: var(--ground); border-radius: 4px; overflow: hidden; }
+  .tall { display: none; }
+  @media (max-width: 640px) {
+    .wide { display: none; }
+    .tall { display: block; }
+  }
+  /* Canvas px to the screen: n canvas px are n * 100cqw / W. */
+  .head {
+    position: absolute; display: flex; justify-content: space-between; align-items: center; gap: calc(4 * 100cqw / var(--W));
+    padding: 0 calc(4 * 100cqw / var(--W)); font-size: calc(var(--fs) * 100cqw / var(--W)); line-height: 1; font-weight: 700;
+    color: var(--text); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; transition: color 150ms ease;
+  }
+  .head:hover { color: var(--accent); }
+  .head .r { color: var(--muted); font-weight: 500; }
+  .head:focus-visible { outline-offset: -2px; }
+  .cell {
+    position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: calc(2 * 100cqw / var(--W)) calc(3 * 100cqw / var(--W)); border-radius: 2px;
+    background: var(--c-value); color: var(--text); text-align: center; line-height: 1.15; white-space: nowrap;
+    font-size: calc(var(--fs) * 100cqw / var(--W)); transition: background-color 200ms ease;
+  }
+  .hm[data-mode="week"] .cell { background: var(--c-week); }
+  .cell.out, .hm[data-mode="week"] .cell.out { background: var(--stripes); color: var(--muted); }
+  .cell:hover, .cell:focus-visible { box-shadow: inset 0 0 0 2px var(--text); outline: none; z-index: 1; }
+  .nm { font-weight: 700; }
+  .fig { font-size: 0.85em; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  .table { margin-top: 12px; }
+  summary { width: max-content; color: var(--muted); cursor: pointer; }
+  summary:hover { color: var(--text); }
+  table { width: 100%; margin-top: 8px; border-collapse: collapse; }
+  th { padding: 0 8px 2px; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--muted); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+  td { height: 28px; padding: 0 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; color: var(--muted); }
+  th:first-child, td:first-child { padding-left: 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+  .num { text-align: right; }
+  /* A long name wraps in its cell rather than pushing the table past a phone's width. */
+  td.who { color: var(--text); white-space: normal; }
+  .flag { color: var(--muted); }
+</style>

@@ -95,3 +95,10 @@ test("the odds live at /odds/, a conference's under it, and a finished season's 
   assert.deepEqual(switchTarget({ kind: "odds", season: now, conference: "West" }, past, anyTeam), { kind: "home", season: past, conference: "West" });
   assert.deepEqual(switchTarget({ kind: "odds", season: now }, now, anyTeam), { kind: "odds", season: now });
 });
+
+test("the players page lives at /players/ in either season, shares its season's picture and stays on the players in the season switch", () => {
+  assert.equal(routePath({ kind: "players", season: now }), "/players/");
+  assert.equal(routePath({ kind: "players", season: past }), "/2025-26/players/");
+  assert.equal(sharePath(shareImage({ kind: "players", season: past }, now)), "/share/2025-26.png");
+  assert.deepEqual(switchTarget({ kind: "players", season: now }, past, anyTeam), { kind: "players", season: past });
+});
