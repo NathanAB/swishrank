@@ -24,13 +24,13 @@ const DOWN: readonly Bin[] = [0, -1, -2, -3, -4];
 export const binOf = (v: number, cuts: readonly number[]): Bin => (v < 0 ? DOWN : UP)[cuts.filter((c) => Math.abs(v) >= c).length] ?? 0;
 
 /**
- * A layout's size in its own px, and how much larger than the wide layout's its labels run. A narrow heatmap, on a
- * phone or in a page's side column, draws on a tall canvas rather than shrinking the wide one, and its canvas px are
- * smaller on screen, so its labels run larger to stay as readable: twice as large keeps every name at 8px or more and
- * every figure at 7px or more in a page's side column.
+ * A layout's size in its own px, and how many times MIN_FONT its smallest label is. A heatmap 640px wide or narrower,
+ * on a phone or in a page's side column, draws on the tall canvas rather than shrinking the wide one. Each scale keeps
+ * every label at about 7px or more on screen at its layout's narrowest: the tall one at the side column's 278px, the
+ * wide one at 641px, as on a tablet.
  */
 export type Canvas = { w: number; h: number; scale: number };
-export const TEAM_WIDE: Canvas = { w: 1200, h: 420, scale: 1 };
+export const TEAM_WIDE: Canvas = { w: 1200, h: 420, scale: 1.5 };
 export const TEAM_TALL: Canvas = { w: 600, h: 640, scale: 2 };
 
 /** A tile's label in canvas px: its name alone, or its name over the figure the colour shows. */
