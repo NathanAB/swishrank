@@ -72,7 +72,7 @@ const odds = season.current ? currentOdds() : null;
       </Panel>
       {m.players[abbr].length > 0 && (
         <Panel title="Players">
-          <Heatmap players={m.players[abbr]} label={`${me.short} players`} />
+          <Heatmap players={m.players[abbr]} label={`${me.short} players`} teamRating={m.r[abbr]} />
         </Panel>
       )}
       <Panel title="History">

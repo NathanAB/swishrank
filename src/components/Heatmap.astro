@@ -2,13 +2,14 @@
 // A team's players heatmap (src/lib/heatmap.ts): a tile per player as big as his minutes, drawn in percentages of its
 // canvas, with labels and gaps in container units against the canvas's own width, so a layout scales with its card
 // and keeps every label inside its tile. A heatmap 640px wide or narrower, as on a phone, gets the tall layout, a wider
-// one the wide; both are on the page and a container query on the heatmap's own width shows one. The switch shows each
-// player's win chance added per game, or how far it moved over the past 7 days, on the tiles and in their colour, blue
-// up and orange down, with no legend: the figure is on the tile. A tile's tooltip, on hover or a tap, has his minutes
-// and both figures, and the table under it every value. The table is what a keyboard or a screen reader reads, so the
-// tiles, which repeat it, are hidden from both.
+// one the wide; both are on the page and a container query on the heatmap's own width shows one. The switch shows the
+// rating points each player adds to his team's rating, or how far that moved over the past 7 days, on the tiles and in
+// their colour, blue up and orange down, with no legend: the figure is on the tile. A tile's tooltip, on hover or a
+// tap, has both figures and his minutes and win chance a game, and the table under it every value. The table is what a
+// keyboard or a screen reader reads, so the tiles, which repeat it, are hidden from both.
 import Segmented from "./Segmented.astro";
 import type { PlayerPart } from "../lib/elo.ts";
+import { rating } from "../lib/format.ts";
 import { FIGURE, LINE, MODES, PAD, TEAM_TALL, TEAM_WIDE, teamMap, type Bin, type Canvas, type Mode } from "../lib/heatmap.ts";
 
 interface Props {
@@ -16,34 +17,37 @@ interface Props {
   players: readonly PlayerPart[];
   /** What the table view lists, as its accessible name: "Thunder players". */
   label: string;
+  /** The team's rating the players' points add up to. */
+  teamRating: number;
 }
 
-const { players, label } = Astro.props;
+const { players, label, teamRating } = Astro.props;
 const pct = (v: number, of: number) => `${((v / of) * 100).toFixed(2)}%`;
 /** A box's place on its canvas, in percentages. */
 const box = (r: { x: number; y: number; w: number; h: number }, canvas: Canvas) =>
   `left: ${pct(r.x, canvas.w)}; top: ${pct(r.y, canvas.h)}; width: ${pct(r.w, canvas.w)}; height: ${pct(r.h, canvas.h)}`;
 const fill = (b: Bin | "out") => (b === "out" ? "var(--stripes)" : b === 0 ? "var(--heat-0)" : `var(--heat-${b > 0 ? "up" : "down"}-${Math.abs(b)})`);
-const MODE_LABEL: Record<Mode, string> = { game: "Win % per game", week: "7 day change" };
+const MODE_LABEL: Record<Mode, string> = { game: "Rating points", week: "7 day change" };
 const layouts = [{ name: "wide", canvas: TEAM_WIDE }, { name: "tall", canvas: TEAM_TALL }].map((l) => ({ ...l, tiles: teamMap(players, l.canvas) }));
 // Both layouts hold the same tiles, largest first, in a different place: a tile's index in either is its row in the
 // table and the tooltips, so their text is written once.
 const rows = layouts[0].tiles;
 /** Each row's tooltip: his name, a row each of [figure, what it is, its key's fill], and his minutes or that he is out. */
-const tips = rows.map(({ name, part, text, bins }) => {
+const tips = rows.map(({ name, part, text, chance, bins }) => {
   const minutes = Math.round(part.minutes);
   return {
     name,
     rows: [
-      [text.game, part.out ? "win chance per game while out" : "win chance per game", fill(bins.game)],
+      [text.game, part.out ? "rating points while out" : "rating points", fill(bins.game)],
       [text.week, "7 day change", fill(bins.week)],
     ],
-    note: part.out ? `Out for weeks · backups play his ${minutes} min` : `${minutes} min a game`,
+    note: `${part.out ? `Out for weeks · backups play his ${minutes} min` : `${minutes} min a game`} · ${chance} win chance a game`,
   };
 });
 ---
 
 <div class="hm" data-heatmap data-mode="game" style={`--pad-x: ${PAD.x}; --pad-y: ${PAD.y}; --line: ${LINE}; --figure: ${FIGURE}`}>
+  <p class="lede">Points each player adds to the team's {rating(teamRating)} rating, compared with an average player in his minutes. An average team is 1000.</p>
   <div class="bar"><Segmented label="Show" options={MODES.map((m) => ({ label: MODE_LABEL[m], value: m, pressed: m === "game" }))} /></div>
   {layouts.map(({ name, canvas, tiles }) => (
     <div class:list={["canvas", name]} style={`aspect-ratio: ${canvas.w} / ${canvas.h}; --W: ${canvas.w}`}>
@@ -75,8 +79,9 @@ const tips = rows.map(({ name, part, text, bins }) => {
           <tr>
             <th scope="col">Player</th>
             <th class="num" scope="col">Min</th>
-            <th class="num" scope="col">Win %</th>
+            <th class="num" scope="col">Points</th>
             <th class="num" scope="col">7 day change</th>
+            <th class="num" scope="col">Win % a game</th>
           </tr>
         </thead>
         <tbody>
@@ -86,6 +91,7 @@ const tips = rows.map(({ name, part, text, bins }) => {
               <td class="num">{Math.round(t.part.minutes)}</td>
               <td class="num">{t.text.game}</td>
               <td class="num">{t.text.week}</td>
+              <td class="num">{t.chance}</td>
             </tr>
           ))}
         </tbody>
@@ -159,6 +165,7 @@ const tips = rows.map(({ name, part, text, bins }) => {
     --heat-down-3: color-mix(in oklab, var(--drop) 80%, var(--heat-base)); --heat-down-4: var(--drop);
     --stripes: repeating-linear-gradient(135deg, var(--heat-out) 0 4px, var(--heat-0) 4px 8px);
   }
+  .lede { margin: 0 0 12px; color: var(--muted); }
   .bar { margin-bottom: 12px; }
   .tip { --tip-figure: 40px; }
   .canvas { position: relative; width: 100%; container-type: inline-size; background: var(--ground); border-radius: 4px; overflow: hidden; }
