@@ -1,49 +1,36 @@
 ---
-// A switch between a few options: a rounded track with the current one raised on a pill. As links it moves between
-// sibling pages, such as the home's All, East and West, and on a phone fills the rest of its card's header row. As
-// buttons it changes what a card shows in place, such as the heatmap's colouring, at its own width: each button
-// carries its option in data-value for the card's script, which moves aria-pressed. A longer list, such as the
-// seasons, goes in a menu instead (SeasonMenu.astro).
-type Link = { label: string; href: string; current: boolean };
-type Toggle = { label: string; value: string; pressed: boolean };
+// A switch between a few sibling pages, such as the home's All, East and West: a rounded track of links with
+// the current page raised on a pill. A longer list, such as the seasons, goes in a menu instead
+// (SeasonMenu.astro).
 interface Props {
-  /** The switch's accessible name, such as "Conference". */
+  /** The nav's accessible name, such as "Conference". */
   label: string;
-  options: readonly Link[] | readonly Toggle[];
+  options: readonly { label: string; href: string; current: boolean }[];
 }
 
 const { label, options } = Astro.props;
-const isLinks = (o: Props["options"]): o is readonly Link[] => o.every((x) => "href" in x);
 ---
 
-{isLinks(options) ? (
-  <nav class="seg" aria-label={label}>
-    {options.map((o) => (
-      <a href={o.href} aria-current={o.current ? "page" : undefined}>{o.label}</a>
-    ))}
-  </nav>
-) : (
-  <div class="seg" role="group" aria-label={label}>
-    {options.map((o) => (
-      <button type="button" data-value={o.value} aria-pressed={String(o.pressed)}>{o.label}</button>
-    ))}
-  </div>
-)}
+<nav class="seg" aria-label={label}>
+  {options.map((o) => (
+    <a href={o.href} aria-current={o.current ? "page" : undefined}>{o.label}</a>
+  ))}
+</nav>
 
 <style>
   .seg { display: inline-flex; flex: none; border-radius: 8px; background: var(--seg-track); }
-  /* The transparent border insets the pill inside its option, so the whole option stays the target. */
-  a, button {
+  /* The transparent border insets the pill inside its link, so the whole link stays the target. */
+  a {
     flex: 1 0 auto; display: flex; align-items: center; justify-content: center; height: var(--control-h); padding: 0 12px;
     border: 3px solid transparent; border-radius: 8px; background-clip: padding-box;
-    color: var(--muted); font-weight: 500; white-space: nowrap;
+    color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap;
     transition: color 150ms ease, background-color 150ms ease;
   }
-  a:hover, button:hover { color: var(--text); }
-  a[aria-current="page"], button[aria-pressed="true"] { background-color: var(--seg-pill); box-shadow: var(--seg-lift); color: var(--text); }
-  a:focus-visible, button:focus-visible { outline-offset: -1px; border-radius: 8px; }
+  a:hover { color: var(--text); }
+  a[aria-current="page"] { background-color: var(--seg-pill); box-shadow: var(--seg-lift); color: var(--text); }
+  a:focus-visible { outline-offset: -1px; border-radius: 8px; }
 
   @media (max-width: 640px) {
-    nav.seg { display: flex; flex: 1 1 auto; }
+    .seg { display: flex; flex: 1 1 auto; }
   }
 </style>

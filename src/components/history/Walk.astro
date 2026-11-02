@@ -4,7 +4,7 @@
 // from the running rating, its figure at the end it moved to, drops and rises in two colours. On a phone each bar
 // sits on a track of the scale, and the axis splits: the rating before at the top, the rating after at the bottom.
 // `id` names the walk on its page, so its drawers' ids are unique and the same on every build.
-import { MINUS, signed } from "../../lib/format.ts";
+import { signed, signedTenth } from "../../lib/format.ts";
 import type { Walk, WalkLine, WalkPart } from "../../lib/ledger.ts";
 
 interface Props { walk: Walk; id: string }
@@ -40,10 +40,8 @@ const steps: Step[] = parts.flatMap((part): Step[] => {
   return single ? lines : [{ kind: "head", part }, ...lines];
 });
 
-/** An item's true effect to a tenth of a point, with a real minus: +0.4, −0.6. */
-const tenth = (n: number) => `${n < 0 ? MINUS : "+"}${Math.abs(n).toFixed(1)}`;
 /** What rounding did to a closing line, when it moved the line by half a point or more: "+0.2 in all, rounded to +1". */
-const rounding = (l: WalkLine) => (l.kind === "group" && Math.abs(l.points - l.whole) >= 0.5 ? `${tenth(l.points)} in all, rounded to ${signed(l.whole)}` : "");
+const rounding = (l: WalkLine) => (l.kind === "group" && Math.abs(l.points - l.whole) >= 0.5 ? `${signedTenth(l.points)} in all, rounded to ${signed(l.whole)}` : "");
 /**
  * A line's two lines of words. Alone in its part, the line takes the part's heading, and its own words go under it;
  * a closing line whose items are listed open leaves its count to the list and says only what rounding did.
@@ -89,7 +87,7 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
     );
     const list = l.kind === "group" && l.items.length > 0 && (
       <ul class="drawer">
-        {l.items.map((it) => <li><span><span class="s-name">{it.name}</span>{it.phrase && <span class="s-why">{it.phrase}</span>}</span><span class="num">{tenth(it.points)}</span></li>)}
+        {l.items.map((it) => <li><span><span class="s-name">{it.name}</span>{it.phrase && <span class="s-why">{it.phrase}</span>}</span><span class="num">{signedTenth(it.points)}</span></li>)}
       </ul>
     );
     return (

@@ -155,22 +155,20 @@ export const playerPart = (fit: Fit, lineup: Lineup) => {
 /**
  * One slot of the lineup a team's shown rating counts, in Elo points: `minutes` a game it counts him for, his value
  * per 48 and what he adds to the rating, which together with the team part and 1000 make it up. A player out for
- * weeks (`out`) is his gap slot, which counts gapValue for the backups who play his minutes. `week` is how far his
- * value per 48, or the gap slot's, moved over the 7 days to the team's rating day.
+ * weeks (`out`) is his gap slot, which counts gapValue for the backups who play his minutes.
  */
-export type PlayerPart = { athlete: Athlete; minutes: number; per48: number; adds: number; out: boolean; week: number };
+export type PlayerPart = { athlete: Athlete; minutes: number; per48: number; adds: number; out: boolean };
 
 /**
- * playerPart() split by slot and scaled by `scale` to Elo points, with `week` against `then`, the fit 7 days before
- * `now`'s. Each slot counts as playerPart() counts it, so the slots' `adds` sum to playerPart(now, lineup) * scale.
+ * playerPart() split by slot and scaled by `scale` to Elo points. Each slot counts as playerPart() counts it, so the
+ * slots' `adds` sum to playerPart(fit, lineup) * scale.
  */
-export function playerParts(now: Fit, then: Fit, lineup: Lineup, scale: number): PlayerPart[] {
-  const per48 = (fit: Fit) => {
-    const rest = restValue(fit, lineup);
-    return lineup.map((p) => (p.athlete > 0 ? (fit.v.get(p.athlete) ?? 0) : gapValue(fit, -p.athlete, rest)));
-  };
-  const v = per48(now), w = per48(then);
-  return lineup.map((p, i) => ({ athlete: Math.abs(p.athlete), minutes: p.share * 48, per48: v[i] * scale, adds: p.share * v[i] * scale, out: p.athlete < 0, week: (v[i] - w[i]) * scale }));
+export function playerParts(fit: Fit, lineup: Lineup, scale: number): PlayerPart[] {
+  const rest = restValue(fit, lineup);
+  return lineup.map((p) => {
+    const per48 = (p.athlete > 0 ? (fit.v.get(p.athlete) ?? 0) : gapValue(fit, -p.athlete, rest)) * scale;
+    return { athlete: Math.abs(p.athlete), minutes: p.share * 48, per48, adds: p.share * per48, out: p.athlete < 0 };
+  });
 }
 
 /** A game's expected home margin under `fit`. */
@@ -464,6 +462,13 @@ export const EARLY = { games: 5, widen: 1.14 };
 /** The model's win chance for a rating gap in Elo points, when the less experienced side has `played` games. */
 export const winProb = (gap: number, played = Infinity) => phi(gap / (ELO_PER_SIGMA * (played < EARLY.games ? EARLY.widen : 1)));
 
+/**
+ * The wins a point of rating adds over an 82-game season against average teams: winProb's slope at an even game
+ * times 82, about 1 win for every 9 points. Near even it is the same as playing out winProb, and it adds up, so a
+ * team's players' wins sum to what their part of its rating is worth.
+ */
+export const WINS_PER_POINT = 82 / (Math.sqrt(2 * Math.PI) * ELO_PER_SIGMA);
+
 /** The fewest games either side of `game` had played, by `log`. */
 export const played = (log: Record<Abbr, readonly unknown[]>, game: Game) => Math.min(log[game.home].length, log[game.away].length);
 
@@ -582,7 +587,7 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const lastDay = new Map<Abbr, string>();
   for (const g of data.games) for (const a of [g.home, g.away]) if (dayKey(g.t) > (lastDay.get(a) ?? "")) lastDay.set(a, dayKey(g.t));
   // A held team keeps the rating, and so the fit and lineup, of its last game day in the file.
-  const held = new Map<Abbr, { r: number; day: string; fit: Fit; lineup: Lineup }>();
+  const held = new Map<Abbr, { r: number; fit: Fit; lineup: Lineup }>();
 
   for (const { day, games, before, after } of days) {
     const priced = games.map((pg) => ({
@@ -595,7 +600,7 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
     for (const a of abbrs) {
       const h = held.get(a);
       if (h !== undefined) now[a] = h.r;
-      else if (lastDay.get(a) === day) held.set(a, { r: now[a], day, fit: after, lineup: usual[a] });
+      else if (lastDay.get(a) === day) held.set(a, { r: now[a], fit: after, lineup: usual[a] });
     }
     const prev = r;
     r = now;
@@ -637,10 +642,9 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const second = secondNights(data);
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
   const pricing = rated(latest, next);
-  const weekBefore = (day: string | undefined) => (day === undefined ? undefined : days.findLast((d) => d.day <= addDays(day, -7))?.after) ?? start;
   const parts = Object.fromEntries(abbrs.map((a) => {
-    const { day, fit, lineup } = held.get(a) ?? { day: days.at(-1)?.day, fit: latest, lineup: usual[a] };
-    return [a, playerParts(fit, weekBefore(day), lineup, scale)];
+    const { fit, lineup } = held.get(a) ?? { fit: latest, lineup: usual[a] };
+    return [a, playerParts(fit, lineup, scale)];
   }));
   return {
     data, abbrs, r, pricing, home: latest.home * scale, rank: ranksOf(r), log, results, series, stats, order,

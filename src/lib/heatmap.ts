@@ -1,23 +1,17 @@
 // A team's players heatmap, laid out at build time like a stock market map: each player its rating counts a tile as
-// big as the minutes it counts him for, coloured by his value per 48 or by its move over the week (Season.players in
-// src/lib/elo.ts). Everything is in a canvas's own px, which the page draws in percentages and container units, so a
+// big as the minutes it counts him for, coloured by the wins he adds over a season (Season.players in src/lib/elo.ts). Everything is in a canvas's own px, which the page draws in percentages and container units, so a
 // layout scales with its card and a label that fits here fits on every screen. Labels are measured with Public Sans
 // Bold's own glyph widths, so none is ever clipped: one shrinks to fit its tile, and a tile too small for any gets none.
-import type { PlayerPart } from "./elo.ts";
-import { signed, signedTenth } from "./format.ts";
+import { WINS_PER_POINT, type PlayerPart } from "./elo.ts";
+import { signedTenth } from "./format.ts";
 import { playerName } from "./names.ts";
 import { inset, squarify, type Rect } from "./treemap.ts";
 
-/** What a tile's colour shows: its player's value per 48, or how far it moved over the week. */
-export type Mode = "value" | "week";
-export const MODES: readonly Mode[] = ["value", "week"];
 /** A colour step on the site's diverging pair: 0 the neutral grey, 1 to 4 stronger rises, −1 to −4 stronger drops. */
 export type Bin = -4 | -3 | -2 | -1 | 0 | 1 | 2 | 3 | 4;
-/** Where each step starts, in Elo points per 48: within 3 of an average player is neutral, and a week's move within 0.5. */
-export const CUTS: Record<Mode, readonly [number, number, number, number]> = { value: [3, 10, 20, 30], week: [0.5, 1.5, 3, 5] };
+/** Where each step starts, in wins over a season: within half a win of an average player is neutral. */
+export const CUTS = [0.5, 1, 2, 4] as const;
 
-/** Every step, strongest drop to strongest rise, as a legend runs. */
-export const BINS: readonly Bin[] = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
 const UP: readonly Bin[] = [0, 1, 2, 3, 4];
 const DOWN: readonly Bin[] = [0, -1, -2, -3, -4];
 /** The step a value falls in: a value on a cut point takes the step that starts there. */
@@ -33,19 +27,20 @@ export type Canvas = { w: number; h: number; scale: number };
 export const TEAM_WIDE: Canvas = { w: 1200, h: 420, scale: 1.5 };
 export const TEAM_TALL: Canvas = { w: 600, h: 640, scale: 2 };
 
-/** A tile's label in canvas px: its name alone, or its name over the figure the colour shows. */
+/** A tile's label in canvas px: its name alone, or its name over his wins. */
 export type Label = { name: string; size: number; lines: 1 | 2 };
 export type Tile = Rect & {
   part: PlayerPart;
   /** His full name, for the tooltip and the table. */
   name: string;
   label: Label | null;
-  bins: Record<Mode, Bin>;
-  figures: Record<Mode, string>;
-  /** His per 48, what he adds and his week, as the tooltip and the table print them. */
-  text: { per48: string; adds: string; week: string };
-  /** The tooltip: his name, then a line each for his minutes, his value and what it adds, and the week. */
-  tip: readonly [string, string, string, string];
+  bin: Bin;
+  /** The wins he adds over a season, to a tenth, or what his backups do while he is out. */
+  wins: string;
+  /** The tile's figure: his wins, or "out". */
+  figure: string;
+  /** The tooltip: his name, then his minutes and his wins. */
+  tip: readonly [string, string];
 };
 // Public Sans Bold's advance widths in thousandths of an em for ASCII from the space to the tilde, read from the face
 // the site serves by scripts/glyph-widths.mjs; labels are bold or lighter, and lighter weights run narrower. Kerning
@@ -85,14 +80,14 @@ const TILE_GAP = 1;
  * The largest label that fits a `w` by `h` tile, up to a size that grows with the tile, trying each name in turn;
  * null when none fits at the smallest size.
  */
-function fitLabel(w: number, h: number, names: readonly string[], figures: readonly string[], scale: number): Label | null {
+function fitLabel(w: number, h: number, names: readonly string[], figure: string, scale: number): Label | null {
   const inner = w - 2 * PAD.x;
   const min = MIN_FONT * scale;
   const natural = scale * Math.min(MAX_FONT, Math.sqrt(w * h) / 5);
-  const figure = inner / (SAFETY * FIGURE * Math.max(...figures.map(textWidth)));
+  const byFigure = inner / (SAFETY * FIGURE * textWidth(figure));
   for (const name of names) {
     const across = Math.min(natural, inner / (SAFETY * textWidth(name)));
-    const two = Math.min(across, figure, (h - 2 * PAD.y) / (LINE * (1 + FIGURE)));
+    const two = Math.min(across, byFigure, (h - 2 * PAD.y) / (LINE * (1 + FIGURE)));
     if (two >= min) return { name, size: two, lines: 2 };
     const one = Math.min(across, (h - 2 * PAD.y) / LINE);
     if (one >= min) return { name, size: one, lines: 1 };
@@ -127,8 +122,8 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
   return squarify(parts.map((p) => p.minutes), { x: 0, y: 0, w: canvas.w, h: canvas.h }).map((r, i) => {
     const part = parts[i];
     const t = inset(r, TILE_GAP);
-    const text = { per48: signed(Math.round(part.per48)), adds: signed(Math.round(part.adds)), week: signedTenth(part.week) };
-    const figures = { value: part.out ? "out" : text.per48, week: part.out ? "out" : text.week };
+    const wins = part.adds * WINS_PER_POINT;
+    const figure = part.out ? "out" : signedTenth(wins);
     // A hyphenated name too long for its tile falls back to its first half.
     const tries = shown[i].includes("-") ? [shown[i], shown[i].split("-")[0]] : [shown[i]];
     const minutes = Math.round(part.minutes);
@@ -136,15 +131,13 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
       ...t,
       part,
       name: names[i],
-      label: fitLabel(t.w, t.h, tries, [figures.value, figures.week], canvas.scale),
-      bins: { value: part.out ? 0 : binOf(part.per48, CUTS.value), week: part.out ? 0 : binOf(part.week, CUTS.week) },
-      figures,
-      text,
+      label: fitLabel(t.w, t.h, tries, figure, canvas.scale),
+      bin: part.out ? 0 : binOf(wins, CUTS),
+      wins: signedTenth(wins),
+      figure,
       tip: [
         names[i],
-        part.out ? `Out for weeks · his ${minutes} min to backups` : `${minutes} min a game`,
-        `${text.per48} per 48 · adds ${text.adds}`,
-        `${text.week} this week`,
+        part.out ? `Out · backups ${signedTenth(wins)} wins` : `${minutes} min · ${signedTenth(wins)} wins`,
       ],
     };
   });

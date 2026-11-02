@@ -19,7 +19,6 @@ Two independent reviews checked an earlier draft of this audit against the code.
 - **Fixtures.** The team page prices its next games with `fixture()` and groups them with `fixtureDays`, which `nextDays` also uses.
 - **Empty states and notes.** A list or chart with nothing in it is one `Empty`, "No games yet." unless the page says otherwise. Small print under a table or a game is one global `.note`.
 - **Page titles.** One h1 style, in `global.css`.
-- **Switches.** A switch with its current option raised on a pill is one `Segmented`: links between pages, as the home's and the odds page's All, East and West, or buttons that change a card in place, as the heatmap's colouring.
 - **Readout boxes.** Every box that reads out what the pointer is on is placed by `scripts/tip.ts`: the rating charts', the title race's, the season fan's, the odds page's season results, a team's seeds and the heatmap's tiles. It keeps 24px from a finger and 12px from a mouse everywhere, and its arithmetic (`tipAt`) is under test. Where a box sits differs only by an option: beside the pointer for a chart, centred for the seeds and the heatmap.
 - **Table chrome.** The league table, the seasons and the heatmap's values take their headings, row rules and open last row from one global `.ruled` class, and keep only their own padding, heights and widths. The headings' 11px is `--fs-tiny`; the seasons keep 12px.
 
