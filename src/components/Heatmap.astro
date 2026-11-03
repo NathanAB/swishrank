@@ -17,7 +17,7 @@ interface Props {
   players: readonly PlayerPart[];
   /** What the table view lists, as its accessible name: "Thunder players". */
   label: string;
-  /** The team's rating the players' points add up to. */
+  /** The team's rating, which the line over the map names. */
   teamRating: number;
 }
 
@@ -32,16 +32,17 @@ const layouts = [{ name: "wide", canvas: TEAM_WIDE }, { name: "tall", canvas: TE
 // Both layouts hold the same tiles, largest first, in a different place: a tile's index in either is its row in the
 // table and the tooltips, so their text is written once.
 const rows = layouts[0].tiles;
-/** Each row's tooltip: his name, a row each of [figure, what it is, its key's fill], and his minutes or that he is out. */
+/** Each row's tooltip: his name, a row each of [figure, what it is, its key's fill], and his minutes or that he is out, with his win chance a game. */
 const tips = rows.map(({ name, part, text, chance, bins }) => {
   const minutes = Math.round(part.minutes);
+  const plays = part.out ? `Out for weeks · backups play his ${minutes} min` : `${minutes} min a game`;
   return {
     name,
     rows: [
       [text.game, part.out ? "rating points while out" : "rating points", fill(bins.game)],
       [text.week, "7 day change", fill(bins.week)],
     ],
-    note: `${part.out ? `Out for weeks · backups play his ${minutes} min` : `${minutes} min a game`} · ${chance} win chance a game`,
+    note: `${plays} · ${chance} win chance a game`,
   };
 });
 ---

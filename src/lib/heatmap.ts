@@ -130,7 +130,8 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
   return squarify(parts.map((p) => p.minutes), { x: 0, y: 0, w: canvas.w, h: canvas.h }).map((r, i) => {
     const part = parts[i];
     const t = inset(r, TILE_GAP);
-    const text = { game: signed(Math.round(part.adds)), week: signed(Math.round(part.adds - part.weekAgo)) };
+    const week = part.adds - part.weekAgo;
+    const text = { game: signed(Math.round(part.adds)), week: signed(Math.round(week)) };
     const figures = { game: part.out ? "out" : text.game, week: text.week };
     // A hyphenated name too long for its tile falls back to its first half.
     const tries = shown[i].includes("-") ? [shown[i], shown[i].split("-")[0]] : [shown[i]];
@@ -139,7 +140,7 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
       part,
       name: names[i],
       label: fitLabel(t.w, t.h, tries, [figures.game, figures.week], canvas.scale),
-      bins: { game: part.out ? "out" : binOf(part.adds, CUTS.game), week: binOf(part.adds - part.weekAgo, CUTS.week) },
+      bins: { game: part.out ? "out" : binOf(part.adds, CUTS.game), week: binOf(week, CUTS.week) },
       text,
       chance: signedPercent(winProb(part.adds) - 0.5),
       figures,
