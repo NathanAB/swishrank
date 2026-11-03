@@ -11,8 +11,18 @@ const part = (athlete: number, minutes: number, out: boolean): PlayerPart => ({ 
 const players = MINUTES.map((m, j) => part(ids[j], m, j === 3));
 
 test("a tile's colour takes a stronger step at each cut point, either way from neutral", () => {
-  assert.deepEqual([0.4, 0.5, 0.9, 1, 2.5, 5, 9].map((v) => binOf(v, CUTS.game)), [0, 1, 1, 2, 3, 4, 4]);
-  assert.deepEqual([-0.09, -0.1, -0.25, -0.5, -1].map((v) => binOf(v, CUTS.week)), [0, -1, -2, -3, -4]);
+  assert.deepEqual([3.9, 4, 7.9, 8, 20, 40, 72].map((v) => binOf(v, CUTS.game)), [0, 1, 1, 2, 3, 4, 4]);
+  assert.deepEqual([-0.9, -1, -2, -4, -8].map((v) => binOf(v, CUTS.week)), [0, -1, -2, -3, -4]);
+});
+
+test("a tile's figures are whole rating points, a slip under a point showing 0, and its colour comes from the unrounded points", () => {
+  const [a, b] = teamMap([
+    { athlete: ids[0], minutes: 30, adds: -0.3, out: false, weekAgo: -0.7 },
+    { athlete: ids[1], minutes: 20, adds: 10, out: false, weekAgo: 9.5 },
+  ], TEAM_WIDE);
+  assert.deepEqual(a.text, { game: "0", week: "0" });
+  assert.deepEqual(b.text, { game: "+10", week: "+1" });
+  assert.deepEqual(b.bins, { game: 2, week: 0 });
 });
 
 test("teammates who share a last name are told apart by an initial, and by their whole names when that is shared too", () => {

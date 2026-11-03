@@ -1,24 +1,24 @@
 // A team's players heatmap, laid out at build time like a stock market map: each player its rating counts a tile as
-// big as the minutes it counts him for, coloured by how much he raises his team's chance of winning a game, or by how
-// far that moved over the past 7 days (Season.players in src/lib/elo.ts). Everything is in a canvas's own px, which the
+// big as the minutes it counts him for, coloured by the rating points he adds to his team's rating, or by how far that
+// moved over the past 7 days (Season.players in src/lib/elo.ts). Everything is in a canvas's own px, which the
 // page draws in percentages and container units, so a layout scales with its card and a label that fits here fits on
 // every screen. Labels are measured with Public Sans Bold's own glyph widths, so none is ever clipped: one shrinks to
 // fit its tile, and a tile too small for any gets none.
 import { winProb, type PlayerPart } from "./elo.ts";
-import { signedPercent } from "./format.ts";
+import { signed, signedPercent } from "./format.ts";
 import { playerName } from "./names.ts";
 import { inset, squarify, type Rect } from "./treemap.ts";
 
 /** A colour step on the site's diverging pair: 0 the neutral grey, 1 to 4 stronger rises, −1 to −4 stronger drops. */
 export type Bin = -4 | -3 | -2 | -1 | 0 | 1 | 2 | 3 | 4;
 /**
- * What a tile shows: how much he raises his team's chance of winning a game against an average team, over an average
- * player in his minutes, or how far that moved over the past 7 days.
+ * What a tile shows: the rating points he adds to his team's rating, over an average player in his minutes, or how far
+ * that moved over the past 7 days.
  */
 export type Mode = "game" | "week";
 export const MODES: readonly Mode[] = ["game", "week"];
-/** Where each step starts, in percentage points of a game's win chance. */
-export const CUTS: Record<Mode, readonly [number, number, number, number]> = { game: [0.5, 1, 2.5, 5], week: [0.1, 0.25, 0.5, 1] };
+/** Where each step starts, in rating points. */
+export const CUTS: Record<Mode, readonly [number, number, number, number]> = { game: [4, 8, 20, 40], week: [1, 2, 4, 8] };
 
 const UP: readonly Bin[] = [0, 1, 2, 3, 4];
 const DOWN: readonly Bin[] = [0, -1, -2, -3, -4];
@@ -42,11 +42,13 @@ export type Tile = Rect & {
   /** His full name, for the tooltip and the table. */
   name: string;
   label: Label | null;
-  /** The step each figure's colour is in, or "out" for his win chance while he is out, which is striped. */
+  /** The step each figure's colour is in, or "out" for his points while he is out, which is striped. */
   bins: { game: Bin | "out"; week: Bin };
-  /** His win chance added and its 7-day move, as the tooltip and the table print them. */
+  /** His rating points added and their 7-day move, as the tooltip and the table print them. */
   text: Record<Mode, string>;
-  /** The tile's figure in each mode: the text, or "out" for his win chance while he is out. */
+  /** The win chance a game his points add against an average team, which the tooltip and the table print beside them. */
+  chance: string;
+  /** The tile's figure in each mode: the text, or "out" for his points while he is out. */
   figures: Record<Mode, string>;
 };
 // Public Sans Bold's advance widths in thousandths of an em for ASCII from the space to the tilde, read from the face
@@ -128,9 +130,8 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
   return squarify(parts.map((p) => p.minutes), { x: 0, y: 0, w: canvas.w, h: canvas.h }).map((r, i) => {
     const part = parts[i];
     const t = inset(r, TILE_GAP);
-    const game = winProb(part.adds) - 0.5;
-    const week = game - (winProb(part.weekAgo) - 0.5);
-    const text = { game: signedPercent(game), week: signedPercent(week) };
+    const week = part.adds - part.weekAgo;
+    const text = { game: signed(Math.round(part.adds)), week: signed(Math.round(week)) };
     const figures = { game: part.out ? "out" : text.game, week: text.week };
     // A hyphenated name too long for its tile falls back to its first half.
     const tries = shown[i].includes("-") ? [shown[i], shown[i].split("-")[0]] : [shown[i]];
@@ -139,8 +140,9 @@ export function teamMap(players: readonly PlayerPart[], canvas: Canvas): Tile[] 
       part,
       name: names[i],
       label: fitLabel(t.w, t.h, tries, [figures.game, figures.week], canvas.scale),
-      bins: { game: part.out ? "out" : binOf(game * 100, CUTS.game), week: binOf(week * 100, CUTS.week) },
+      bins: { game: part.out ? "out" : binOf(part.adds, CUTS.game), week: binOf(week, CUTS.week) },
       text,
+      chance: signedPercent(winProb(part.adds) - 0.5),
       figures,
     };
   });
