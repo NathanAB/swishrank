@@ -2,7 +2,7 @@
 // injury report, the latest saved before its tip-off, says will play; the minutes of the players it leaves out counted
 // below the rest of their team's lineup; and a top-three draft pick starting from the box rating top-three picks play
 // at. The site runs version 3; scripts/backtest-v4.ts scores this against it.
-import { finalDays, type Abbr, type SeasonData } from "./elo.ts";
+import { finalDays, type Abbr, type Game, type SeasonData } from "./elo.ts";
 import { topPick, type DraftFile } from "./draft.ts";
 import type { NbaArchive, NbaStatus, SideReport } from "./nba-report.ts";
 import { gameScore, ROTATION, scaled, UNKNOWN, type Athlete, type BoxLine, type Lineup, type SeasonBox, type Sides } from "./players.ts";
@@ -30,7 +30,7 @@ export const V4 = {
 /** What availability() reads of V4; scripts/backtest-v4.ts also runs version 3's rule, "Out" only, through it. */
 export type LineupRule = Pick<typeof V4, "out" | "questionable" | "back" | "window" | "recent" | "fill">;
 
-/** A season's version 4 lineups by game id, each game's extra term (fill times the sides' missing minutes), and the missing minutes, as shares of 48. */
+/** A season's version 4 lineups by game id, played and to come, each game's extra term (fill times the sides' missing minutes), and the missing minutes, as shares of 48. */
 export type Availability = { lineups: Map<string, Sides<Lineup>>; extra: Map<string, number>; missing: Map<string, Sides<number>> };
 
 const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
@@ -42,7 +42,9 @@ const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.lengt
  * expected minutes, the mean of his last 5 appearances, when they are at least 10, a Questionable player half of them,
  * scaled to 240. The side's missing minutes are those of the previous game's players the report takes out, and half
  * of a Questionable one's, over the previous game's lineup's, times 5: shares of 48 minutes. A side the report does
- * not cover takes `fallback`'s lineup and misses nothing. `rule` holds those settings, V4's by default.
+ * not cover takes `fallback`'s lineup and misses nothing. `rule` holds those settings, V4's by default. A game still
+ * to come is priced the same way from where the season's last game day leaves each team, so `fallback` gives its
+ * uncovered sides too, and a game the report does not reach yet takes `fallback`'s lineups whole.
  */
 export function availability(
   seasons: readonly { data: SeasonData; box: SeasonBox }[],
@@ -79,25 +81,27 @@ export function availability(
       const gone = rotation.reduce((s, p) => s + (isOut(p.a) ? p.min : p.min * (1 - weight(p.a))), 0);
       return { lineup, missing: total ? (5 * gone) / total : 0 };
     };
+    const price = (g: Game) => {
+      const report = archive?.games[g.id];
+      const kept = before.get(g.id) ?? { home: [], away: [] };
+      const side = (abbr: Abbr, which: "home" | "away") => {
+        const r = report?.[which];
+        return r ? fromReport(abbr, r) : { lineup: kept[which].map((p) => ({ ...p })), missing: 0 };
+      };
+      const home = side(g.home, "home"), away = side(g.away, "away");
+      season.lineups.set(g.id, { home: home.lineup, away: away.lineup });
+      season.missing.set(g.id, { home: home.missing, away: away.missing });
+      if (home.missing !== away.missing) season.extra.set(g.id, rule.fill * (home.missing - away.missing));
+    };
     for (const { games } of finalDays(data)) {
-      for (const g of games) {
-        const report = archive?.games[g.id];
-        const kept = before.get(g.id) ?? { home: [], away: [] };
-        const side = (abbr: Abbr, which: "home" | "away") => {
-          const r = report?.[which];
-          return r ? fromReport(abbr, r) : { lineup: kept[which].map((p) => ({ ...p })), missing: 0 };
-        };
-        const home = side(g.home, "home"), away = side(g.away, "away");
-        season.lineups.set(g.id, { home: home.lineup, away: away.lineup });
-        season.missing.set(g.id, { home: home.missing, away: away.missing });
-        if (home.missing !== away.missing) season.extra.set(g.id, rule.fill * (home.missing - away.missing));
-      }
+      for (const g of games) price(g);
       for (const g of games) for (const [abbr, lines] of Object.entries(box.games[g.id] ?? {})) {
         if (!lines) continue;
         recent.set(abbr, [...(recent.get(abbr) ?? []), lines].slice(-rule.window));
         for (const l of lines) { minutes.set(l[0], [...(minutes.get(l[0]) ?? []), l[1]].slice(-rule.recent)); teamOf.set(l[0], abbr); }
       }
     }
+    for (const g of data.games) if (!g.final) price(g);
     out.set(data.season, season);
   }
   return out;
