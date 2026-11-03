@@ -47,7 +47,7 @@ const tips = rows.map(({ name, part, text, chance, bins }) => {
 ---
 
 <div class="hm" data-heatmap data-mode="game" style={`--pad-x: ${PAD.x}; --pad-y: ${PAD.y}; --line: ${LINE}; --figure: ${FIGURE}`}>
-  <p class="lede">Points each player adds to the team's {rating(teamRating)} rating, compared with an average player in his minutes. An average team is 1000.</p>
+  <p class="lede">How much each player is worth to this team's {rating(teamRating)} rating.</p>
   <div class="bar"><Segmented label="Show" options={MODES.map((m) => ({ label: MODE_LABEL[m], value: m, pressed: m === "game" }))} /></div>
   {layouts.map(({ name, canvas, tiles }) => (
     <div class:list={["canvas", name]} style={`aspect-ratio: ${canvas.w} / ${canvas.h}; --W: ${canvas.w}`}>
