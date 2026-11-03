@@ -85,8 +85,8 @@ export function counted(margin: number, rule: MarginRule): number {
 
 /** One fit: each team's rating, the home edge and each player's value, in the margin rule's units. */
 export type Fit = { r: Record<Abbr, number>; home: number; v: ReadonlyMap<Athlete, number> };
-/** A final game as its prediction saw it: the back-to-back term, with any SeasonInputs `extra`, in margin units, and each side's lineup. */
-export type Pregame = { game: FinalGame; b2b: number; lineup: Sides<Lineup> };
+/** A game, final unless `G` says otherwise, as its prediction saw it: the back-to-back term, with any SeasonInputs `extra`, in margin units, and each side's lineup. */
+export type Pregame<G extends Game = FinalGame> = { game: G; b2b: number; lineup: Sides<Lineup> };
 /** A game day: its games, the fit they were predicted from, and the fit after them. */
 export type FitDay = { day: string; games: Pregame[]; before: Fit; after: Fit };
 /**
@@ -177,7 +177,7 @@ export function playerParts(fit: Fit, lineup: Lineup, scale: number): SlotPart[]
 }
 
 /** A game's expected home margin under `fit`, played or to come. */
-export const expected = (fit: Fit, { game, b2b, lineup }: Omit<Pregame, "game"> & { game: Game }) =>
+export const expected = (fit: Fit, { game, b2b, lineup }: Pregame<Game>) =>
   fit.r[game.home] - fit.r[game.away] + (game.neutral ? 0 : fit.home) + b2b + playerPart(fit, lineup.home) - playerPart(fit, lineup.away);
 
 /**
@@ -227,6 +227,13 @@ const startFit = (abbrs: Abbr[], rule: FitRule, centres?: Record<Abbr, number>):
 });
 const NO_LINEUP: Sides<Lineup> = { home: [], away: [] };
 
+/** Each game's Pregame under `rule`, from the season's `second` nights and `inputs`; lineups count only when the rule has players. */
+export const pregameOf = (rule: FitRule, second: ReadonlyMap<string, Sides<boolean>>, inputs: SeasonInputs) => <G extends Game>(game: G): Pregame<G> => ({
+  game,
+  b2b: b2bTerm(rule, second.get(game.id)!) + (inputs.extra?.get(game.id) ?? 0),
+  lineup: (rule.players && inputs.players?.lineups.get(game.id)) || NO_LINEUP,
+});
+
 /**
  * The season fitted after every game day. Each fit minimises the squared misses on every final game so far,
  * sum (counted(margin) - b2b - (r_home - r_away + home + player parts))^2, plus strength * (r - centre)^2 for
@@ -241,7 +248,7 @@ export function fitSeason(data: SeasonData, rule: FitRule, inputs: SeasonInputs 
   const days = finalDays(data);
   const first = days.length ? Date.parse(days[0].day) : 0;
   const strength = (day: string) => (rule.seed ? rule.n0 * Math.exp(-Math.round((Date.parse(day) - first) / 86_400_000) / rule.seed.fade) : rule.n0);
-  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!) + (inputs.extra?.get(game.id) ?? 0), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
+  const pregame = pregameOf(rule, second, inputs);
   const solver = players ? playerSolver(abbrs, rule, centres, players) : teamSolver(abbrs, rule, centres);
   let fit = solver.start;
   const out: FitDay[] = [];
@@ -286,7 +293,7 @@ export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonIn
   const days = finalDays(data);
   const start = days.length ? Date.parse(days[0].day) : 0;
   const strength = (day: string) => (rule.seed ? rule.n0 * Math.exp(-Math.round((Date.parse(day) - start) / 86_400_000) / rule.seed.fade) : rule.n0);
-  const pregame = (game: FinalGame): Pregame => ({ game, b2b: b2bTerm(rule, second.get(game.id)!) + (inputs.extra?.get(game.id) ?? 0), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
+  const pregame = pregameOf(rule, second, inputs);
   const solver = players ? playerSolver(abbrs, rule, inputs.centres, players) : teamSolver(abbrs, rule, inputs.centres);
   const ratings = players?.ratings;
   const index = new Map(ratings?.athletes.map((a, j) => [a, j]) ?? []);
@@ -634,7 +641,7 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const second = secondNights(data);
   const order = [...abbrs].sort((x, y) => r[y] - r[x] || data.teams[x].name.localeCompare(data.teams[y].name));
   const upcoming = data.games.filter((g) => !g.final);
-  const pregame = (game: Game) => ({ game, b2b: b2bTerm(PARAMS, second.get(game.id)!) + (inputs.extra?.get(game.id) ?? 0), lineup: players?.lineups.get(game.id) ?? NO_LINEUP });
+  const pregame = pregameOf(PARAMS, second, inputs);
   const gaps = Object.fromEntries(upcoming.map((g) => [g.id, expected(latest, pregame(g)) * scale]));
   // Each slot of a team's lineup as of `day`, from the fit and lineup of the last game day on or before it, or the
   // opening night's.
