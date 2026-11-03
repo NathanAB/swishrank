@@ -49,6 +49,17 @@ test("a covered side drops Out and Doubtful, halves Questionable, and brings bac
   assert.ok(!season.extra.has("1") && !season.extra.has("2"), "games without a report have no extra term");
 });
 
+test("a game still to come is priced by the same rule, from the team's last game", () => {
+  const ahead: SeasonData = { ...data, games: [...data.games, { ...game("5", 28), hs: null, as: null, final: false }] };
+  const reports: NbaArchive = { season: "2026-27", games: { 5: { published: "2026-10-28T17:00", home: { 1: "Out" }, away: null } } };
+  const uncovered = () => new Map([["5", { home: [], away: [{ athlete: 77, share: 5 }] }]]);
+  const season = availability([{ data: ahead, box }], new Map([["2026-27", reports]]), uncovered).get("2026-27")!;
+  // Game 4's 1, 2, 3, 4 and 5, less 1; 6, who missed game 4, is not listed, so he stays out.
+  assert.deepEqual(minutesOf(season.lineups.get("5")!.home), { 2: 60, 3: 60, 4: 60, 5: 60 });
+  assert.deepEqual(season.lineups.get("5")!.away, [{ athlete: 77, share: 5 }], "an uncovered side takes the fallback");
+  assert.ok(Math.abs(season.extra.get("5")! - V4.fill) < 1e-12, "40 of the previous lineup's 200 minutes, times 5");
+});
+
 test("a player not listed is not brought back, and expected minutes read the last 5 appearances", () => {
   const unlisted: NbaArchive = { season: "2026-27", games: { 3: { published: "x", home: {}, away: {} } } };
   const season = availability([{ data, box }], new Map([["2026-27", unlisted]]), fallback).get("2026-27")!;

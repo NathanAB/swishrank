@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, counted, fitSeason, gap, PARAMS, phi, ranksOf, winProb, type Game, type SeasonData } from "./elo.ts";
+import { compute, counted, fitSeason, PARAMS, phi, ranksOf, winProb, type Game, type SeasonData } from "./elo.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
 const teams = (...abbrs: string[]) => Object.fromEntries(abbrs.map((a) => [a, team(a)]));
@@ -76,7 +76,8 @@ test("the win chance shown for a rating gap is the model's own chance for that g
   const m = compute(data);
   const fit = fitSeason(data, PARAMS).at(-1)!.after;
   const next = m.upcoming[0];
-  near(winProb(gap(next, m.pricing, m.home)), phi((fit.r.A - fit.r.C + fit.home) / PARAMS.sigma), "A's chance against C");
+  // C plays on the 21st, so the 22nd is its second night.
+  near(winProb(m.gaps[next.id]), phi((fit.r.A - fit.r.C + fit.home + PARAMS.b2b) / PARAMS.sigma), "A's chance against C");
 });
 
 test("a 43-point win counts at most four times a 1-point win, and a loss counts as the same win negated", () => {

@@ -126,9 +126,9 @@ function cacheKey(seasonId: string): string {
   const root = process.cwd();
   const hash = createHash("sha256");
   const lib = filesUnder(join(root, "src", "lib")).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
-  const data = ["games", "box", "preseason", "injuries"].flatMap((dir) => filesUnder(join(root, "src", "data", dir)))
+  const data = ["games", "box", "preseason", "injuries", "nba-reports"].flatMap((dir) => filesUnder(join(root, "src", "data", dir)))
     .filter((f) => (/(\d{4}-\d{2})\.json$/.exec(f)?.[1] ?? "9999") <= seasonId);
-  for (const f of [...lib, join(root, "src", "data", "seasons.json"), ...data]) hash.update(f.slice(root.length)).update("\0").update(readFileSync(f)).update("\0");
+  for (const f of [...lib, join(root, "src", "data", "seasons.json"), join(root, "src", "data", "draft.json"), ...data]) hash.update(f.slice(root.length)).update("\0").update(readFileSync(f)).update("\0");
   cacheKeys.set(seasonId, (key = hash.digest("hex")));
   return key;
 }
@@ -166,7 +166,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   /** Each game's pre-game chance for its home side. */
   const homeChance = new Map(season.model.results.map((r) => [r.game.id, r.p]));
   const { players: pl } = inputs;
-  const days = fitSeasonSteps(data, seasonRule(inputs), { centres: inputs.centres, players: pl && { ...pl, lineups: pl.lineups.previous } }, abbr);
+  const days = fitSeasonSteps(data, seasonRule(inputs), inputs, abbr);
   const shown = shownLineups(data, pl?.rotation);
   const box = pl?.box.games ?? {};
   const rate = (fit: Fit, lineup: Lineup) => START + (fit.r[abbr] + playerPart(fit, lineup)) * scale;

@@ -14,6 +14,7 @@
 //     does not play the whole season without them.
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { addDays, compute, dayKey, ELO_PER_SIGMA, fitModel, PARAMS, phi, playerPart, shownLineups, START, type Abbr, type Fit, type Season, type SeasonData } from "../src/lib/elo.ts";
+import type { DraftFile } from "../src/lib/draft.ts";
 import { modelInputs, LONG_ABSENCE } from "../src/lib/inputs.ts";
 import { parseArchive } from "../src/lib/injuries.ts";
 import { scaled, type Lineup } from "../src/lib/players.ts";
@@ -35,8 +36,8 @@ const list = read("seasons.json") as { id: string; end?: string }[];
 const ids = list.map((s) => s.id).sort();
 const current = list.find((s) => !s.end)!.id;
 const last = ids[ids.indexOf(current) - 1];
-const files = ids.map((id) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`), injuries: read(`injuries/${id}.json`) }));
-const inputs = modelInputs(files);
+const files = ids.map((id) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`), injuries: read(`injuries/${id}.json`), nbaReports: read(`nba-reports/${id}.json`) }));
+const inputs = modelInputs(files, read("draft.json") as DraftFile);
 const dataOf = (id: string) => files.find((f) => f.data.season === id)!.data;
 const model = compute(dataOf(current), inputs.get(current));
 const lastModel = compute(dataOf(last), inputs.get(last));

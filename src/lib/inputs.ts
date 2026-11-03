@@ -1,21 +1,26 @@
-// What the model reads beyond a season's games: each team's seed from its preseason win total (docs/model-v2.md),
-// and, for version 3 (docs/model-v3.md), the season's home edge from the three seasons before it, every player's box
-// rating, the season's rookies, and the lineups games are priced with, less the players the morning's injury report
-// lists as out. The shown rotation also leaves out the players the report lists as out for weeks. A box rating reads every earlier season, a home edge the seasons before, and a team without a total
-// is seeded from its rating at the end of the season before, so the seasons are walked together, oldest first.
+// What the model reads beyond a season's games: each team's seed from its preseason win total (docs/model-v2.md);
+// for version 3 (docs/model-v3.md), the season's home edge from the three seasons before it and its rookies; and for
+// version 4 (docs/model-v4.md), every player's box rating with a top-three pick's start, and each game's lineups and
+// extra term from the NBA's injury report, the latest saved before its tip-off (src/lib/v4.ts availability()). The
+// shown rotation also leaves out the players ESPN's report lists as out for weeks. A box rating reads every earlier
+// season, a home edge the seasons before, and a team without a total is seeded from its rating at the end of the
+// season before, so the seasons are walked together, oldest first.
 import { addDays, dayKey, finalDays, fitModel, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
+import type { DraftFile } from "./draft.ts";
 import { trailingHomeEdges } from "./home.ts";
 import { parseArchive, type InjuryArchive, type Report } from "./injuries.ts";
-import { boxRatings, lineups, parseBox, usualRotations, type Athlete, type Lineup, type Lineups, type SeasonBox, type SeasonRotations } from "./players.ts";
+import { parseNbaArchive } from "./nba-report.ts";
+import { boxRatings, lineups, parseBox, usualRotations, type Athlete, type Lineup, type Lineups, type SeasonBox, type SeasonRotations, type Sides } from "./players.ts";
 import { parsePreseason } from "./preseason.ts";
 import { OUT_STATUSES, reportLineups, reportNext } from "./report-lineup.ts";
 import { newcomers } from "./rookies.ts";
+import { availability, topThreeStart, V4 } from "./v4.ts";
 
 /**
- * One season's raw files: its games, parsed, and its box scores, preseason totals and injury reports as read from
- * JSON, undefined where a file is missing.
+ * One season's raw files: its games, parsed, and its box scores, preseason totals, ESPN's injury reports and the
+ * NBA's (src/data/nba-reports/) as read from JSON, undefined where a file is missing.
  */
-export type SeasonFiles = { data: SeasonData; box: unknown; preseason: unknown; injuries?: unknown };
+export type SeasonFiles = { data: SeasonData; box: unknown; preseason: unknown; injuries?: unknown; nbaReports?: unknown };
 
 /** Each team's team part after a season's last game day, or its seed when the season has no final game. */
 const lastTeamParts = (data: SeasonData, inputs: ModelInputs): Record<Abbr, number> => fitModel(data, inputs).at(-1)?.after.r ?? inputs.centres ?? {};
@@ -27,14 +32,15 @@ const latestReport = (archive: InjuryArchive): Report | undefined => {
 };
 
 /**
- * A season's lineups with its injury reports applied: each played game's lineup less that day's report, fetched
- * before the day's first tip-off, and each team's next lineup less the latest report.
+ * Version 3's lineups by game id, which version 4 takes for a side the NBA's report does not cover: each played
+ * game's previous lineup less ESPN's report of its day, fetched before the day's first tip-off, and each game still
+ * to come with each team's latest next lineup less ESPN's latest report.
  */
-function withReports(data: SeasonData, seasonLineups: Lineups, archive: InjuryArchive | undefined): Lineups {
-  if (!archive) return seasonLineups;
-  const report = latestReport(archive);
-  const next = new Map([...seasonLineups.next].map(([day, teams]) => [day, reportNext(teams as Record<Abbr, Lineup>, report)]));
-  return { ...seasonLineups, previous: reportLineups(data, seasonLineups.previous, archive), next };
+function espnLineups(data: SeasonData, seasonLineups: Lineups, archive: InjuryArchive | undefined): Map<string, Sides<Lineup>> {
+  const out = reportLineups(data, seasonLineups.previous, archive);
+  const next = reportNext(Object.assign({}, ...seasonLineups.next.values()) as Record<Abbr, Lineup>, archive && latestReport(archive));
+  for (const g of data.games) if (!g.final) out.set(g.id, { home: next[g.home] ?? [], away: next[g.away] ?? [] });
+  return out;
 }
 
 /** Days ahead a report's projected return must be for a player to leave his team's shown rotation: about 10 games. */
@@ -98,34 +104,39 @@ function withLongAbsences(data: SeasonData, box: SeasonBox, rotation: SeasonRota
   return out;
 }
 
-/** compute()'s inputs for each of `seasons`, by season id. */
-export function modelInputs(seasons: readonly SeasonFiles[]): Map<string, ModelInputs> {
+/** compute()'s inputs for each of `seasons`, by season id; `draft` names the top-three picks. */
+export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<DraftFile> = {}): Map<string, ModelInputs> {
   const walked = [...seasons]
     .sort((x, y) => x.data.season.localeCompare(y.data.season))
     .map((s) => ({ ...s, box: s.box === undefined ? { season: s.data.season, games: {} } : parseBox(s.box, s.data.season) }));
-  const ratings = boxRatings(walked, PARAMS.players.halfLife);
-  const lineupsBySeason = lineups(walked);
+  const rookies = newcomers(walked);
+  const ratings = boxRatings(walked, PARAMS.players.halfLife, topThreeStart(walked, rookies, draft));
+  const lineupsBySeason = lineups(walked, V4.recent);
   const rotations = usualRotations(walked);
   const homes = trailingHomeEdges(walked.map((s) => s.data), PARAMS);
-  const rookies = newcomers(walked);
+  const espn = new Map(walked.flatMap((s) => (s.injuries === undefined ? [] : [[s.data.season, parseArchive(s.injuries, s.data.season)] as const])));
+  const nba = new Map(walked.flatMap((s) => (s.nbaReports === undefined ? [] : [[s.data.season, parseNbaArchive(s.nbaReports, s.data.season)] as const])));
+  const dataOf = (season: string) => walked.find((s) => s.data.season === season)!.data;
+  const priced = availability(walked, nba, (season) => espnLineups(dataOf(season), lineupsBySeason.get(season)!, espn.get(season)));
   const out = new Map<string, ModelInputs>();
   let before: { data: SeasonData; inputs: ModelInputs } | null = null;
-  for (const { data, box, preseason, injuries } of walked) {
+  for (const { data, box, preseason } of walked) {
     const abbrs = Object.keys(data.teams);
     const totals = preseason === undefined ? null : parsePreseason(preseason, data.season);
     const everyTotal = totals !== null && abbrs.every((a) => a in totals.totals);
     const last = before && !everyTotal ? lastTeamParts(before.data, before.inputs) : {};
-    const archive = injuries === undefined ? undefined : parseArchive(injuries, data.season);
+    const archive = espn.get(data.season);
     const inputs: ModelInputs = {
       centres: seedCentres(PARAMS.seed, abbrs, { preseason: totals, last }),
       home: homes.get(data.season)!.value,
       players: {
         box,
         ratings: ratings.get(data.season)!,
-        lineups: withReports(data, lineupsBySeason.get(data.season)!, archive),
+        lineups: priced.get(data.season)!.lineups,
         rotation: archive ? withLongAbsences(data, box, rotations.get(data.season)!, archive) : rotations.get(data.season)!,
         rookies: rookies.get(data.season),
       },
+      extra: priced.get(data.season)!.extra,
     };
     out.set(data.season, inputs);
     before = { data, inputs };

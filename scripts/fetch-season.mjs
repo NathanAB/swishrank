@@ -163,8 +163,8 @@ async function fetchNames() {
   console.log(`names: ${wanted.size} players, ${found} looked up, ${missing.length - found} still without a name`);
 }
 
-// A draft ESPN cannot give leaves the player out of the file, so the next run asks again. Version 4 reads it only
-// for a rookie's starting level, and the site runs version 3.
+// A draft ESPN cannot give leaves the player out of the file, so the next run asks again. Version 4, the site's model,
+// reads it only for a rookie's starting level.
 async function fetchDrafts() {
   const draft = JSON.parse(await readFile(DRAFT_FILE, "utf8").catch(() => "{}"));
   const boxes = await readAll(BOX_DIR);

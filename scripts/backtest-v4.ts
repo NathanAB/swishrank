@@ -1,8 +1,9 @@
 // npm run backtest:v4: runs docs/model-v4.md's pre-registered plan. It scores version 4, and each of its parts, against
-// version 3 as the site runs it on the tuning and exploration seasons, logs 2026-27 and the 2027-28 confirmation
+// version 3 as the site ran it on the tuning and exploration seasons, logs 2026-27 and the 2027-28 confirmation
 // games so far and, once 2027-28 has its end in src/data/seasons.json, gives the confirmation's verdict. It prints
 // every table and rewrites the Results part of docs/model-v4.md. It exits non-zero when the pre-registration's text
-// has changed, or when src/lib/v4.ts's SIGMA and early widening differ from what the plan fits.
+// has changed, or when src/lib/elo.ts's SIGMA and early widening differ from what the plan fits. Version 3 is
+// src/lib/v3.ts's frozen settings with its own lineups and box ratings, so its numbers hold while the site runs version 4.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { EARLY, ELO_PER_SIGMA, PARAMS, seasonRule, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
@@ -11,6 +12,7 @@ import { modelInputs } from "../src/lib/inputs.ts";
 import { parseNbaArchive, type NbaArchive } from "../src/lib/nba-report.ts";
 import { boxRatings, lineups, parseBox, type BoxRatings, type SeasonBox } from "../src/lib/players.ts";
 import { reportLineups } from "../src/lib/report-lineup.ts";
+import { V3 } from "../src/lib/v3.ts";
 import { availability, topThreeStart, V4, type Availability, type LineupRule } from "../src/lib/v4.ts";
 import type { DraftFile } from "../src/lib/draft.ts";
 import {
@@ -55,6 +57,9 @@ const fallbackOf = (recent: number) => {
 const topThree = boxRatings(walked, PARAMS.players.halfLife, topThreeStart(walked, new Map(ALL.map((id) => [id, inputs.get(id)!.players!.rookies!])), draft));
 const v4Lineups = availability(walked, reports, fallbackOf(V4.recent));
 const NONE = new Map<string, Availability>();
+/** Version 3's lineups and box ratings: the previous game's, 10 appearances' minutes, less ESPN's "Out", and no top-three start. */
+const v3Lineups = new Map(ALL.map((id) => [id, fallbackOf(10)(id)]));
+const v3Ratings = boxRatings(walked, PARAMS.players.halfLife);
 
 /** Every season's rows: version 3's inputs with these lineups, box ratings and extra terms. */
 function rows(lineupsOf?: ReadonlyMap<string, Availability>, ratingsOf?: ReadonlyMap<string, BoxRatings>, fill = true): Row[] {
@@ -64,7 +69,7 @@ function rows(lineupsOf?: ReadonlyMap<string, Availability>, ratingsOf?: Readonl
     const a = lineupsOf?.get(data.season);
     const season: SeasonInputs = {
       centres: inp.centres,
-      players: { box: box as SeasonBox, ratings: ratingsOf?.get(data.season) ?? players.ratings, lineups: a?.lineups ?? players.lineups.previous, rookies: players.rookies },
+      players: { box: box as SeasonBox, ratings: ratingsOf?.get(data.season) ?? v3Ratings.get(data.season)!, lineups: a?.lineups ?? v3Lineups.get(data.season)!, rookies: players.rookies },
       extra: fill ? a?.extra : undefined,
     };
     return modelRows(data, seasonRule(inp), season);
@@ -77,7 +82,7 @@ function fitted(r: Row[]) {
   return { sigma, widen, scored: price(r, sigma, widen) };
 }
 
-const v3 = price(rows(), PARAMS.sigma, EARLY.widen);
+const v3 = price(rows(), V3.sigma, V3.widen);
 const fit4 = fitted(rows(v4Lineups, topThree));
 const { sigma, widen } = fit4;
 const v4 = fit4.scored;
@@ -179,7 +184,7 @@ section(
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const want = { sigma: r3(sigma), widen: r2(widen) };
-const have = { sigma: r3(V4.sigma), widen: r2(V4.widen) };
+const have = { sigma: r3(PARAMS.sigma), widen: r2(EARLY.widen) };
 const match = JSON.stringify(want) === JSON.stringify(have);
 out.push(`### Check\n\nsrc/lib/v4.ts V4 ${match ? "matches" : "DOES NOT match"} the plan's fit, \`${JSON.stringify(want)}\`.`);
 if (!match) process.exitCode = 1;
@@ -189,7 +194,7 @@ const lines = doc.split("\n");
 const from = lines.indexOf("## Pre-registration");
 const to = lines.findIndex((l, i) => i > from && l.startsWith("## "));
 const hash = createHash("sha256").update(lines.slice(from + 1, to).join("\n")).digest("hex");
-out.unshift(`Pre-registration SHA-256 now: \`${hash}\`, ${hash === PREREGISTERED ? "unchanged since its amendment on 2026-11-01" : "CHANGED since its amendment on 2026-11-01"}. Bootstrap: 2000 resamples of whole weeks, seed 20261025. Version 4's SIGMA ${f3(sigma)} (${(ELO_PER_SIGMA / sigma).toFixed(1)} Elo points per margin unit), early widening ${widen.toFixed(2)}; version 3's ${f3(PARAMS.sigma)} and ${EARLY.widen.toFixed(2)}. Version 3's log loss on the tuning seasons: ${f4(logLoss(only(v3, inSeasons(TUNING))))}.`);
+out.unshift(`Pre-registration SHA-256 now: \`${hash}\`, ${hash === PREREGISTERED ? "unchanged since its amendment on 2026-11-01" : "CHANGED since its amendment on 2026-11-01"}. Bootstrap: 2000 resamples of whole weeks, seed 20261025. Version 4's SIGMA ${f3(sigma)} (${(ELO_PER_SIGMA / sigma).toFixed(1)} Elo points per margin unit), early widening ${widen.toFixed(2)}; version 3's ${f3(V3.sigma)} and ${V3.widen.toFixed(2)}. Version 3's log loss on the tuning seasons: ${f4(logLoss(only(v3, inSeasons(TUNING))))}.`);
 if (hash !== PREREGISTERED) process.exitCode = 1;
 
 const body = out.join("\n\n");

@@ -1,7 +1,8 @@
 # Saves the NBA's injury report onto every game still to come, every half hour through each game day, so each game
-# keeps the latest report saved before its tip-off (docs/model-v4.md, scripts/fetch-nba-report.ts). Nothing is built
-# or deployed: the site runs version 3, which reads ESPN's report in the deploy. A push made with this workflow's
-# token starts no other workflow, so these commits never start a deploy.
+# keeps the latest report saved before its tip-off (docs/model-v4.md, scripts/fetch-nba-report.ts). The site runs
+# version 4, which prices each game from that report, so a run that commits a report starts the deploy workflow to
+# rebuild the site: a push made with this workflow's token starts no other workflow, but a dispatch does. The dispatch
+# passes `source=report`, so that run only builds and deploys, without the tests or the ESPN fetch.
 name: Save the NBA injury report
 
 on:
@@ -15,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: nba-report
@@ -34,6 +36,7 @@ jobs:
       - name: Save the latest report onto the games still to come
         run: node scripts/fetch-nba-report.ts
       - name: Commit the report
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -41,5 +44,12 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Save the NBA injury report"
           # The deploy may have pushed since this run checked out.
-          for attempt in 1 2 3; do git pull --rebase && git push && exit 0; sleep 10; done
+          for attempt in 1 2 3; do git pull --rebase && git push && echo "pushed=true" >> "$GITHUB_OUTPUT" && exit 0; sleep 10; done
           exit 1
+      # Only after a push, so the dispatched run checks out main with this report on it. The deploy's concurrency group
+      # queues it behind a deploy in progress, and a newer dispatch replaces one still waiting, so the site catches up.
+      - name: Rebuild the site with the new report
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main -f source=report

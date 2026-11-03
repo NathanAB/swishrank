@@ -1,7 +1,7 @@
 // Games still to play, priced on the ratings as they stand now: nothing here moves a rating before tip-off,
 // so a game five days out gets the same chances it would get if it were played tonight, apart from a back-to-back,
-// which the schedule already shows.
-import { addDays, dayKey, gap, played, winProb, type Abbr, type Game, type Season } from "./elo.ts";
+// which the schedule already shows, and the NBA's injury report, once it lists the game.
+import { addDays, dayKey, played, winProb, type Abbr, type Game, type Season } from "./elo.ts";
 import type { Side } from "./facts.ts";
 
 export type FixtureLine = {
@@ -24,9 +24,8 @@ export type FixtureDay = { day: string; fixtures: Fixture[] };
 /** The days the games page looks ahead: today and the six after it. */
 export const WEEK = 7;
 
-/** A game priced on `model`'s current pricing ratings, home edge and back-to-back term, and the games each side has played. */
-export const fixture = (game: Game, model: Pick<Season, "pricing" | "home" | "log" | "b2b">): Fixture =>
-  priced(game, winProb(gap(game, model.pricing, model.home) + model.b2b[game.id], played(model.log, game)));
+/** A game priced on its gap in `model`, from the current ratings and its own lineups, and the games each side has played. */
+export const fixture = (game: Game, model: Pick<Season, "gaps" | "log">): Fixture => priced(game, winProb(model.gaps[game.id], played(model.log, game)));
 
 /** A game with `p`, the home side's chance. */
 export function priced(game: Game, p: number): Fixture {
