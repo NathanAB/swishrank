@@ -210,7 +210,9 @@ const dates = clearOfMark(dateTicks(ser.map((d) => d.day), DAY_LABEL / PLOT_MIN)
   .fill.down { right: 50%; }
   .fill.rise { background: var(--rise); }
   .fill.fall { background: var(--drop); }
-  .move { display: inline-block; min-width: 3ch; }
+  /* Wide enough for a sign and three digits, so a move of 100 or more keeps its row's bar in line. The minus sign is
+     wider than a digit, so 4ch is not enough. */
+  .move { display: inline-block; min-width: 5ch; }
   .move.rise { color: var(--rise); }
   .move.fall { color: var(--drop); }
 
