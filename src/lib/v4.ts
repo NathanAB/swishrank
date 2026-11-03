@@ -1,8 +1,9 @@
 // Version 4's settings and lineups (docs/model-v4.md): version 3, with each game priced from the players the NBA's
 // injury report, the latest saved before its tip-off, says will play; the minutes of the players it leaves out counted
 // below the rest of their team's lineup; and a top-three draft pick starting from the box rating top-three picks play
-// at. The site runs version 3; scripts/backtest-v4.ts scores this against it.
-import { finalDays, type Abbr, type Game, type SeasonData } from "./elo.ts";
+// at. The site runs version 4 since 2026-11-02 (src/lib/inputs.ts modelInputs); scripts/backtest-v4.ts scores it
+// against version 3.
+import { EARLY, finalDays, PARAMS, type Abbr, type Game, type SeasonData } from "./elo.ts";
 import { topPick, type DraftFile } from "./draft.ts";
 import type { NbaArchive, NbaStatus, SideReport } from "./nba-report.ts";
 import { gameScore, ROTATION, scaled, UNKNOWN, type Athlete, type BoxLine, type Lineup, type SeasonBox, type Sides } from "./players.ts";
@@ -22,9 +23,9 @@ export const V4 = {
   fill: -0.3,
   /** A top-three pick's starting box rating above the previous season's minutes-weighted mean, per 36 minutes. */
   topThree: 0.28,
-  /** SIGMA and the early widening, fitted on the tuning seasons by scripts/backtest-v4.ts. */
-  sigma: 2.981,
-  widen: 1.15,
+  /** SIGMA and the early widening, fitted on the tuning seasons by scripts/backtest-v4.ts, as src/lib/elo.ts's PARAMS and EARLY hold them. */
+  sigma: PARAMS.sigma,
+  widen: EARLY.widen,
 };
 
 /** What availability() reads of V4; scripts/backtest-v4.ts also runs version 3's rule, "Out" only, through it. */

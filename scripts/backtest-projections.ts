@@ -12,6 +12,7 @@
 //   node scripts/backtest-projections.ts            the grid and the report
 //   node scripts/backtest-projections.ts --quick    a smaller grid, fewer runs
 import { readFileSync, existsSync } from "node:fs";
+import type { DraftFile } from "../src/lib/draft.ts";
 import { compute, type Abbr, type Season, type SeasonData } from "../src/lib/elo.ts";
 import { modelInputs } from "../src/lib/inputs.ts";
 import { meanWins, setupAt, simulate, winsAt, type Drift, type Outlook, type Projection } from "../src/lib/project.ts";
@@ -31,8 +32,8 @@ const read = (path: string): unknown => {
 };
 const list = read("seasons.json") as { id: string; end?: string }[];
 const ids = list.map((s) => s.id).sort();
-const files = ids.map((id) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`), injuries: read(`injuries/${id}.json`) }));
-const inputs = modelInputs(files);
+const files = ids.map((id) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`), injuries: read(`injuries/${id}.json`), nbaReports: read(`nba-reports/${id}.json`) }));
+const inputs = modelInputs(files, read("draft.json") as DraftFile);
 const finished = list.filter((s) => s.end).map((s) => s.id).sort();
 
 type Truth = { wins: Record<Abbr, number>; playoffs: Set<Abbr> | null; top6: Set<Abbr> | null; champion: Abbr | null; rounds: { round2: Set<Abbr>; confFinals: Set<Abbr>; finals: Set<Abbr> } | null };

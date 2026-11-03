@@ -32,7 +32,8 @@ test("the week ahead is the game days among the seven US Eastern days from today
 });
 
 test("the favourite is the side at 50% or more, home court counted", () => {
-  const model = { pricing: { STRONG: 1150, EVEN: 1000, WEAK: 1000 }, home: 100, log: { STRONG: [], EVEN: [], WEAK: [] }, b2b: { 1: 0, 2: 0 } };
+  // Ratings STRONG 1150, EVEN and WEAK 1000, and 100 points of home court.
+  const model = { gaps: { 1: 1000 + 100 - 1000, 2: 1000 + 100 - 1150 }, log: { STRONG: [], EVEN: [], WEAK: [] } };
   const fav = (g: Game) => {
     const f = fixture(g, model);
     return f.lines.find((l) => l.side === f.fav)?.abbr;
@@ -47,7 +48,7 @@ test("a game between teams with few games behind them gets a chance nearer even,
   const g = game("1", "2026-10-25T23:00Z", "B", "A");
   const chance = (games: number) => {
     const log = { A: Array(games).fill(null), B: Array(games + 1).fill(null) };
-    return fixture(g, { pricing: { A: 1100, B: 1000 }, home: 0, log, b2b: { 1: 0 } }).lines[1].chance;
+    return fixture(g, { gaps: { 1: 100 }, log }).lines[1].chance;
   };
   assert.ok(chance(4) < chance(5) - 0.01, `${chance(4)} vs ${chance(5)}`);
   assert.equal(chance(5), chance(40));

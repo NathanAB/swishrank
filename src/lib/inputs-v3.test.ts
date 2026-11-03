@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { BACKUP_GAP, compute, ELO_PER_SIGMA, fitModel, gapValue, PARAMS, playerPart, shownLineups, START, type Game, type SeasonData } from "./elo.ts";
 import { trailingHomeEdges } from "./home.ts";
 import { modelInputs } from "./inputs.ts";
-import type { BoxLine } from "./players.ts";
+import { parseBox, REPLACEMENT, type BoxLine } from "./players.ts";
+import { seasonMean, V4 } from "./v4.ts";
 
 // Last season A beat B at home three times by 10. This season A brings in rookie 5. The morning report of A's second
 // game lists player 2 as out; he plays anyway, and the report, the latest, still lists him for the game to come.
@@ -40,13 +41,37 @@ test("a season's inputs name its rookies: players new to the box scores, not las
   assert.deepEqual([...inputs.players!.rookies!], [5]);
 });
 
-test("a game is priced without the players its morning's report lists as out, and so are the games to come", () => {
-  const priced = inputs.players!.lineups.previous.get("g2")!.home.map((p) => p.athlete).sort();
+test("a rookie the draft file names a top-three pick starts from version 4's level, not replacement", () => {
+  const drafted = modelInputs([
+    { data: last, box: lastBox, preseason: totals("2025-26") },
+    { data, box, preseason: totals("2026-27"), injuries },
+  ], { 5: [2026, 1, 2] }).get("2026-27")!;
+  const start = (i: typeof inputs) => i.players!.ratings.start[i.players!.ratings.athletes.indexOf(5)];
+  near(start(drafted) - start(inputs), seasonMean(parseBox(lastBox, "2025-26"))! + V4.topThree - REPLACEMENT, "rookie 5's box rating before his first game");
+});
+
+test("a side the NBA's report does not cover is priced without the players ESPN's morning report lists as out, and so are the games to come", () => {
+  const priced = inputs.players!.lineups.get("g2")!.home.map((p) => p.athlete).sort();
   assert.deepEqual(priced, [1, 5], "player 2 played g1 but is out for g2");
-  const share = inputs.players!.lineups.previous.get("g2")!.home.reduce((s, p) => s + p.share, 0);
+  const share = inputs.players!.lineups.get("g2")!.home.reduce((s, p) => s + p.share, 0);
   assert.ok(Math.abs(share - 5) < 1e-9, `the lineup still fills 240 minutes: ${share}`);
-  const next = inputs.players!.lineups.next.get("2026-10-23")!.A!.map((p) => p.athlete);
+  const next = inputs.players!.lineups.get("g3")!.home.map((p) => p.athlete);
   assert.deepEqual(next.sort(), [1, 5], "player 2 played g2, but the latest report holds for the game to come");
+});
+
+test("a game to come that the NBA's report covers is priced by version 4's rule, its fill term included", () => {
+  const nbaReports = { season: "2026-27", games: { g3: { published: "2026-10-25T17:00", home: { 1: "Out" }, away: null } } };
+  const withNba = modelInputs([
+    { data: last, box: lastBox, preseason: totals("2025-26") },
+    { data, box, preseason: totals("2026-27"), injuries, nbaReports },
+  ]).get("2026-27")!;
+  const lineup = withNba.players!.lineups.get("g3")!;
+  assert.deepEqual(lineup.home.map((p) => p.athlete).sort(), [2, 5], "1 is out; 2, whom ESPN's report lists, plays by the NBA's");
+  assert.deepEqual(lineup.away, inputs.players!.lineups.get("g3")!.away, "B, uncovered, keeps version 3's next lineup");
+  // 1's 30 expected minutes of g2's lineup's 90, times 5.
+  near(withNba.extra!.get("g3")!, V4.fill * (5 / 3), "the fill term");
+  const gap = (extra?: ReadonlyMap<string, number>) => compute(data, { ...withNba, extra }).gaps.g3;
+  near(gap(withNba.extra) - gap(undefined), V4.fill * (5 / 3) * (ELO_PER_SIGMA / PARAMS.sigma), "the chance reads the fill term");
 });
 
 // This season A plays B four times. Player 9 plays A's first two games, is hurt in the second, and the next

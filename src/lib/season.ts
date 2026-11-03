@@ -1,7 +1,10 @@
 // The seasons the site shows, loaded and rated once per build. seasons.json lists them; the one without
 // "end" is current and lives at the site root. Each season's games come from src/data/games/<id>.json, and the
-// model also reads its box scores and preseason win totals from src/data/box/ and src/data/preseason/.
+// model also reads its box scores and preseason win totals from src/data/box/ and src/data/preseason/, ESPN's and
+// the NBA's injury reports from src/data/injuries/ and src/data/nba-reports/, and the draft from src/data/draft.json.
+import draft from "../data/draft.json" with { type: "json" };
 import list from "../data/seasons.json" with { type: "json" };
+import type { DraftFile } from "./draft.ts";
 import { compute, dayKey, type Abbr, type Game, type ModelInputs, type Season, type SeasonData, type Team } from "./elo.ts";
 import { seasonLabel } from "./format.ts";
 import { modelInputs } from "./inputs.ts";
@@ -32,6 +35,7 @@ const GAME_FILES = import.meta.glob<unknown>("../data/games/*.json", { eager: tr
 const BOX_FILES = import.meta.glob<unknown>("../data/box/*.json", { eager: true, import: "default" });
 const PRESEASON_FILES = import.meta.glob<unknown>("../data/preseason/*.json", { eager: true, import: "default" });
 const INJURY_FILES = import.meta.glob<unknown>("../data/injuries/*.json", { eager: true, import: "default" });
+const NBA_REPORT_FILES = import.meta.glob<unknown>("../data/nba-reports/*.json", { eager: true, import: "default" });
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isNumOrNull = (v: unknown): v is number | null => v === null || typeof v === "number";
@@ -94,7 +98,13 @@ const seasonData = (id: string) => {
 // and one without injury reports prices its games with the previous game's lineups.
 let inputs: Map<string, ModelInputs> | undefined;
 const allInputs = () =>
-  (inputs ??= modelInputs(ENTRIES.all.map(({ id }) => ({ data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id), injuries: file(INJURY_FILES, "injuries", id) }))));
+  (inputs ??= modelInputs(
+    ENTRIES.all.map(({ id }) => ({
+      data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id),
+      injuries: file(INJURY_FILES, "injuries", id), nbaReports: file(NBA_REPORT_FILES, "nba-reports", id),
+    })),
+    draft as unknown as DraftFile,
+  ));
 
 /** A season's model inputs, as compute() read them. */
 export const seasonInputs = (id: string) => allInputs().get(id);

@@ -4,7 +4,8 @@ import { compute, EARLY, ELO_PER_SIGMA, expected, fitModel, fitSeason, PARAMS, p
 import { outcome } from "./facts.ts";
 import { fixture } from "./fixtures.ts";
 import { modelInputs } from "./inputs.ts";
-import type { BoxLine, Lineup } from "./players.ts";
+import { lineups, type BoxLine, type Lineup } from "./players.ts";
+import { V4 } from "./v4.ts";
 
 const season = "2026-27";
 const near = (actual: number, want: number, what: string) => assert.ok(Math.abs(actual - want) < 1e-9, `${what}: ${actual}, wanted ${want}`);
@@ -48,9 +49,9 @@ test("opening night shows each team's seed, read from its preseason win total", 
 });
 
 test("a game to come gets the model's chance: team parts, each side's next lineup, home court and the back-to-back", () => {
-  const days = fitSeason(data, PARAMS, { centres: inputs.centres, players: { ...inputs.players!, lineups: inputs.players!.lineups.previous } });
+  const days = fitSeason(data, PARAMS, inputs);
   const next: Record<string, Lineup> = Object.fromEntries(model.abbrs.map((a) => [a, []]));
-  for (const { day } of days) Object.assign(next, inputs.players!.lineups.next.get(day));
+  for (const teams of lineups([{ data, box }], V4.recent).get(season)!.next.values()) Object.assign(next, teams);
   const fit = days.at(-1)!.after;
   const second = secondNights(data);
   assert.deepEqual(model.upcoming.map((g) => [g.id, model.b2b[g.id] !== 0]), [["5", true], ["6", false]]);
@@ -96,7 +97,7 @@ test("a game's change is its team's whole move that day, from the chart the day 
 
 test("a team's opening point counts the players of its first game once it is played, and its seed alone until then", () => {
   const inputs = seasonsWith(switchedBox).get(season)!;
-  const start = fitSeason(switched, PARAMS, { centres: inputs.centres, players: { ...inputs.players!, lineups: inputs.players!.lineups.previous } })[0].before;
+  const start = fitSeason(switched, PARAMS, inputs)[0].before;
   const firstGame = playerPart(start, inputs.players!.rotation.get("2026-10-21")!.A!);
   assert.ok(Math.abs(firstGame) > 0.05, `A's first game's players are worth ${firstGame}`);
   const opening = withStar.series[0].r;
