@@ -2,12 +2,14 @@
 // 2026-11-02: version 2 with a home edge from the three seasons before, each game's lineup less the players that
 // morning's injury report lists as out, and a rookie's value held with 40 games instead of 320. They are frozen here
 // so version 3's backtest and version 4's baseline stay checkable after src/lib/elo.ts moved on; `npm run
-// backtest:v3` fails if they differ from what the plan fits.
+// backtest:v3` fails if they differ from what the plan fits. `out` alone reads the live OUT_STATUSES, which still
+// prices every side the NBA's report does not cover.
 import { HOME_TRAIL } from "./home.ts";
+import { OUT_STATUSES } from "./report-lineup.ts";
 
 export const V3 = {
   home: HOME_TRAIL,
-  out: ["Out"],
+  out: [...OUT_STATUSES],
   rookieNp: 40,
   sigma: 3.037,
   widen: 1.14,
