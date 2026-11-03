@@ -1,5 +1,5 @@
-# Saves the NBA's injury report onto every game still to come, every half hour through each game day, so each game
-# keeps the latest report saved before its tip-off (docs/model-v4.md, scripts/fetch-nba-report.ts). The site runs
+# Saves the NBA's injury report onto every game still to come, so each game keeps the latest report saved before its
+# tip-off (docs/model-v4.md, scripts/fetch-nba-report.ts). The site runs
 # version 4, which prices each game from that report, so a run that commits a report starts the deploy workflow to
 # rebuild the site: a push made with this workflow's token starts no other workflow, but a dispatch does. The dispatch
 # passes `source=report`, so that run only builds and deploys, without the tests or the ESPN fetch.
@@ -7,11 +7,11 @@ name: Save the NBA injury report
 
 on:
   schedule:
-    # :13 and :43 past each hour from 15:13 to 04:43 UTC: 10:13 AM to 11:43 PM Eastern in winter, 11:13 AM to
-    # 12:43 AM in summer, so the last runs before the earliest and latest tip-offs both fall inside. GitHub can
-    # delay or drop a scheduled run; the next one, half an hour later, saves the report then.
-    - cron: "13,43 15-23 * * *"
-    - cron: "13,43 0-4 * * *"
+    # A backup: the Worker in cron/ starts this workflow every half hour while a game is still to tip off, since
+    # GitHub delays and drops scheduled runs. These four, 12:43, 4:43, 6:43 and 9:43 PM Eastern in winter, catch a
+    # day the Worker misses; a run with no new report commits nothing.
+    - cron: "43 17,21,23 * * *"
+    - cron: "43 2 * * *"
   workflow_dispatch:
 
 permissions:

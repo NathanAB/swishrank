@@ -8,6 +8,8 @@ Teams sit around 1000, and only the gap between two ratings matters. Every team 
 
 A GitHub Action ([deploy.yml](.github/workflows/deploy.yml)) runs once a day at 08:17 UTC, once the last West Coast game is in, started by the Cloudflare Worker in [cron/](cron/), with GitHub's own schedule at 12:17 UTC as a backup. It pulls the season's games from ESPN's public scoreboard, commits them to `src/data/games/` when they change, rebuilds the site and deploys it to Cloudflare. It also runs on every push to `main`, and after each NBA injury report that [nba-report.yml](.github/workflows/nba-report.yml) saves, as often as every half hour on game days, so each game's chances read the latest report.
 
+GitHub delays and drops scheduled runs too, so the same Worker starts [nba-report.yml](.github/workflows/nba-report.yml): every half hour through each game day it checks ESPN's scoreboard for a game still to tip off, and if there is one it starts the workflow. A few runs on GitHub's own schedule are its backup. To change the Worker, run `npx wrangler deploy` in `cron/`.
+
 ## Run it locally
 
 ```sh
@@ -30,7 +32,7 @@ npm run dev     # http://localhost:4321/
 - `src/lib/elo.ts` is the rating model. Everything else reads from what it computes.
 - `scripts/backtest.ts` scores the model against the old Elo (`scripts/elo538.ts`) on past seasons.
 - `src/lib/home.ts`, `src/lib/report-lineup.ts` and `src/lib/rookies.ts` hold version 3, which version 4 builds on and `scripts/backtest-v3.ts` scores against version 2, frozen as `V2` in `scripts/evaluate.ts`. `src/lib/v3.ts` freezes version 3's settings.
-- `src/lib/v4.ts`, `src/lib/nba-report.ts` and `src/lib/draft.ts` hold version 4, the site's model, which `src/lib/inputs.ts` feeds to `src/lib/elo.ts` and `scripts/backtest-v4.ts` scores against version 3. `.github/workflows/nba-report.yml` runs `scripts/fetch-nba-report.ts` every half hour through each game day, saving the NBA's injury report onto the games still to come in `src/data/nba-reports/<season>.json`, and starts the deploy when it saves one; `scripts/nba-report-history.ts` built the seasons before 2026-27 from the league's archive.
+- `src/lib/v4.ts`, `src/lib/nba-report.ts` and `src/lib/draft.ts` hold version 4, the site's model, which `src/lib/inputs.ts` feeds to `src/lib/elo.ts` and `scripts/backtest-v4.ts` scores against version 3. `.github/workflows/nba-report.yml`, started by the Worker in `cron/` every half hour while a game is still to tip off, runs `scripts/fetch-nba-report.ts`, saving the NBA's injury report onto the games still to come in `src/data/nba-reports/<season>.json`, and starts the deploy when it saves one; `scripts/nba-report-history.ts` built the seasons before 2026-27 from the league's archive.
 - `src/data/seasons.json` lists the seasons. The one without an `end` date is the current season and lives at the site root; older seasons live under their id, such as `/2025-26/`.
 - `scripts/fetch-season.mjs` turns ESPN's scoreboard into `src/data/games/<season>.json`.
 - `src/pages/` holds the routes, and `src/components/` the table, chart and game lists they share.
