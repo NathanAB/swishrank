@@ -1,8 +1,9 @@
 # Builds the site and deploys it to Cloudflare with Cloudflare's own action
 # (https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/), plus a daily run that pulls the
 # night's scores from ESPN and commits them before building. The NBA report's workflow (nba-report.yml) also starts it
-# after each report it saves, as often as every half hour on game days, since version 4 prices games from that report;
-# each of those runs fetches too, and one with no new scores commits nothing.
+# after each report it saves, as often as every half hour on game days, since version 4 prices games from that report.
+# It passes `source: report`, and those runs only build and deploy: a report commit changes no code, so the tests have
+# nothing new to check, and the daily run fetches the scores.
 name: Refresh scores and deploy
 
 on:
@@ -14,6 +15,11 @@ on:
     # run with no new scores commits nothing.
     - cron: "17 12 * * *"
   workflow_dispatch:
+    inputs:
+      source:
+        description: "report: only build and deploy, skipping the tests and the ESPN fetch"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -38,15 +44,18 @@ jobs:
       # The tests run beside the fetch and the build, in a worktree of the commit as pushed, so the fetch's new files
       # never reach them, as when they ran first. They take up to a minute; the deploy waits for them below.
       - name: Start the tests
+        if: inputs.source != 'report'
         run: |
           git worktree add --detach "$RUNNER_TEMP/tests" HEAD
           ln -s "$PWD/node_modules" "$RUNNER_TEMP/tests/node_modules"
           (cd "$RUNNER_TEMP/tests" && npm test > "$RUNNER_TEMP/tests.log" 2>&1; echo $? > "$RUNNER_TEMP/tests.exit") &
       # A failed fetch never holds back the deploy, so an outage at ESPN never holds back a change to the site. The
       # build reads what is on disk: the scores already committed, or a games file the fetch wrote before it failed
-      # later, which the commit step skips. The fetch-failed job below then turns the run red.
+      # later, which the commit step skips. The fetch-failed job below then turns the run red. A skipped fetch skips
+      # both commit steps too.
       - name: Fetch this season's games, box scores, injury report and schedule from ESPN
         id: fetch
+        if: inputs.source != 'report'
         continue-on-error: true
         # A day's fetch takes minutes; ESPN failing with many names to look up could retry for hours and hold every
         # deploy behind it, so a slow run fails here and the injury report is committed alone.
@@ -86,6 +95,7 @@ jobs:
         env:
           SWISHRANK_CACHE: .cache
       - name: Test the Elo math
+        if: inputs.source != 'report'
         timeout-minutes: 10
         run: |
           until [ -f "$RUNNER_TEMP/tests.exit" ]; do sleep 2; done

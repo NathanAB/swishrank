@@ -1,7 +1,8 @@
 # Saves the NBA's injury report onto every game still to come, every half hour through each game day, so each game
 # keeps the latest report saved before its tip-off (docs/model-v4.md, scripts/fetch-nba-report.ts). The site runs
 # version 4, which prices each game from that report, so a run that commits a report starts the deploy workflow to
-# rebuild the site: a push made with this workflow's token starts no other workflow, but a dispatch does.
+# rebuild the site: a push made with this workflow's token starts no other workflow, but a dispatch does. The dispatch
+# passes `source=report`, so that run only builds and deploys, without the tests or the ESPN fetch.
 name: Save the NBA injury report
 
 on:
@@ -51,4 +52,4 @@ jobs:
         if: steps.commit.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run deploy.yml --ref main
+        run: gh workflow run deploy.yml --ref main -f source=report
