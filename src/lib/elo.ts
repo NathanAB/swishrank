@@ -8,7 +8,7 @@ import type { Athlete, BoxRatings, Lineup, SeasonBox, SeasonRotations, Sides } f
 export const START = 1000;
 /**
  * What the minutes of a player out for weeks are worth below the rest of his team's rotation, per 48, in margin units
- * (29 Elo points at version 3's SIGMA): his teammates play them, and the backups who get them play worse than the
+ * (30 Elo points at version 4's SIGMA): his teammates play them, and the backups who get them play worse than the
  * regulars (docs/model-v2.md). A shown lineup carries those minutes as a slot with his id negated, at the share the
  * rotation counted him for, beside the rest of the rotation scaled up to take them; the slot counts gapValue.
  * Version 4 prices a game the same way, with V4.fill in src/lib/v4.ts. ESPN's athlete ids start at 1.
@@ -469,9 +469,6 @@ export const winProb = (gap: number, played = Infinity) => phi(gap / (ELO_PER_SI
 
 /** The fewest games either side of `game` had played, by `log`. */
 export const played = (log: Record<Abbr, readonly unknown[]>, game: Game) => Math.min(log[game.home].length, log[game.away].length);
-
-/** Home-court-adjusted rating gap, home minus away, with `home` the home edge in Elo points. */
-export const gap = (game: Game, r: Record<Abbr, number>, home: number) => r[game.home] + (game.neutral ? 0 : home) - r[game.away];
 
 type Pair = { h: number; a: number };
 /**
