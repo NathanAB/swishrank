@@ -4,9 +4,16 @@
   "main": "index.js",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
-  // 3:17 AM Eastern in winter, 4:17 AM in summer: after the latest West Coast game ends, even in overtime.
   "triggers": {
-    "crons": ["17 8 * * *"]
+    "crons": [
+      // 3:17 AM Eastern in winter, 4:17 AM in summer: after the latest West Coast game ends, even in overtime. Starts
+      // deploy.yml; index.js tells it from the other schedule by this exact string.
+      "17 8 * * *",
+      // Every half hour, five minutes after one of the league's quarter-hour reports, from 10:05 AM to 10:35 PM
+      // Eastern in winter and 11:05 AM to 11:35 PM in summer: before the earliest tip-off through the latest. Starts
+      // nba-report.yml while a game is still to tip off.
+      "5,35 0-3,15-23 * * *"
+    ]
   },
   "vars": {
     "REPO": "NathanAB/swishrank"

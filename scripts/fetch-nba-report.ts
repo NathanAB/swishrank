@@ -1,6 +1,7 @@
 // Saves the NBA's latest injury report onto every game still to come (docs/model-v4.md), into
-// src/data/nba-reports/<season>.json for each season in progress. .github/workflows/nba-report.yml runs it every half
-// hour through each game day, so a game keeps the latest report saved before its tip-off and none after.
+// src/data/nba-reports/<season>.json for each season in progress. .github/workflows/nba-report.yml runs it, started by
+// the Worker in cron/ every half hour while a game is still to tip off, so a game keeps the latest report saved before
+// its tip-off and none after.
 //
 //   node scripts/fetch-nba-report.ts
 //
