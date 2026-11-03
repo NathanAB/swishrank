@@ -1,6 +1,8 @@
 # Builds the site and deploys it to Cloudflare with Cloudflare's own action
 # (https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/), plus a daily run that pulls the
-# night's scores from ESPN and commits them before building.
+# night's scores from ESPN and commits them before building. The NBA report's workflow (nba-report.yml) also starts it
+# after each report it saves, as often as every half hour on game days, since version 4 prices games from that report;
+# each of those runs fetches too, and one with no new scores commits nothing.
 name: Refresh scores and deploy
 
 on:
@@ -56,8 +58,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/data/games src/data/box src/data/injuries src/data/schedule src/data/players.json src/data/draft.json
-          # A run that waited in the queue may be behind a push made since, which would reject its own.
-          git diff --cached --quiet || { git commit -m "Update scores" && git pull --rebase && git push; }
+          git diff --cached --quiet && exit 0
+          git commit -m "Update scores"
+          # A run that waited in the queue may be behind a push made since, which would reject its own, and the NBA
+          # report's workflow pushes as often as every half hour.
+          for attempt in 1 2 3; do git pull --rebase && git push && exit 0; sleep 10; done
+          exit 1
       # The fetch saves the injury report before the scores, and the day's first saved report stands, so it is kept
       # even when the scores fail: a retry later in the day would otherwise save that afternoon's in its place.
       - name: Commit the injury report alone
