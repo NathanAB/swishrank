@@ -1,5 +1,5 @@
 // node scripts/early-season.ts: is version 4 weak at the start of a season, and would counting early games for more
-// help? It prints its tables and rewrites them between the markers in docs/research/early-season.md. It diagnoses the site's model by the game number of the less
+// help? It prints its tables and rewrites them between the markers in docs/early-season.md. It diagnoses the site's model by the game number of the less
 // experienced side, against Vegas on the same games; tests whether a team's early misses against the model keep going
 // over its next games; then scores changes to the team seed's pull, each with its own SIGMA and early widening fitted on
 // the tuning seasons, against the site's model. Investigation only: it changes nothing the site runs.
@@ -556,7 +556,7 @@ section(
 
 const body = out.join("\n\n");
 console.log(body);
-const DOC = new URL("../docs/research/early-season.md", import.meta.url);
+const DOC = new URL("../docs/early-season.md", import.meta.url);
 if (existsSync(DOC)) {
   const doc = readFileSync(DOC, "utf8"), START_MARK = "<!-- tables:start -->", END_MARK = "<!-- tables:end -->";
   const a = doc.indexOf(START_MARK), b = doc.indexOf(END_MARK);
