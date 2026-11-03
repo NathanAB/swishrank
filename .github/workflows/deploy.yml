@@ -2,8 +2,8 @@
 # (https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/), plus a daily run that pulls the
 # night's scores from ESPN and commits them before building. The NBA report's workflow (nba-report.yml) also starts it
 # after each report it saves, as often as every half hour on game days, since version 4 prices games from that report.
-# It passes `source: report`, and those runs only build and deploy: a report commit changes no code, so the tests have
-# nothing new to check, and the daily run fetches the scores.
+# It passes `source: report`, and those runs skip the ESPN fetch, which the daily run makes. They still run the tests:
+# a newer run in the deploy group replaces one still waiting, so a report run can be the one that deploys a push.
 name: Refresh scores and deploy
 
 on:
@@ -44,7 +44,6 @@ jobs:
       # The tests run beside the fetch and the build, in a worktree of the commit as pushed, so the fetch's new files
       # never reach them, as when they ran first. They take up to a minute; the deploy waits for them below.
       - name: Start the tests
-        if: inputs.source != 'report'
         run: |
           git worktree add --detach "$RUNNER_TEMP/tests" HEAD
           ln -s "$PWD/node_modules" "$RUNNER_TEMP/tests/node_modules"
@@ -95,7 +94,6 @@ jobs:
         env:
           SWISHRANK_CACHE: .cache
       - name: Test the Elo math
-        if: inputs.source != 'report'
         timeout-minutes: 10
         run: |
           until [ -f "$RUNNER_TEMP/tests.exit" ]; do sleep 2; done
