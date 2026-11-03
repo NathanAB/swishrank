@@ -1,7 +1,8 @@
 // Version 3's lineups (docs/model-v3.md): the lineup a game is predicted with is version 2's, the players of the
 // team's previous game, less everyone the day's injury report lists as out. The report is the first one the fetch
 // saved that US Eastern day, and only a report saved before the day's first tip-off counts, so a game's lineup
-// never reads news from after it began. A game on a day without such a report keeps version 2's lineup.
+// never reads news from after it began. A game on a day without such a report keeps version 2's lineup. Version 4
+// (src/lib/v4.ts) prices a side with these lineups when the NBA's report does not cover it.
 import { dayKey, type Abbr, type SeasonData } from "./elo.ts";
 import { beforeTip, type InjuryArchive, type Report } from "./injuries.ts";
 import type { Lineup, Sides } from "./players.ts";

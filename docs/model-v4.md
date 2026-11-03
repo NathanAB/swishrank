@@ -2,7 +2,7 @@
 
 Version 4 changes how the model in `docs/model-v3.md` reads who will play. A game is priced from the NBA's official injury report, the latest saved before its tip-off, read with its every status. A team missing players counts their minutes below the rest of its lineup. A rookie drafted in the top three starts from the box rating top-three picks have played at.
 
-This file holds the plan version 4 is confirmed by, written before its confirmation season begins. Where it says "as in version 3", the definition in `docs/model-v3.md`'s pre-registration applies unchanged. The site runs version 3 until this plan's confirmation says otherwise or the owner switches it.
+This file holds the plan version 4 is confirmed by, written before its confirmation season begins. Where it says "as in version 3", the definition in `docs/model-v3.md`'s pre-registration applies unchanged. The site ran version 3 until the owner switched it to version 4 on 2026-11-02, before the confirmation season, as The switch below records.
 
 ## Pre-registration
 
@@ -153,3 +153,7 @@ No confirmation game has been played.
 
 src/lib/v4.ts V4 matches the plan's fit, `{"sigma":2.981,"widen":1.15}`.
 <!-- results:end -->
+
+## The switch
+
+On 2026-11-02 the owner switched the site to version 4, as the plan allows; the confirmation runs either way. `src/lib/elo.ts` holds version 4's SIGMA and early widening in `PARAMS` and `EARLY`, which `V4` in `src/lib/v4.ts` reads, and `modelInputs` in `src/lib/inputs.ts` gives each season its box ratings with the top-three start and each game its lineups and extra term from `availability()`, as `scripts/backtest-v4.ts` defines them. Version 3, the baseline, is frozen as `V3` in `src/lib/v3.ts` with the settings `src/lib/elo.ts` held until then, and the backtest builds version 3's lineups and box ratings itself, so its tables do not move with the site. A game still to come is priced by the same rule as a played one, from where its teams' last games leave them: a side the latest saved report covers starts from its team's last game's players, read with the report's statuses, and adds the fill term; a side it does not cover takes version 3's next lineup, the players of its team's last game, at their minutes over 5 appearances, less those ESPN's latest report lists as out. So each game to come has its own chance, where version 3 priced every game a team had left with one lineup. Each report `.github/workflows/nba-report.yml` saves now starts the deploy, so the site reads it before tip-off instead of the next morning.

@@ -1,5 +1,5 @@
 // npm run backtest:v3: runs docs/model-v3.md's pre-registered plan, as amended before any confirmation game. It
-// scores version 3 and each of its changes against version 2 as the site runs it on the tuning and exploration
+// scores version 3 and each of its changes against version 2 as the site ran it on the tuning and exploration
 // seasons, checks the tuning windows, logs the 2026-27 confirmation games so far and, once the season has its end in
 // src/data/seasons.json, gives the confirmation's verdict. It prints every table and rewrites the Results part of
 // docs/model-v3.md. It exits non-zero when the pre-registration's text has changed, or when version 3's settings,
