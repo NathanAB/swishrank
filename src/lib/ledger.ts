@@ -45,9 +45,6 @@ export type LedgerGame = {
   beat: boolean;
 };
 
-/** One other game that day, what adding it to the fit did to this team, and which of its sides this team has played. */
-export type OtherGame = { home: Abbr; away: Abbr; hs: number; as: number; points: number; met: Abbr[] };
-
 /** One player's value change from his box score in the team's own game, times his share of the minutes. */
 export type BoxPlayer = { athlete: number; name: string; points: number };
 
@@ -59,18 +56,22 @@ export type LedgerRow = {
   change: number;
   game: LedgerGame | null;
   /**
-   * The move in rating points, in the walk's three parts, which add up to it exactly. `result` is what the team's
-   * own game did before its players' box scores counted, and the team part's shift when they did; `players` is
-   * each player's value change from his box score plus what his change in counted minutes did; `others` is the
-   * day's other games and the seed's daily fading.
+   * The move in rating points, in the walk's two parts, which add up to it exactly. `result` is what the team's
+   * own game did before its players' box scores counted, the team part's shift when they did, and the seed's
+   * fading; `players` is each player's value change from his box score, what his change in counted minutes did,
+   * and what the day's other games did to his value (`former`).
    */
   raw: Record<WalkKey, number>;
   /** Each player of the rotation the team took into the day, and his value change from his box score. */
   box: BoxPlayer[];
   /** Players whose counted minutes changed, largest effect first. */
   players: PlayerMove[];
-  /** The day's other games, largest effect on this team first. */
-  others: OtherGame[];
+  /**
+   * Players of the rotation whose value the day's other games moved. Each game counts its opponent as it stood
+   * before it, so only a player's past games with a former team tie him to another game, through the teammates he
+   * shared them with.
+   */
+  former: BoxPlayer[];
   /** What the seed's daily fading did. */
   seed: number;
 };
@@ -141,7 +142,7 @@ function finishedLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   try {
     const kept = JSON.parse(readFileSync(file, "utf8")) as { key: string; rows: LedgerRow[] };
     if (kept.key === key) {
-      return kept.rows.map((r) => ({ ...r, players: r.players.map((p) => ({ ...p, name: nameOf(p.athlete) })), box: r.box.map((p) => ({ ...p, name: nameOf(p.athlete) })) }));
+      return kept.rows.map((r) => ({ ...r, players: r.players.map((p) => ({ ...p, name: nameOf(p.athlete) })), box: r.box.map((p) => ({ ...p, name: nameOf(p.athlete) })), former: r.former.map((p) => ({ ...p, name: nameOf(p.athlete) })) }));
     }
   } catch {
     // No file yet, or one this build cannot read: work the rows out.
@@ -171,8 +172,6 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   const box = pl?.box.games ?? {};
   const rate = (fit: Fit, lineup: Lineup) => START + (fit.r[abbr] + playerPart(fit, lineup)) * scale;
   const lastDay = [...data.games].filter((g) => g.home === abbr || g.away === abbr).map((g) => dayKey(g.t)).sort().at(-1) ?? "";
-  /** This team's opponents so far. */
-  const met = new Set<Abbr>();
   /** Everyone with minutes in a game on an earlier day this season. */
   const seen = new Set<number>();
 
@@ -182,7 +181,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   let heldAt: number | null = null;
   const rows: LedgerRow[] = [];
 
-  for (const { day, games, before, after, priors, steps } of days) {
+  for (const { day, games, before, after, priors, own, others } of days) {
     const was = usual[abbr];
     usual = shown.after.get(day)!;
     const held = heldAt !== null;
@@ -190,39 +189,36 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
     if (!held && lastDay === day) heldAt = shownNow;
     const pg = games.find((p) => p.game.home === abbr || p.game.away === abbr);
     const g = pg?.game;
-    // The team's own game is the first step, fitted once before its players' box ratings move (`result`) and once after.
-    const own = g ? steps[0] : undefined;
     const value = (fit: Fit, athlete: number) => (fit.v.get(athlete) ?? 0) * scale;
-    const result = own?.result;
-    const boxed: BoxPlayer[] = own && result
-      ? was.filter((p) => p.athlete > 0).map((p) => ({ athlete: p.athlete, name: name(p.athlete), points: (value(own.fit, p.athlete) - value(result, p.athlete)) * p.share }))
+    const boxed: BoxPlayer[] = own
+      ? was.filter((p) => p.athlete > 0).map((p) => ({ athlete: p.athlete, name: name(p.athlete), points: (value(own.fit, p.athlete) - value(own.result, p.athlete)) * p.share }))
       : [];
-    let at = rate(own?.fit ?? priors, was);
-    const others: OtherGame[] = [];
-    for (const step of steps.slice(own ? 1 : 0)) {
-      const next = rate(step.fit, was);
-      const og = step.game;
-      others.push({ home: og.home, away: og.away, hs: og.hs, as: og.as, points: next - at, met: [og.home, og.away].filter((t) => met.has(t)) });
-      at = next;
-    }
-    const seed = rate(priors, was) - rate(before, was) + rate(after, was) - rate(steps.at(-1)?.fit ?? priors, was);
-    const minutes = rate(after, usual[abbr]) - rate(after, was);
+    // The rotation changes once the team's own game is in, so the day's other games are read on the new one: a
+    // player gone to another team leaves at his value before his first game there.
+    const mid = own?.fit ?? priors;
+    const former: BoxPlayer[] = usual[abbr].filter((p) => p.athlete > 0).flatMap((p) => {
+      const points = (value(others, p.athlete) - value(mid, p.athlete)) * p.share;
+      return Math.abs(points) >= 0.005 ? [{ athlete: p.athlete, name: name(p.athlete), points }] : [];
+    });
+    const formerPoints = former.reduce((s, p) => s + p.points, 0);
+    const seed = rate(priors, was) - rate(before, was) + rate(after, usual[abbr]) - rate(others, usual[abbr]);
+    const minutes = rate(mid, usual[abbr]) - rate(mid, was);
     const boxPoints = boxed.reduce((s, p) => s + p.points, 0);
+    // The team part's own tie to the other games, through the same past games, and the gap slots' worth.
+    const tail = rate(others, usual[abbr]) - rate(mid, usual[abbr]) - formerPoints;
     const raw: Record<WalkKey, number> = held
-      ? { result: 0, players: 0, others: 0 }
+      ? { result: 0, players: 0 }
       : {
-          result: own ? rate(own.fit, was) - rate(priors, was) - boxPoints : 0,
-          players: boxPoints + minutes,
-          others: seed + others.reduce((s, o) => s + o.points, 0),
+          result: (own ? rate(own.fit, was) - rate(priors, was) - boxPoints : 0) + seed + tail,
+          players: boxPoints + minutes + formerPoints,
         };
-    const residual = shownNow - prevShown - (raw.result + raw.players + raw.others);
+    const residual = shownNow - prevShown - (raw.result + raw.players);
     if (Math.abs(residual) > 1e-6) throw new Error(`ledger ${season.id} ${abbr} ${day}: parts miss the move by ${residual}`);
     const change = shownChange(prevShown, shownNow);
     let game: LedgerGame | null = null;
     if (pg && g) {
       const home = g.home === abbr;
       const opp = home ? g.away : g.home;
-      met.add(opp);
       // The score against the margin the chances priced, both in counted points for the home side.
       const surprise = counted(g.hs - g.as, PARAMS.margin) - expected(before, pg);
       game = {
@@ -239,12 +235,12 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
     // A player out for weeks is two slots, his own and the gap on his minutes (his id negated): see minuteRows.
     const shareOf = (lineup: Lineup, athlete: number) => lineup.find((p) => p.athlete === athlete)?.share ?? 0;
     const ids = [...new Set([...was, ...usual[abbr]].map((p) => Math.abs(p.athlete)))];
-    const restBefore = restValue(after, was), restAfter = restValue(after, usual[abbr]);
+    const restBefore = restValue(mid, was), restAfter = restValue(mid, usual[abbr]);
     const playedIn = (athlete: number) => { const line = lines?.find((l) => l[0] === athlete); return g ? (lines ? (line ? line[1] : null) : undefined) : undefined; };
     const credited = minuteRows(ids.map((athlete) => ({
       athlete,
-      before: shareOf(was, athlete), after: shareOf(usual[abbr], athlete), value: value(after, athlete),
-      gap: (shareOf(usual[abbr], -athlete) * gapValue(after, athlete, restAfter) - shareOf(was, -athlete) * gapValue(after, athlete, restBefore)) * scale,
+      before: shareOf(was, athlete), after: shareOf(usual[abbr], athlete), value: value(mid, athlete),
+      gap: (shareOf(usual[abbr], -athlete) * gapValue(mid, athlete, restAfter) - shareOf(was, -athlete) * gapValue(mid, athlete, restBefore)) * scale,
       sat: playedIn(athlete) === null,
     })));
     const players: PlayerMove[] = held ? [] : ids.flatMap((athlete) => {
@@ -264,7 +260,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
       rows.push({
         day, before: prevShown, after: shownNow, change, game, raw, players, seed,
         box: held ? [] : boxed,
-        others: others.sort((x, y) => Math.abs(y.points) - Math.abs(x.points)),
+        former: held ? [] : former,
       });
     }
     for (const { game: dg } of games) for (const side of Object.values(box[dg.id] ?? {})) for (const l of side ?? []) if (l[1] > 0) seen.add(l[0]);
@@ -333,11 +329,11 @@ export function minuteRows(changes: readonly RotationChange[]): Map<number, { po
   return out;
 }
 
-/** The three parts a row's change is split into for showing: the team's own result, its players, and other games. */
-export type WalkKey = "result" | "players" | "others";
+/** The two parts a row's change is split into for showing: the team's own result and its players. */
+export type WalkKey = "result" | "players";
 
 /** One cause the walk steps through, at its true effect in rating points, with the few words that explain it. */
-export type WalkItem = { kind: "team" | "player" | "other" | "seed"; name: string; points: number; phrase: string };
+export type WalkItem = { kind: "team" | "player" | "seed"; name: string; points: number; phrase: string };
 
 /** A line of the walk at its whole-point share: one item, or every item under a point folded into one closing line. */
 export type WalkLine =
@@ -353,7 +349,7 @@ export type WalkPart = { key: WalkKey; label: string; whole: number; lines: Walk
  */
 export type Walk = { from: number; to: number; whole: Record<WalkKey, number>; parts: WalkPart[]; tipped: boolean };
 
-const LABELS: Record<WalkKey, string> = { result: "Result", players: "Players", others: "Other games" };
+const LABELS: Record<WalkKey, string> = { result: "Result", players: "Players" };
 const byMagnitude = (a: { points: number }, b: { points: number }) => Math.abs(b.points) - Math.abs(a.points);
 
 /**
@@ -420,27 +416,28 @@ function playerPhrase(value: number, move: PlayerMove | undefined): string {
   return "About as expected";
 }
 
-/** "9 players under a point each", "2 games and the preseason estimate under a point each". */
+/** "9 players under a point each", "The preseason estimate under a point". */
 function groupPhrase(items: WalkItem[], all: number): string {
   if (!items.length) return `${all} effect${all === 1 ? "" : "s"} under a tenth of a point${all > 1 ? " each" : ""}`;
   const counts = new Map<WalkItem["kind"], number>();
   for (const x of items) counts.set(x.kind, (counts.get(x.kind) ?? 0) + 1);
   const parts = [...counts].map(([kind, n]) => {
     if (kind === "seed") return "the preseason estimate";
-    return `${n} ${kind === "player" ? "player" : "game"}${n === 1 ? "" : "s"}`;
+    return `${n} player${n === 1 ? "" : "s"}`;
   });
   const text = `${parts.join(" and ")} under a point${items.length > 1 ? " each" : ""}`;
   return text[0].toUpperCase() + text.slice(1);
 }
 
 /**
- * A part's lines: each item of a point or more (and the team's result) on its own, then one line for the rest. The
+ * A part's lines: the team's result, then each item of a point or more on its own, then one line for the rest. The
  * part's whole figure is split across them by the largest-remainder rule, so they add up to it. The closing line
  * lists its items of a tenth or more, and is left out when it has none and its share is 0.
  */
 function partLines(items: WalkItem[], whole: number): WalkLine[] {
   // Judged at the tenth the drawer prints, so nothing in a line "under a point" reads as 1.0.
-  const big = items.filter((x) => x.kind === "team" || Math.abs(x.points) >= 0.95).sort(byMagnitude);
+  // The team's own result leads its part, even on a day the seed's fading moves it more.
+  const big = items.filter((x) => x.kind === "team" || Math.abs(x.points) >= 0.95).sort((a, b) => Number(b.kind === "team") - Number(a.kind === "team") || byMagnitude(a, b));
   const rest = items.filter((x) => !big.includes(x));
   const restPoints = rest.reduce((s, x) => s + x.points, 0);
   const shares = apportion(Object.fromEntries([...big.map((x, i) => [String(i), x.points]), ["rest", restPoints]]), whole);
@@ -451,31 +448,30 @@ function partLines(items: WalkItem[], whole: number): WalkLine[] {
 }
 
 /**
- * A row as the walk draws it, in three parts that never show a player twice: the team's own result, each player's
- * whole effect (his value change from his box score plus his change in expected minutes), and other games. The
- * whole points are split again from those raw parts by the largest-remainder rule, so they still add up to the change.
+ * A row as the walk draws it, in two parts that never show a player twice: the team's own result with the seed's
+ * fading, and each player's whole effect (his value change from his box score, his change in expected minutes, and
+ * what the day's other games did to his value through his past games with a former team). The whole points are split again from
+ * those raw parts by the largest-remainder rule, so they still add up to the change.
  */
 export function walk(season: SeasonView, row: LedgerRow): Walk {
   const whole = apportion(row.raw, row.change);
-  const short = (abbr: Abbr) => team(season, abbr).short;
 
-  const byAthlete = new Map<number, { name: string; box: number; move?: PlayerMove }>();
-  for (const p of row.box) byAthlete.set(p.athlete, { name: p.name, box: p.points });
-  for (const p of row.players) byAthlete.set(p.athlete, { name: p.name, box: byAthlete.get(p.athlete)?.box ?? 0, move: p });
-  const players = [...byAthlete.values()].map(({ name, box, move }): WalkItem => (
-    { kind: "player", name, points: box + (move?.points ?? 0), phrase: playerPhrase(box, move) }
-  ));
-  const others: WalkItem[] = [
-    ...row.others.map((o): WalkItem => {
-      const [w, l] = o.hs > o.as ? [o.home, o.away] : [o.away, o.home];
-      return { kind: "other", name: `${short(w)} beat the ${short(l)}`, points: o.points, phrase: o.met.length > 1 ? "Both past opponents" : o.met.length ? "One a past opponent" : "" };
-    }),
-    { kind: "seed", name: "Preseason estimate", points: row.seed, phrase: "Fading a little, as it does each day" },
-  ];
+  const byAthlete = new Map<number, { name: string; box: number; former: number; move?: PlayerMove }>();
+  const entry = (athlete: number, name: string) => byAthlete.get(athlete) ?? byAthlete.set(athlete, { name, box: 0, former: 0 }).get(athlete)!;
+  for (const p of row.box) entry(p.athlete, p.name).box = p.points;
+  for (const p of row.former) entry(p.athlete, p.name).former = p.points;
+  for (const p of row.players) entry(p.athlete, p.name).move = p;
+  const players = [...byAthlete.values()].map(({ name, box, former, move }): WalkItem => {
+    const own = box + (move?.points ?? 0);
+    const phrase = Math.abs(former) > Math.abs(own) ? "His old team's game moved his value" : playerPhrase(box, move);
+    return { kind: "player", name, points: own + former, phrase };
+  });
   const items: Record<WalkKey, WalkItem[]> = {
-    result: row.game ? [{ kind: "team", name: LABELS.result, points: row.raw.result, phrase: resultPhrase(season, row.game) }] : [],
+    result: [
+      ...(row.game ? [{ kind: "team" as const, name: LABELS.result, points: row.raw.result - row.seed, phrase: resultPhrase(season, row.game) }] : []),
+      { kind: "seed", name: "Preseason estimate", points: row.seed, phrase: "Fading a little, as it does each game" },
+    ],
     players,
-    others,
   };
 
   const parts = (Object.keys(LABELS) as WalkKey[])

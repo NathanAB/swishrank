@@ -27,7 +27,7 @@ test("a two-team toy season fits the least-squares answer, day by day", () => {
   near(two.after.home, 14 / 3, "home edge after day two");
 });
 
-test("a team that does not play keeps its rating, and a past opponent's results reach it on its next game day", () => {
+test("a team that does not play keeps its rating, and a past opponent's later results never reach it", () => {
   // A beats B, then B beats or loses to C while A rests, then A beats D. D has a game to come, so nothing is held.
   const world = (bWins: boolean): SeasonData => ({
     season: "x", teams: teams("A", "B", "C", "D"),
@@ -39,11 +39,10 @@ test("a team that does not play keeps its rating, and a past opponent's results 
   const on = (d: SeasonData, day: string) => compute(d).series.find((x) => x.day === day)!.r.A;
   const [up, down] = [world(true), world(false)];
   assert.equal(on(up, "2026-10-21"), on(up, "2026-10-20"), "A keeps its rating on the day it rests");
-  assert.equal(on(up, "2026-10-21"), on(down, "2026-10-21"), "whatever B did that day");
-  assert.ok(on(up, "2026-10-23") > on(down, "2026-10-23"), "on A's next game day, B's win makes A's win over B count for more");
-  // Without the freeze, as version 3's plan defines the fit, the re-fit moves A on the day it rests.
-  const refit = fitSeason(world(true), { ...PARAMS, idle: undefined });
-  assert.ok(refit[1].after.r.A > refit[0].after.r.A, "the plain re-fit lifts A without playing");
+  assert.equal(on(up, "2026-10-23"), on(down, "2026-10-23"), "on A's next game day, whatever B did since");
+  // Without fixed opponents, as version 3's plan defines the fit, B's later win makes A's win over B count for more.
+  const joint = (d: SeasonData) => fitSeason(d, { ...PARAMS, opponents: undefined })[2].after.r.A;
+  assert.ok(joint(up) > joint(down), "the joint fit lets B's later result reach A");
 });
 
 test("a game's ratings before and after are the team's ratings at the end of the day before and of its day", () => {
