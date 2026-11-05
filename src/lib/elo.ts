@@ -53,9 +53,11 @@ export type PlayerRule = { a: number; np: number; halfLife: number; rookieNp?: n
  * is the rule without `seed`, `b2b` or `players`: every centre at 0, the league average, and a pull that stays.
  * `b2b` is what a team on the second night of a back-to-back gives up, in margin units. With `idle: "freeze"`, a
  * day's fit moves only the teams that played that day and the players with lines in their games; everyone else keeps
- * the day before's value, so a team's rating moves only on its own game days.
+ * the day before's value, so a team's rating moves only on its own game days. With `opponents: "fixed"`, each game
+ * counts each side against the other as it stood at the end of the day before, so a past opponent's later results never
+ * reach a team.
  */
-export type FitRule = { n0: number; margin: MarginRule; home: HomeRule; seed?: SeedRule; b2b?: number; players?: PlayerRule; idle?: "freeze" };
+export type FitRule = { n0: number; margin: MarginRule; home: HomeRule; seed?: SeedRule; b2b?: number; players?: PlayerRule; idle?: "freeze"; opponents?: "fixed" };
 /** `sigma` turns an expected margin into a win chance: Phi(margin / sigma). */
 export type Params = FitRule & { sigma: number };
 
@@ -64,13 +66,14 @@ export type Params = FitRule & { sigma: number };
  * 2's settings with a rookie's value held with 40 games, and SIGMA fitted again; src/lib/v4.ts holds the rest. The
  * home edge here, 0.622, is only the fallback: each season's own edge, from the three seasons before it, comes in its
  * ModelInputs. Since 2026-11-01, by the owner's choice outside version 3's plan, a team's rating moves only on its own
- * game days (`idle`); docs/model-v3.md, The switch, has why. Version 3 is frozen as `V3` in src/lib/v3.ts, version 2
+ * game days (`idle`), and since 2026-11-05 a past opponent's later results no longer reach it (`opponents`);
+ * docs/model-v3.md, The switch, has why. Version 3 is frozen as `V3` in src/lib/v3.ts, version 2
  * as `V2` in scripts/evaluate.ts.
  */
 export const PARAMS = {
   n0: 96, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 },
   seed: { scale: 5, fade: 120, carry: 0.7 }, b2b: 0.4, players: { a: 0.08, np: 320, halfLife: 365, rookieNp: 40 },
-  idle: "freeze", sigma: 2.981,
+  idle: "freeze", opponents: "fixed", sigma: 2.986,
 } satisfies Params;
 
 /** Games a team plays before its rating stops being provisional: docs/model-v2.md, table 9. */
@@ -275,16 +278,16 @@ function dayFree(games: readonly FinalGame[], box: SeasonBox | undefined): Free 
 }
 
 /**
- * One day of fitSeasonSteps(): the fit once the seed's pull fades to the day's strength, then after each of its
- * games in turn, each bringing its players' box ratings up to the day; `after`, the day's fit, also ages the box
- * ratings of everyone who did not play.
+ * One day of fitSeasonSteps(): the fit once the seed's pull fades to the day's strength; for `first`'s game, the fit
+ * after it before and after its players' box ratings come up to the day; the fit after the day's other games, their
+ * players' box ratings brought up too; and `after`, the day's fit, which also ages the box ratings of everyone who
+ * did not play.
  */
-export type FitSteps = FitDay & { priors: Fit; steps: { game: FinalGame; fit: Fit; result?: Fit }[] };
+export type FitSteps = FitDay & { priors: Fit; own?: { result: Fit; fit: Fit }; others: Fit };
 
 /**
- * fitSeason() with each day's games added one at a time, `first`'s game before the rest, keeping the fit after the
- * day's priors move and after each game. The last step is the day's fit, so the steps' differences add up exactly
- * to the day's move. src/lib/ledger.ts reads it to split a team's move into its parts.
+ * fitSeason() with `first`'s game added before the rest of its day, keeping the fits FitSteps names. Their
+ * differences add up exactly to the day's move. src/lib/ledger.ts reads it to split a team's move into its parts.
  */
 export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonInputs, first: Abbr): FitSteps[] {
   const abbrs = Object.keys(data.teams);
@@ -302,21 +305,27 @@ export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonIn
   const out: FitSteps[] = [];
   for (const { day, games } of days) {
     const pre = games.map(pregame);
-    const order = [...pre].sort((x, y) => Number(y.game.home === first || y.game.away === first) - Number(x.game.home === first || x.game.away === first));
     const today = ratings?.after.get(day);
     const mix = previous && Float64Array.from(previous);
+    const bringUp = (p: Pregame) => {
+      if (mix && today) for (const lines of Object.values(players!.box.games[p.game.id] ?? {})) for (const l of lines ?? []) { const j = index.get(l[0]); if (j !== undefined) mix[j] = today[j]; }
+    };
     const before = fit;
     const free = rule.idle === "freeze" ? dayFree(games, players?.box) : undefined;
     const priors = solver.fit(day, strength(day), mix, free);
-    const steps = order.map((p, i) => {
-      solver.add(p);
-      // `first`'s own game is also fitted before its players' box ratings move, to split the result from the box score.
-      const result = i === 0 && (p.game.home === first || p.game.away === first) ? solver.fit(day, strength(day), mix, free) : undefined;
-      if (mix && today) for (const lines of Object.values(players!.box.games[p.game.id] ?? {})) for (const l of lines ?? []) { const j = index.get(l[0]); if (j !== undefined) mix[j] = today[j]; }
-      return { game: p.game, fit: solver.fit(day, strength(day), mix, free), result };
-    });
+    const mine = pre.find((p) => p.game.home === first || p.game.away === first);
+    let own: FitSteps["own"];
+    if (mine) {
+      solver.add(mine);
+      // Fitted before its players' box ratings move too, to split the result from the box score.
+      const result = solver.fit(day, strength(day), mix, free);
+      bringUp(mine);
+      own = { result, fit: solver.fit(day, strength(day), mix, free) };
+    }
+    for (const p of pre) if (p !== mine) { solver.add(p); bringUp(p); }
+    const others = solver.fit(day, strength(day), mix, free);
     fit = solver.fit(day, strength(day), undefined, free);
-    out.push({ day, games: pre, before, after: fit, priors, steps });
+    out.push({ day, games: pre, before, after: fit, priors, own, others });
     previous = today;
   }
   return out;
@@ -333,18 +342,28 @@ function teamSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number> 
   const xy = new Array<number>(n + 1).fill(0);
   const home = rule.home;
   let last: number[] = [...abbrs.map((a) => centres?.[a] ?? 0), home.kind === "fixed" ? home.value : home.centre];
+  // The values at the end of the day before the last day fitted, which a game of that day counts its opponent at.
+  let opened = "", dayStart = last;
   return {
     start: startFit(abbrs, rule, centres),
     add({ game: g, b2b }) {
-      const idx: [number, number][] = [[at.get(g.home)!, 1], [at.get(g.away)!, -1]];
-      if (!g.neutral) idx.push([n, 1]);
+      const push = (idx: [number, number][], y: number) => {
+        for (const [i, xi] of idx) {
+          xy[i] += xi * y;
+          for (const [j, xj] of idx) xx[i][j] += xi * xj;
+        }
+      };
+      const [h, a] = [at.get(g.home)!, at.get(g.away)!];
+      const edge: [number, number][] = g.neutral ? [] : [[n, 1]];
       const y = counted(g.hs - g.as, rule.margin) - b2b;
-      for (const [i, xi] of idx) {
-        xy[i] += xi * y;
-        for (const [j, xj] of idx) xx[i][j] += xi * xj;
-      }
+      if (rule.opponents !== "fixed") return push([[h, 1], [a, -1], ...edge], y);
+      const was = dayKey(g.t) === opened ? dayStart : last;
+      const homeEdge = g.neutral ? 0 : home.kind === "fixed" ? home.value : was[n];
+      push([[h, 1], ...edge], y + was[a]);
+      push([[a, -1]], y - was[h] - homeEdge);
     },
-    fit(_day, strength, _rating, free) {
+    fit(day, strength, _rating, free) {
+      if (day !== opened) [opened, dayStart] = [day, last];
       const size = home.kind === "fixed" ? n : n + 1;
       const M = xx.slice(0, size).map((row) => row.slice(0, size));
       const v = xy.slice(0, size);
@@ -402,20 +421,32 @@ function playerSolver(abbrs: Abbr[], rule: FitRule, centres: Record<Abbr, number
     }
   };
   const snapshot = (): Fit => ({ r: Object.fromEntries(abbrs.map((a, i) => [a, x[i]])), home: fitted ? x[n] : home.value, v: new Map(athletes.map((a, j) => [a, x[p0 + j]])) });
+  const push = (row: Map<number, number>, y: number) => {
+    for (const [c, v] of row) { idx.push(c); val.push(v); diag[c] += v * v; xty[c] += v * y; }
+    offs.push(idx.length);
+  };
+  // The values at the end of the day before the last day fitted, which a game of that day counts its opponent at.
+  let opened = "", dayStart = x.slice();
   return {
     start: snapshot(),
     add({ game: g, b2b }) {
-      const cols = new Map<number, number>([[col.get(g.home)!, 1], [col.get(g.away)!, -1]]);
-      if (fitted && !g.neutral) cols.set(n, 1);
       const sides = players.box.games[g.id] ?? {};
-      for (const [abbr, sign] of [[g.home, 1], [g.away, -1]] as const) {
-        for (const l of sides[abbr] ?? []) { const c = col.get(l[0])!; cols.set(c, (cols.get(c) ?? 0) + (sign * l[1]) / 48); }
-      }
+      const [homeRow, awayRow] = ([[g.home, 1], [g.away, -1]] as const).map(([abbr, sign]) => {
+        const row = new Map<number, number>([[col.get(abbr)!, sign]]);
+        for (const l of sides[abbr] ?? []) { const c = col.get(l[0])!; row.set(c, (row.get(c) ?? 0) + (sign * l[1]) / 48); }
+        return row;
+      });
+      if (fitted && !g.neutral) homeRow.set(n, 1);
       const y = counted(g.hs - g.as, rule.margin) - b2b - (fitted || g.neutral ? 0 : home.value);
-      for (const [c, v] of cols) { idx.push(c); val.push(v); diag[c] += v * v; xty[c] += v * y; }
-      offs.push(idx.length);
+      if (rule.opponents !== "fixed") return push(new Map([...homeRow, ...awayRow]), y);
+      // Each side's row holds the other side at its value before the game's day, so later games never reach back.
+      const was = dayKey(g.t) === opened ? dayStart : x;
+      const part = (row: Map<number, number>) => { let s = 0; for (const [c, v] of row) s += v * was[c]; return s; };
+      push(homeRow, y - part(awayRow));
+      push(awayRow, y - part(homeRow));
     },
     fit(day, strength, rating, free) {
+      if (day !== opened) { opened = day; dayStart = x.slice(); }
       setPlayerCentres(rating ?? players.ratings.after.get(day)!);
       for (let k = 0; k < dim; k++) {
         D[k] = k < n ? strength : k < p0 && fitted ? home.weight : hold[k - p0];
@@ -469,7 +500,7 @@ export const ELO_PER_SIGMA = (400 / Math.LN10) * 1.702;
  * A season's first games say little, and the model's chances for them run high. While either side has played
  * fewer than `games` games, a gap counts `widen` times less, fitted on the tuning seasons: docs/model-v4.md.
  */
-export const EARLY = { games: 5, widen: 1.15 };
+export const EARLY = { games: 5, widen: 1.14 };
 
 /** The model's win chance for a rating gap in Elo points, when the less experienced side has `played` games. */
 export const winProb = (gap: number, played = Infinity) => phi(gap / (ELO_PER_SIGMA * (played < EARLY.games ? EARLY.widen : 1)));

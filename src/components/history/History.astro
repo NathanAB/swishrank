@@ -1,5 +1,5 @@
 ---
-// A team's history: TeamGames.astro's rows and layout, with the ledger's parts as three more columns that add up
+// A team's history: TeamGames.astro's rows and layout, with the ledger's parts as two more columns that add up
 // to the change and a muted row for each day off that moved the rating. Each row is one button that opens where
 // its points came from; a game's opened row ends with a link to its page.
 import UpsetBadge from "../UpsetBadge.astro";
@@ -19,7 +19,7 @@ const z = (n: number) => (n === 0 ? "·" : signed(n));
 
 <div class="headwrap"><div class="line head" aria-hidden="true">
   <span></span><span></span><span></span><span></span>
-  <span class="num part">Result</span><span class="num part">Players</span><span class="num part">Other games</span><span class="num">Change</span><span class="num rt">Rating</span><span></span>
+  <span class="num part">Result</span><span class="num part">Players</span><span class="num">Change</span><span class="num rt">Rating</span><span></span>
 </div></div>
 <ol aria-label={label}>
   {newest.map((r, i) => {
@@ -50,7 +50,6 @@ const z = (n: number) => (n === 0 ? "·" : signed(n));
             )}
             <span class="num part">{z(w.whole.result)}</span>
             <span class="num part">{z(w.whole.players)}</span>
-            <span class="num part">{z(w.whole.others)}</span>
             <span class="num chg">{signed(r.change)}</span>
             <span class="num rt">{shown(r.after)}</span>
             <span class="chev"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" /></svg></span>
@@ -81,7 +80,7 @@ const z = (n: number) => (n === 0 ? "·" : signed(n));
   /* The whole row, game and figures and the chevron in a ring, is one button that opens the breakdown. */
   li, .headwrap { container-type: inline-size; }
   /* The row's columns. */
-  .line { --cols: 72px minmax(0, 1fr) 20px 96px 48px 56px 84px 56px 48px 28px; --log-gap: 16px; }
+  .line { --cols: 72px minmax(0, 1fr) 20px 96px 48px 56px 56px 48px 28px; --log-gap: 16px; }
   li + li { border-top: 1px solid var(--rule); }
   .line { display: grid; grid-template-columns: var(--cols); align-items: center; column-gap: var(--log-gap); }
   .row { all: unset; box-sizing: border-box; cursor: pointer; grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; position: relative; isolation: isolate; min-height: 48px; font-size: var(--fs-card); white-space: nowrap; color: var(--muted); }
@@ -116,7 +115,7 @@ const z = (n: number) => (n === 0 ? "·" : signed(n));
   @media (prefers-reduced-motion: reduce) { .more, .inner, .chev { transition: none; } }
   /* Half a page: tighter columns, and the rating gives way as TeamGames.astro's does on a phone. */
   @container (max-width: 760px) {
-    .line { --cols: 52px minmax(0, 1fr) 16px 76px 44px 52px 76px 48px 28px; --log-gap: 10px; }
+    .line { --cols: 52px minmax(0, 1fr) 16px 76px 44px 52px 48px 28px; --log-gap: 10px; }
     .rt, .tag { display: none; }
   }
   /* A phone's row keeps TeamGames.astro's columns; the parts move into the opened row. */

@@ -25,7 +25,7 @@ test("every row's walk adds up, part by part and in all, shows each player once,
       const at = `${id} ${abbr} ${row.day}`;
       const w = walk(season, row);
       rows++;
-      assert.equal(w.whole.result + w.whole.players + w.whole.others, row.change, `${at}: the three parts add up to the change`);
+      assert.equal(w.whole.result + w.whole.players, row.change, `${at}: the two parts add up to the change`);
       for (const part of w.parts) {
         assert.equal(part.lines.reduce((s, l) => s + l.whole, 0), part.whole, `${at}: ${part.label}'s lines add up to its figure`);
       }

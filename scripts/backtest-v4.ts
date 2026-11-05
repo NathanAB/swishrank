@@ -22,7 +22,7 @@ import { loadVegas } from "./vegas.ts";
 
 const started = performance.now();
 const DOC = new URL("../docs/model-v4.md", import.meta.url);
-const PREREGISTERED = "cf8d8da90813f602c24fd5530ba3a8920fa484bfcb272f78a91a58b4aebb7ce2";
+const PREREGISTERED = "90f4dd33b78b01a496c2274c7c13b76ae3732edc8e71fe8df96649996c04641c";
 
 const WITH_REPORTS = ["2019-20", "2020-21", "2021-22", "2022-23"];
 const EXPLORATION = ["2023-24", "2024-25", "2025-26"];
@@ -194,7 +194,7 @@ const lines = doc.split("\n");
 const from = lines.indexOf("## Pre-registration");
 const to = lines.findIndex((l, i) => i > from && l.startsWith("## "));
 const hash = createHash("sha256").update(lines.slice(from + 1, to).join("\n")).digest("hex");
-out.unshift(`Pre-registration SHA-256 now: \`${hash}\`, ${hash === PREREGISTERED ? "unchanged since its amendment on 2026-11-01" : "CHANGED since its amendment on 2026-11-01"}. Bootstrap: 2000 resamples of whole weeks, seed 20261025. Version 4's SIGMA ${f3(sigma)} (${(ELO_PER_SIGMA / sigma).toFixed(1)} Elo points per margin unit), early widening ${widen.toFixed(2)}; version 3's ${f3(V3.sigma)} and ${V3.widen.toFixed(2)}. Version 3's log loss on the tuning seasons: ${f4(logLoss(only(v3, inSeasons(TUNING))))}.`);
+out.unshift(`Pre-registration SHA-256 now: \`${hash}\`, ${hash === PREREGISTERED ? "unchanged since its amendment on 2026-11-05" : "CHANGED since its amendment on 2026-11-05"}. Bootstrap: 2000 resamples of whole weeks, seed 20261025. Version 4's SIGMA ${f3(sigma)} (${(ELO_PER_SIGMA / sigma).toFixed(1)} Elo points per margin unit), early widening ${widen.toFixed(2)}; version 3's ${f3(V3.sigma)} and ${V3.widen.toFixed(2)}. Version 3's log loss on the tuning seasons: ${f4(logLoss(only(v3, inSeasons(TUNING))))}.`);
 if (hash !== PREREGISTERED) process.exitCode = 1;
 
 const body = out.join("\n\n");
