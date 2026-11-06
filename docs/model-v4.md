@@ -103,7 +103,7 @@ Each final game's report and how many of its sides it covers; a side is uncovere
 | 2023-24 | 1319 | 1264 | 54 | 1 | 796 |
 | 2024-25 | 1321 | 1278 | 42 | 1 | 850 |
 | 2025-26 | 1322 | 1276 | 43 | 3 | 1076 |
-| 2026-27 | 121 | 32 | 1 | 88 | 126 |
+| 2026-27 | 123 | 34 | 1 | 88 | 136 |
 
 ### Table 2. Version 4 and its parts against version 3
 
@@ -143,7 +143,7 @@ The live fetch began saving the NBA's report before each tip-off during 2026-27,
 
 | Games with an NBA report | Version 3 log loss | Version 4 log loss | Minus version 3 [95%] |
 | --- | --- | --- | --- |
-| 33 | 0.5918 | 0.5902 | -0.0016 [-0.0087, +0.0082] |
+| 35 | 0.5987 | 0.5961 | -0.0026 [-0.0087, +0.0046] |
 
 ### Table 5. Confirmation, 2027-28
 
@@ -159,3 +159,5 @@ src/lib/v4.ts V4 matches the plan's fit, `{"sigma":2.986,"widen":1.14}`.
 ## The switch
 
 On 2026-11-02 the owner switched the site to version 4, as the plan allows; the confirmation runs either way. `src/lib/elo.ts` holds version 4's SIGMA and early widening in `PARAMS` and `EARLY`, and `modelInputs` in `src/lib/inputs.ts` gives each season its box ratings with the top-three start and each game its lineups and extra term from `availability()`, as `scripts/backtest-v4.ts` defines them. Version 3, the baseline, is frozen as `V3` in `src/lib/v3.ts` with the settings `src/lib/elo.ts` held until then, and the backtest builds version 3's lineups and box ratings itself, so its tables do not move with the site. A game still to come is priced by the same rule as a played one, from where its teams' last games leave them: a side the latest saved report covers starts from its team's last game's players, read with the report's statuses, and adds the fill term; a side it does not cover takes version 3's next lineup, the players of its team's last game, at their minutes over 5 appearances, less those ESPN's latest report lists as out. So each game to come has its own chance, where version 3 priced every game a team had left with one lineup. Each report `.github/workflows/nba-report.yml` saves now starts the deploy, so the site reads it before tip-off instead of the next morning.
+
+On 2026-11-06 the owner added one rule to the site beyond this plan, after Jayson Tatum was left out of BOS's lineup for its game at CHA: he missed the previous game and, healthy, was not on the report. A player the report does not list now comes back if he played in the game before the team's previous one and his expected minutes are at least 25 (`SITE_RULE` in `src/lib/v4.ts`). Such players played that night about 90% of the time: 787 of 880 on 2019-20 to 2022-23 and 699 of 762 on 2023-24 to 2025-26. Against version 4 the rule scored -0.0007 [-0.0016, +0.0001] on 2019-20 to 2022-23, +0.0006 [-0.0002, +0.0015] on 2023-24 to 2025-26, and -0.0001 [-0.0007, +0.0005] on all seven seasons, by the weekly block bootstrap. It ties version 4 on log loss and is here so that a game's lineup does not leave out a regular who is expected to play. A side the report does not cover yet still takes version 3's lineup, so such a player joins it when the report arrives and that game's chance can move then. `availability()`'s default stays this plan's rule, so `npm run backtest:v4` and the confirmation still score version 4 as written. This plan's finding that bringing back every unlisted player does worse still holds: that broad rule scored +0.0003 and +0.0010 on the same two groups.

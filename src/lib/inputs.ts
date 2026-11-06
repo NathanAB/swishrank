@@ -14,7 +14,7 @@ import { boxRatings, lineups, parseBox, usualRotations, type Athlete, type Lineu
 import { parsePreseason } from "./preseason.ts";
 import { OUT_STATUSES, reportLineups, reportNext } from "./report-lineup.ts";
 import { newcomers } from "./rookies.ts";
-import { availability, topThreeStart, V4 } from "./v4.ts";
+import { availability, SITE_RULE, topThreeStart, V4 } from "./v4.ts";
 
 /**
  * One season's raw files: its games, parsed, and its box scores, preseason totals, ESPN's injury reports and the
@@ -117,7 +117,7 @@ export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<Dra
   const espn = new Map(walked.flatMap((s) => (s.injuries === undefined ? [] : [[s.data.season, parseArchive(s.injuries, s.data.season)] as const])));
   const nba = new Map(walked.flatMap((s) => (s.nbaReports === undefined ? [] : [[s.data.season, parseNbaArchive(s.nbaReports, s.data.season)] as const])));
   const dataOf = (season: string) => walked.find((s) => s.data.season === season)!.data;
-  const priced = availability(walked, nba, (season) => espnLineups(dataOf(season), lineupsBySeason.get(season)!, espn.get(season)));
+  const priced = availability(walked, nba, (season) => espnLineups(dataOf(season), lineupsBySeason.get(season)!, espn.get(season)), SITE_RULE);
   const out = new Map<string, ModelInputs>();
   let before: { data: SeasonData; inputs: ModelInputs } | null = null;
   for (const { data, box, preseason } of walked) {

@@ -74,6 +74,13 @@ test("a game to come that the NBA's report covers is priced by version 4's rule,
   near(gap(withNba.extra) - gap(undefined), V4.fill * (5 / 3) * (ELO_PER_SIGMA / PARAMS.sigma), "the chance reads the fill term");
 });
 
+test("the site brings back a regular the report leaves off after he missed only the previous game", () => {
+  const rested = { season: "2026-27", games: { g1: { A: [line(1, 30, 15), line(2, 30, 15)], B: [line(3, 30, 15)] }, g2: { A: [line(1, 30, 15)], B: [line(3, 30, 15)] } } };
+  const nbaReports = { season: "2026-27", games: { g3: { published: "2026-10-25T17:00", home: {}, away: {} } } };
+  const site = modelInputs([{ data, box: rested, preseason: totals("2026-27"), nbaReports }]).get("2026-27")!;
+  assert.deepEqual(site.players!.lineups.get("g3")!.home.map((p) => p.athlete).sort(), [1, 2]);
+});
+
 // This season A plays B four times. Player 9 plays A's first two games, is hurt in the second, and the next
 // morning's report lists him out until January; he misses the next two. Player 8 is out for a week on that report.
 const away: SeasonData = {
