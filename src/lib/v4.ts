@@ -25,8 +25,14 @@ export const V4 = {
   topThree: 0.28,
 };
 
-/** What availability() reads of V4; scripts/backtest-v4.ts also runs version 3's rule, "Out" only, through it. */
-export type LineupRule = Pick<typeof V4, "out" | "questionable" | "back" | "window" | "recent" | "fill">;
+/** What availability() reads of a rule: V4 by default; scripts/backtest-v4.ts also runs version 3's rule, "Out" only, through it, and the site SITE_RULE. */
+export type LineupRule = Pick<typeof V4, "out" | "questionable" | "back" | "window" | "recent" | "fill"> & {
+  /** A player the report leaves off, who missed only the team's previous game, comes back with at least these minutes in the game before it and expected. */
+  unlisted?: number;
+};
+
+/** The rule the site prices with: version 4's, plus unlisted regulars (docs/model-v4.md, The switch). */
+export const SITE_RULE: LineupRule = { ...V4, unlisted: 25 };
 
 /** A season's version 4 lineups by game id, played and to come, each game's extra term (fill times the sides' missing minutes), and the missing minutes, as shares of 48. */
 export type Availability = { lineups: Map<string, Sides<Lineup>>; extra: Map<string, number>; missing: Map<string, Sides<number>> };
@@ -36,7 +42,8 @@ const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.lengt
 /**
  * Every season's version 4 lineups. A side the game's report covers starts from the players of the team's previous
  * game, less those listed Out or Doubtful, plus anyone who missed that game, played for the team in one of its last
- * 10 and has not played for another team since, and is listed Available, Probable or Questionable. Each counts his
+ * 10 and has not played for another team since, and is listed Available, Probable or Questionable, or under a rule
+ * with `unlisted`, is not listed, missed only that game, and has at least those minutes both in the one before and expected. Each counts his
  * expected minutes, the mean of his last 5 appearances, when they are at least 10, a Questionable player half of them,
  * scaled to 240. The side's missing minutes are those of the previous game's players the report takes out, and half
  * of a Questionable one's, over the previous game's lineup's, times 5: shares of 48 minutes. A side the report does
@@ -67,9 +74,12 @@ export function availability(
       const previous = games.at(-1) ?? [];
       const ids = new Set(previous.map((l) => l[0]));
       const list = previous.map((l) => l[0]).filter((a) => !isOut(a));
+      const beforeThat = new Map(games.at(-2)?.map((l) => [l[0], l[1]]));
+      const regular = (a: Athlete) => rule.unlisted !== undefined && (beforeThat.get(a) ?? 0) >= rule.unlisted && expected(a) >= rule.unlisted;
+      const returning = (a: Athlete) => { const s = status(a); return s === undefined ? regular(a) : rule.back.includes(s); };
       for (const lines of games) for (const l of lines) {
-        const a = l[0], s = status(a);
-        if (ids.has(a) || teamOf.get(a) !== abbr || s === undefined || !rule.back.includes(s)) continue;
+        const a = l[0];
+        if (ids.has(a) || teamOf.get(a) !== abbr || !returning(a)) continue;
         ids.add(a);
         list.push(a);
       }
