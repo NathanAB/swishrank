@@ -75,10 +75,31 @@ test("the site's rule brings back an unlisted regular who missed only the previo
   // Player 3, at 40 expected minutes, played game 1 and missed game 2.
   assert.deepEqual(home(SITE_RULE, "3"), [1, 2, 3, 4, 5, 6]);
   assert.equal(priced(SITE_RULE).missing.get("3")!.home, 0, "he was not in the previous lineup, so no one is missing");
+  assert.deepEqual(home({ ...SITE_RULE, unlisted: 40 }, "3"), [1, 2, 3, 4, 5, 6], "exactly at the minutes bar he comes back");
   assert.deepEqual(home({ ...SITE_RULE, unlisted: 41 }, "3"), [1, 2, 4, 5, 6], "below the minutes bar he stays out");
   assert.deepEqual(home(SITE_RULE, "4"), [1, 2, 4, 5, 6], "missing two games in a row keeps him out");
   const listed: NbaArchive = { season: "2026-27", games: { 3: { published: "x", home: { 3: "Out" }, away: {} } } };
   assert.ok(!(3 in minutesOf(priced(SITE_RULE, listed).lineups.get("3")!.home)), "a report that lists him out wins");
+});
+
+test("a regular needs SITE_RULE's minutes both in the game before the previous one and expected", () => {
+  const backing = (minutes: number, first = 48) => {
+    const played: SeasonBox = {
+      season: "2026-27",
+      games: {
+        1: { A: [line(1, 48), line(7, first)], B: [line(9, 48)] },
+        2: { A: [line(1, 48), line(7, minutes)], B: [line(9, 48)] },
+        3: { A: [line(1, 48)], B: [line(9, 48)] },
+      },
+    };
+    const reports: NbaArchive = { season: "2026-27", games: { 4: { published: "x", home: {}, away: {} } } };
+    return 7 in minutesOf(availability([{ data, box: played }], new Map([["2026-27", reports]]), fallback, SITE_RULE).get("2026-27")!.lineups.get("4")!.home);
+  };
+  assert.ok(backing(25), "25 minutes brings him back");
+  assert.ok(!backing(24), "24 does not");
+  assert.ok(!backing(2), "2 minutes does not, whatever his average from earlier games");
+  assert.ok(!backing(25, 10), "25 minutes does not when his average is 17.5");
+  assert.ok(backing(25, 25), "25 minutes on a 25-minute average does");
 });
 
 test("the extra term moves the expected margin and comes out of the margin in the fit", () => {
