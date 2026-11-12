@@ -11,24 +11,58 @@ const margin = (o: Outcome) => o.winner.score - o.loser.score;
 const lowest = (list: readonly Outcome[], key: (o: Outcome) => number) =>
   list.reduce<Outcome | undefined>((best, o) => (best === undefined || key(o) < key(best) ? o : best), undefined);
 
+const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+
+/**
+ * A favourite's win and an underdog's by the same margin that show what the two earn on the whole: of every such
+ * pair where the underdog's earned more, the one whose two gains are nearest the season's mean gain for each
+ * kind, the narrower margin and the earlier games first on a tie. One game's change also turns on how far into
+ * the season it came and who sat out, so a pair taken by margin alone can show the reverse, and the widest gap
+ * would overstate it (upsetRatio).
+ */
+function surprisePair(favourites: readonly Outcome[], underdogs: readonly Outcome[]): [Outcome, Outcome] | undefined {
+  const gain = (o: Outcome) => o.winner.change;
+  const usual = { f: mean(favourites.map(gain)), u: mean(underdogs.map(gain)) };
+  let best: { pair: [Outcome, Outcome]; off: number } | undefined;
+  for (const m of [...new Set(favourites.map(margin))].sort((a, b) => a - b)) {
+    const dogs = underdogs.filter((u) => margin(u) === m);
+    for (const f of favourites.filter((o) => margin(o) === m)) {
+      for (const u of dogs) {
+        const off = Math.abs(gain(f) - usual.f) + Math.abs(gain(u) - usual.u);
+        if (gain(u) > gain(f) && (!best || off < best.off)) best = { pair: [f, u], off };
+      }
+    }
+  }
+  return best?.pair;
+}
+
+/**
+ * How many times a favourite's gain an underdog's win earns, on average over every win of each: about 2 in
+ * 2025-26 and 2026-27. Null until both have won and the favourites' wins gain on average.
+ */
+export function upsetRatio(results: readonly Result[]): number | null {
+  const games = results.map(outcome);
+  const gains = (keep: (chance: number) => boolean) => games.filter((o) => keep(o.winner.chance)).map((o) => o.winner.change);
+  const favourites = gains((c) => c > 0.5), underdogs = gains((c) => c < 0.5);
+  if (favourites.length === 0 || underdogs.length === 0 || mean(favourites) <= 0) return null;
+  return mean(underdogs) / mean(favourites);
+}
+
 /**
  * The games the about page draws: the season's first game, then three wins in the order the page compares
- * them. A favourite's close win comes first, then an underdog's win by the same margin, which differs from
- * it only in surprise, then the favourite's widest, which differs from the first in margin. The shared
- * margin is the narrowest that both a favourite and an underdog have won by, earliest game first; with none
- * yet, each takes its own narrowest. A kind with no game yet is left out; an even game has no favourite, so
- * it is never one of the three.
+ * them. A favourite's win comes first, then an underdog's win by the same margin, which differs from it only
+ * in surprise and earned more (surprisePair), then the favourite's widest, which differs from the first in
+ * margin. With no such pair yet, the first is the favourite's narrowest win and the underdog's is left out. A
+ * kind with no game yet is left out; an even game has no favourite, so it is never one of the three.
  */
 export function examples(results: readonly Result[]) {
   const games = results.map(outcome);
   const favourites = games.filter((o) => o.winner.chance > 0.5);
   const underdogs = games.filter((o) => o.winner.chance < 0.5);
-  const upsetMargins = new Set(underdogs.map(margin));
-  const shared = lowest(favourites.filter((o) => upsetMargins.has(margin(o))), margin);
-  const sameAs = (o: Outcome | undefined) => (o ? underdogs.filter((u) => margin(u) === margin(o)) : underdogs);
+  const pair = surprisePair(favourites, underdogs);
   const picks: [ContrastKind, Outcome | undefined][] = [
-    ["close", shared ?? lowest(favourites, margin)],
-    ["upset", lowest(sameAs(shared), margin)],
+    ["close", pair?.[0] ?? lowest(favourites, margin)],
+    ["upset", pair?.[1]],
     ["blowout", lowest(favourites, (o) => -margin(o))],
   ];
   return {
