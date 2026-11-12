@@ -31,12 +31,14 @@ interface Props {
 const { title, docTitle = title, description = "Elo ratings for all 30 NBA teams. Every team starts the season from its preseason odds.", route, ownHeading = false } = Astro.props;
 
 const season = (route && routeSeason(route)) ?? currentSeason();
-const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
+const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route; wide?: true }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
   { label: "Players", kinds: ["players"], to: () => ({ kind: "players" }) },
   { label: "Games", kinds: ["games", "game"], to: (s) => ({ kind: "games", season: s }) },
   // Only the season in progress has odds, so from a finished season the tab goes to the current one's.
   { label: "Odds", kinds: ["odds"], to: (s) => ({ kind: "odds", season: s.current ? s : currentSeason() }) },
+  // The bar is full at phone width, so this one shows from 641px up; the footer links the page at every width.
+  { label: "How it works", kinds: ["about"], to: () => ({ kind: "about" }), wide: true },
 ];
 const home = href({ kind: "home", season: currentSeason() });
 
@@ -80,7 +82,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
         </a>
         <nav class="nav" aria-label="Site">
           {NAV.map((item) => (
-            <a href={href(item.to(season))} aria-current={route && item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
+            <a class:list={{ wide: item.wide }} href={href(item.to(season))} aria-current={route && item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
           ))}
         </nav>
       </div>
@@ -160,6 +162,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
     .bar-in { gap: 8px; }
     .nav { gap: 20px; }
     .nav a:first-child { margin-left: auto; }
+    .nav a.wide { display: none; }
     .brand { font-size: 16px; }
     .brand svg { width: 22px; height: 22px; }
   }
