@@ -143,6 +143,7 @@ const live = r.seasons.find((s) => s.id === current.id);
         <p>The league publishes the report several times a day, and each game here carries one of them. Through 2025–26 it is the afternoon report: the latest published on the hour at least 90 minutes before tip-off, no later than 5 PM and no earlier than 11 AM Eastern. Before 2021–22 the league published only three a day, at 1, 5 and 8 PM, so a game carries the 1 PM or the 5 PM report, whichever is the later one that meets that cutoff. A game that tipped off before 12:30 PM Eastern has no afternoon report and is left out.</p>
         {live && <p>For {current.label} it is the last report the site saved before tip-off, starting {dayWithYear(dayKey(live.from))}. The site checks for a new one every half hour. That report is closer to the game, when fewer players are still listed Questionable, so this season's figures can't be compared with earlier seasons'.</p>}
         <p>A player played if he logged any minutes. A status can change after that report, so these figures say what a status means when you see it that afternoon, not what the team finally decided.</p>
+        <p>The Pacers list their two-way players Questionable because of their contracts, not an injury. That is why Indiana has far more listings than any other team, and why few of those players play.</p>
         <p>Each name on the report is matched to a player who has played for that team that season. A player the report names who never played for that team that season is not counted.</p>
       </div>
     </Panel>

@@ -108,7 +108,7 @@ const game = opener && {
     </Panel></li>
 
     <li><Panel title="Each game's chance, worked out">
-      <p class="say">Take the home team's rating, subtract the visitor's and add home court. The curve in step 2 turns that gap into each team's chance. A team playing the second night of a back-to-back gives up another {int(tired)} points.</p>
+      <p class="say">Take the home team's rating, subtract the visitor's and add home court. The curve in step 2 turns that gap into each team's chance. The injury report then moves it, by up to a few points, for whoever is sitting out that night. A team playing the second night of a back-to-back gives up another {int(tired)} points.</p>
       <Fragment slot="side">{season && <Matchup season={season} />}</Fragment>
     </Panel></li>
   </ol>
