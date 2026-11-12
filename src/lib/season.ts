@@ -8,10 +8,13 @@ import type { DraftFile } from "./draft.ts";
 import { compute, dayKey, type Abbr, type Game, type ModelInputs, type Season, type SeasonData, type Team } from "./elo.ts";
 import { seasonLabel } from "./format.ts";
 import { modelInputs } from "./inputs.ts";
+import { playerName } from "./names.ts";
+import type { ChartData, TeamLook } from "./player-chart.ts";
+import { buildTimeline } from "./player-timeline.ts";
 import { months } from "./results.ts";
 import { conferenceSlug, gameSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
 import { CONFERENCE_ORDER } from "./teams.ts";
-import { coloursOf } from "./tint.ts";
+import { coloursOf, lineColor } from "./tint.ts";
 
 export type SeasonView = SeasonRef & {
   /** "2026–27" */
@@ -186,6 +189,20 @@ export const seasonSwitch = (route: Route) =>
   }));
 
 export const team = (season: SeasonView, abbr: Abbr): Team => season.model.data.teams[abbr];
+
+let players: ChartData | undefined;
+/**
+ * The players page's table (lib/player-timeline.ts), with each team it names in its newest season's short name and
+ * line colour, built once per build for the page, its league-lines file and the copy its script fetches.
+ */
+export function playerChart(): ChartData {
+  if (players) return players;
+  const seasons = allSeasons();
+  const teams: Record<Abbr, TeamLook> = {};
+  for (const s of seasons) for (const [a, t] of Object.entries(s.model.data.teams)) teams[a] ??= { short: t.short, tint: lineColor(t) };
+  const table = buildTimeline(seasons.map((s) => ({ id: s.id, label: s.label, current: s.current, data: s.model.data, inputs: seasonInputs(s.id) ?? {} })), playerName);
+  return (players = { ...table, teams });
+}
 
 /** What a list of games still to play says when it has none. */
 export const noGamesAhead = (season: SeasonView) =>

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fitStep, frame, positions, rangeFrom, ranking, reignStart, runsAtTop, segments, spread, weeksAtTop } from "./player-chart.ts";
+import { fitSteps, frame, parseChartData, positions, rangeFrom, ranking, reignStart, rowSteps, runsAtTop, segments, spread, weeksAtTop } from "./player-chart.ts";
 import type { PlayerTimeline, TimelinePlayer } from "./player-timeline.ts";
 
 const player = (name: string, v: (number | null)[], stints: [number, string][] = [[0, "A"]]): TimelinePlayer => ({ id: name.charCodeAt(0), name, v, stints });
@@ -70,9 +70,23 @@ test("labels keep their points' heights where they can, at least a pitch apart a
   assert.deepEqual(spread([410, 412], 16, 420), [396, 412], "two labels at the foot push up from it");
 });
 
-test("a strip name shows from the narrowest strip width at which its block holds it with room to spare", () => {
+test("a strip name shows at the strip widths at which its block holds it with room to spare", () => {
   // "Al" is 0.727 + 0.329 em wide, 11.6 px at 11 px, plus 6 px of air and the 2 px gap: 19.6 px. A block a twentieth
   // of the strip is 18 px wide at 360 and 24 px at 480.
-  assert.equal(fitStep("Al", 11, 0.05), 480);
-  assert.equal(fitStep("Al", 11, 0.01), null, "10.8 px even at 1080");
+  assert.deepEqual(fitSteps("Al", 11, 0.05), [480, 600, 720, 840, 960, 1080]);
+  assert.deepEqual(fitSteps("Al", 11, 0.01), [], "10.8 px even at 1080");
+});
+
+test("a row of labels keeps each that starts clear of the last one kept and ends inside the row", () => {
+  // "Al" takes 17.6 px with its air. The second starts 3% across, clear of the first from 587 px; the third, 98% across,
+  // ends inside the row from 880 px.
+  const row = rowSteps([{ text: "Al", share: 0 }, { text: "Al", share: 0.03 }, { text: "Al", share: 0.98 }], 11);
+  assert.deepEqual(row, [[240, 360, 480, 600, 720, 840, 960, 1080], [600, 720, 840, 960, 1080], [960, 1080]]);
+});
+
+test("the fetched table is taken only when every part of it has its shape", () => {
+  const good = { days: ["2026-01-01"], seasons: [{ id: "x", label: "x", from: 0, to: 0 }], players: [{ id: 1, name: "Al", v: [9], stints: [[0, "A"]] }], teams: { A: { short: "Aces", tint: "#ffffff" } } };
+  assert.deepEqual(parseChartData(good), good);
+  assert.equal(parseChartData({ ...good, players: [{ id: 1, name: "Al", v: [9, 8], stints: [] }] }), null, "a rating per day, no more");
+  assert.equal(parseChartData({ ...good, teams: { A: { short: "Aces" } } }), null, "a team without its colour");
 });

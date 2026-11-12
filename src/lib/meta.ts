@@ -78,3 +78,10 @@ export function gameDescription(season: Pick<SeasonView, "model">, view: GameVie
   }
   return `${matchup(`The ${short(away.abbr)}`, `the ${short(home.abbr)}`, view.game.neutral)} on ${when}: ${pct(away.chance)} to ${pct(home.chance)} on today's ratings. Win chances and both teams' recent games.`;
 }
+
+/** The players page's document title, led by the words people search for. */
+export const PLAYERS_TITLE = "Best NBA players by rating";
+
+/** "Every NBA player's rating since 2015–16 … Nikola Jokic is No. 1 at 99, as he has been since Mar 2023." */
+export const playersDescription = (since: string, lead: { name: string; rating: string; from: string }) =>
+  `Every NBA player's rating since ${since}, in points over a full 48 minutes against an average player, and who was No. 1 when. ${lead.name} is No. 1 at ${lead.rating}, as he has been since ${lead.from}.`;

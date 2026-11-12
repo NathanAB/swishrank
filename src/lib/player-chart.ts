@@ -13,6 +13,27 @@ export type TeamLook = { short: string; tint: string };
 /** What the page's script fetches: the table and every team it names. */
 export type ChartData = PlayerTimeline & { teams: Record<Abbr, TeamLook> };
 
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const isRating = (v: unknown): v is number | null => v === null || typeof v === "number";
+const isStint = (v: unknown): v is [number, Abbr] => Array.isArray(v) && v.length === 2 && typeof v[0] === "number" && typeof v[1] === "string";
+
+/** The page's fetched table, checked whole, or null when it is not one. */
+export function parseChartData(raw: unknown): ChartData | null {
+  if (!isRecord(raw) || !Array.isArray(raw.days) || !Array.isArray(raw.seasons) || !Array.isArray(raw.players) || !isRecord(raw.teams)) return null;
+  const days = raw.days.filter((d): d is string => typeof d === "string");
+  const seasons = raw.seasons.flatMap((s) =>
+    isRecord(s) && typeof s.id === "string" && typeof s.label === "string" && typeof s.from === "number" && typeof s.to === "number" ? [{ id: s.id, label: s.label, from: s.from, to: s.to }] : [],
+  );
+  const players = raw.players.flatMap((p) =>
+    isRecord(p) && typeof p.id === "number" && typeof p.name === "string" && Array.isArray(p.v) && p.v.length === days.length && p.v.every(isRating) && Array.isArray(p.stints) && p.stints.every(isStint)
+      ? [{ id: p.id, name: p.name, v: p.v, stints: p.stints }]
+      : [],
+  );
+  const teams = Object.entries(raw.teams).flatMap(([a, t]) => (isRecord(t) && typeof t.short === "string" && typeof t.tint === "string" ? [[a, { short: t.short, tint: t.tint }] as const] : []));
+  const whole = days.length === raw.days.length && seasons.length === raw.seasons.length && players.length === raw.players.length && teams.length === Object.keys(raw.teams).length;
+  return whole && days.length > 0 && seasons.length > 0 ? { days, seasons, players, teams: Object.fromEntries(teams) } : null;
+}
+
 /** Players in the day's list, and the fewest ranked players a sample needs before the page shows it. */
 export const BOARD = 10;
 /** Players whose lines are drawn in full and named at the day's line. */
@@ -197,13 +218,29 @@ const LABEL_AIR = 6;
 /** px between two blocks of the strip. */
 const STRIP_GAP = 2;
 
+/** A label's width in px set at `size` px, with its air. Measured bold, wider than it sets, so one shown is never cut. */
+const labelWidth = (text: string, size: number) => textWidth(text) * size + LABEL_AIR;
+
+/** The strip widths, of STRIP_STEPS, at which a label `text` set at `size` px fits in a block `share` of the strip wide. */
+export const fitSteps = (text: string, size: number, share: number): number[] =>
+  STRIP_STEPS.filter((w) => share * w >= labelWidth(text, size) + STRIP_GAP);
+
 /**
- * The narrowest strip width, of STRIP_STEPS, at which a label `text` set at `size` px fits in a block `share` of the
- * strip wide, or null when it fits at none. A label is measured bold, wider than it sets, so one shown is never cut.
+ * The strip widths at which each of a row of labels shows, `share` of the way across, set at `size` px: at each width
+ * the labels are taken left to right, each kept where it starts clear of the last one kept and ends inside the row.
  */
-export function fitStep(text: string, size: number, share: number): number | null {
-  const need = textWidth(text) * size + LABEL_AIR + STRIP_GAP;
-  return STRIP_STEPS.find((w) => share * w >= need) ?? null;
+export function rowSteps(marks: readonly { text: string; share: number }[], size: number): number[][] {
+  const out = marks.map((): number[] => []);
+  for (const w of STRIP_STEPS) {
+    let end = -Infinity;
+    marks.forEach((m, k) => {
+      const x = m.share * w, right = x + labelWidth(m.text, size);
+      if (x < end || right > w) return;
+      out[k].push(w);
+      end = right;
+    });
+  }
+  return out;
 }
 
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
@@ -212,11 +249,15 @@ const pct = (px: number) => `${((px / PLOT.w) * 100).toFixed(3)}%`;
 const look = (d: ChartData, abbr: Abbr | undefined): TeamLook => (abbr && d.teams[abbr]) || { short: abbr ?? "", tint: "var(--line-other)" };
 /** A strip name's and a season label's size in px: the tokens --fs-tiny and --fs-small. */
 const TINY = 11, SMALL = 12;
-const fit = (step: number | null) => (step === null ? "" : ` data-fit="${step}"`);
+const fit = (steps: readonly number[]) => (steps.length ? ` data-fit="${steps.join(" ")}"` : "");
 
 /** Every kept player's line in grey, one polyline per stretch: the league-lines file's and the plot's background. */
 export const greyLines = (t: PlayerTimeline, f: Frame) =>
   t.players.flatMap((p) => segments(p, f, false)).map((s) => `<polyline vector-effect="non-scaling-stroke" points="${s.points}"/>`).join("");
+
+/** The league-lines file (src/pages/players/lines.svg.ts): the default range's grey lines, which the page draws through <use>. */
+export const linesFile = (t: PlayerTimeline) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PLOT.w} ${PLOT.h}"><g id="lines" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round">${greyLines(t, frame(t, DEFAULT_RANGE))}</g></svg>`;
 
 /** The rating axis's labels, each at its tick's height. */
 export const tickLabels = (f: Frame) => f.ticks.map((v) => `<span style="top:${f.y(v).toFixed(1)}px">${v}</span>`).join("");
@@ -233,7 +274,7 @@ export function strip(d: ChartData, f: Frame, runs: readonly Run[]): string {
   return runs.map((r, k) => {
     const left = f.x(r.from), right = k + 1 < runs.length ? f.x(runs[k + 1].from) : f.x(r.to);
     const name = surname(r.player.name);
-    return `<button type="button" tabindex="-1" data-run="${k}"${fit(fitStep(name, TINY, (right - left) / PLOT.w))} title="${esc(`${r.player.name}, ${dayWithYear(d.days[r.from])}`)}" style="left:${pct(left)};width:calc(${pct(right - left)} - ${STRIP_GAP}px);--tint:${look(d, teamAt(r.player, r.from)).tint}"><span>${esc(name)}</span></button>`;
+    return `<button type="button" tabindex="-1" data-run="${k}"${fit(fitSteps(name, TINY, (right - left) / PLOT.w))} title="${esc(`${r.player.name}, ${dayWithYear(d.days[r.from])}`)}" style="left:${pct(left)};width:calc(${pct(right - left)} - ${STRIP_GAP}px);--tint:${look(d, teamAt(r.player, r.from)).tint}"><span>${esc(name)}</span></button>`;
   }).join("");
 }
 
@@ -245,10 +286,8 @@ export function axisLabels(t: PlayerTimeline, f: Frame): string {
   const marks = seasons.length > 1
     ? seasons.map((s) => ({ text: s.label, x: at(Math.max(s.from, f.from)) }))
     : monthsIn(t.days[f.from], t.days[f.to]).map((m) => ({ text: monthShort(m), x: at(f.from, epochDay(`${m}-01`) - epochDay(t.days[f.from])) }));
-  return marks.map((m, k) => {
-    const room = (k + 1 < marks.length ? marks[k + 1].x : PLOT.w) - m.x;
-    return `<span${fit(fitStep(m.text, SMALL, room / PLOT.w))} style="left:${pct(m.x)}">${esc(m.text)}</span>`;
-  }).join("");
+  const steps = rowSteps(marks.map((m) => ({ text: m.text, share: m.x / PLOT.w })), SMALL);
+  return marks.map((m, k) => `<span${fit(steps[k])} style="left:${pct(m.x)}">${esc(m.text)}</span>`).join("");
 }
 
 /** The months, YYYY-MM, whose first day falls from `from` to `to`. */
@@ -269,7 +308,8 @@ function monthsIn(from: string, to: string): string[] {
 export type DayView = {
   i: number;
   date: string;
-  lead: { name: string; team: string; tint: string };
+  /** The No. 1: his name, his team's short name and line colour, his rating and the month his run at No. 1 began. */
+  lead: { name: string; team: string; tint: string; rating: string; since: string };
   figures: { label: string; value: string }[];
   /** The top five's full lines, worst first so the best draws on top. */
   lines: string;
@@ -297,14 +337,15 @@ export function dayView(d: ChartData, f: Frame, runs: readonly Run[], i: number)
   const ly = spread(ys, PITCH, PLOT.h);
   const flip = x / PLOT.w > FLIP;
   const best = lead.v[i]!;
+  const since = monthYear(d.days[reignStart(d, i)].slice(0, 7));
   return {
     i,
     date: dayWithYear(d.days[i]),
-    lead: { name: lead.name, team: lt.short, tint: lt.tint },
+    lead: { name: lead.name, team: lt.short, tint: lt.tint, rating: rating(best), since },
     figures: [
       { label: "Rating", value: rating(best) },
       { label: "Lead over No. 2", value: second ? signed(Math.round(best) - Math.round(second.v[i]!)) : "–" },
-      { label: "No. 1 since", value: monthYear(d.days[reignStart(d, i)].slice(0, 7)) },
+      { label: "No. 1 since", value: since },
       { label: "Weeks at No. 1", value: String(Math.round(weeksAtTop(d, lead, i))) },
     ],
     lines: [...five].reverse().flatMap((p) => segments(p, f).map((s) => `<polyline class="hl" style="--tint:${look(d, s.team).tint}" points="${s.points}"/>`)).join(""),
