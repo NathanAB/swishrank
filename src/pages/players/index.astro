@@ -29,7 +29,7 @@ const description = playersDescription(d.seasons[0].label, { name: view.lead.nam
 // (lib/player-chart.ts fitSteps, rowSteps), and narrower than the next width, which lays the row out again.
 const fits = STRIP_STEPS.map((w, k) => {
   const next = STRIP_STEPS[k + 1];
-  return `@container lane (min-width: ${w}px)${next ? ` and (max-width: ${next - 0.02}px)` : ""} { .players .strip [data-fit~="${w}"] > span, .players .xs > [data-fit~="${w}"] { visibility: visible; } }`;
+  return `@container lane (min-width: ${w}px)${next ? ` and (max-width: ${next - 0.02}px)` : ""} { .players .strip [data-fit~="${w}"] > span, .players .xs > [data-fit~="${w}"] { display: block; } }`;
 }).join("\n");
 ---
 
@@ -120,10 +120,11 @@ const fits = STRIP_STEPS.map((w, k) => {
   .players .strip { height: 34px; margin-top: 12px; }
   .players .strip button { position: absolute; top: 0; height: 12px; min-width: 1px; border-radius: 2px; background: var(--tint); opacity: 0.5; text-align: left; transition: opacity 120ms ease; }
   .players .strip button:hover, .players .strip button.on { opacity: 1; }
-  .players .strip span { position: absolute; top: 16px; left: 0; visibility: hidden; font-size: var(--fs-tiny); line-height: 14px; color: var(--muted); white-space: nowrap; }
+  /* A name that does not fit is left out of the layout, not only unseen: an unseen one past the strip's end would widen the page. */
+  .players .strip span { position: absolute; top: 16px; left: 0; display: none; font-size: var(--fs-tiny); line-height: 14px; color: var(--muted); white-space: nowrap; }
   .players .strip .on span { color: var(--text); }
   .players .xs { height: 20px; }
-  .players .xs span { position: absolute; top: 4px; padding-left: 4px; visibility: hidden; font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap; }
+  .players .xs span { position: absolute; top: 4px; padding-left: 4px; display: none; font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap; }
 
   /* The day's Top 10: rank, name and team, rating, and a bar of the rating against the No. 1's. */
   .players .board { display: grid; }
