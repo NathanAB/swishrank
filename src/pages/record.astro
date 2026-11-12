@@ -31,8 +31,8 @@ const rows = [
 const gap = (a: Summary, b: Summary) => Math.abs(a.logLoss - b.logLoss).toFixed(4);
 const vsVegas =
   vegas.logLoss < model.logLoss
-    ? `Vegas scored better than this model on these games, by ${gap(vegas, model)} of log loss: the betting market's chances are the more accurate.`
-    : `This model scored better than Vegas on these games, by ${gap(vegas, model)} of log loss.`;
+    ? `Vegas was more accurate on these games. Its favorites won ${pctTenth(vegas.favouriteWon)} of the time against this model's ${pctTenth(model.favouriteWon)}, and its log loss is lower by ${gap(vegas, model)}.`
+    : `This model was more accurate than Vegas on these games. Its favorites won ${pctTenth(model.favouriteWon)} of the time against Vegas's ${pctTenth(vegas.favouriteWon)}, and its log loss is lower by ${gap(vegas, model)}.`;
 
 const description = recordDescription(t.since, int(t.all.games), pctTenth(t.all.favouriteWon), { model: loss(model), vegas: loss(vegas) });
 const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/docs/${file}`;
@@ -50,7 +50,7 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
     </Panel>
 
     <Panel title="Calibration">
-      <p class="key">If the chances are right, a team given 70% wins about 70 games in 100. Each dot is one band of the favorite's chance: across, the chance the model gave on average; up, how often the favorite won. A dot on the line happened as often as the model said, above it more often, below it less often.</p>
+      <p class="key">If the chances are right, a team given 70% wins about 70 games in 100. Each dot groups the games where the favorite's chance fell in one 5-point range, such as 70% to 75%. Left to right is the chance the model gave. Bottom to top is how often the favorite won. A dot on the dashed line won as often as the model said. Above the line it won more often, and below it less.</p>
       <div class="cal" aria-hidden="true">
         <p class="ytitle">Favorite won</p>
         <div class="yticks">{ticks.map((v) => <span style={`top: ${100 - at(v)}%`}>{v}%</span>)}</div>
@@ -113,7 +113,7 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
         </table>
       </div>
       <p class="say">{vsVegas}</p>
-      <p class="note">Log loss scores each chance by how much it gave the side that won, and costs a confident miss the most. Picking the favorite alone ignores how sure each chance was.</p>
+      <p class="note">Log loss grades each chance by how much it gave the team that won, so a confident miss costs the most. The favorite's record ignores how sure each chance was.</p>
     </Panel>
 
     <Panel title="Season by season">
@@ -147,7 +147,7 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
       <div class="print">
         <p>A pre-game chance here is the chance the model gives a game from what was known before tip-off: the results of earlier games, and who was expected to play.</p>
         <p>For a finished season these are the chances today's model gives each game, worked out again with today's settings, not chances the site published at the time. Those settings were fitted on 2015–16 to 2022–23, and 2023–24 to 2025–26 were in view when later versions of the model were chosen. Every finished season on this page was seen while the model was built, so its scores flatter it.</p>
-        <p>{current.label} is scored as it is played. Each change to the model works out its earlier games again too, so its figures are today's model's, like the finished seasons'. The current version was settled on November 1, 2026, with 2026–27's games to that day in view. 2027–28 is the season it is tested on, by a plan written before that season starts.</p>
+        <p>{current.label} is scored as it is played. When the model changes, this season's earlier games are worked out again too, so its figures also come from today's model. The current version was settled on November 1, 2026, with 2026–27's games up to that day already seen. Its real test is 2027–28, under a plan written before that season starts.</p>
         <p>How the model was chosen and tested: <a href={doc("model.md")}>the first version's backtest</a> and <a href={doc("model-v4.md")}>the plan for the current version</a>. <a href={href({ kind: "about" })}>How the ratings work</a>.</p>
       </div>
     </Panel>
