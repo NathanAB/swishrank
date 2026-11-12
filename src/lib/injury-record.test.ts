@@ -44,15 +44,15 @@ const listing = (athlete: number, team: string, status: NbaStatus, played: boole
   ({ season, game: `${season}-${team}-${athlete}-${i}`, t, team, athlete, status, played });
 const times = (n: number, make: (i: number) => Listing) => Array.from({ length: n }, (_, i) => make(i));
 
-test("the record tallies how often each status played, overall and season by season, newest season first from its first listing", () => {
+test("the record tallies how often each status played, overall and season by season, newest season first from its first listing, and counts the games", () => {
   const r = injuryRecordOf([
     listing(1, "LAL", "Questionable", true, "2024-25", 0, "2024-11-01T00:00Z"),
     listing(2, "LAL", "Questionable", false, "2024-25", 1, "2024-11-02T00:00Z"),
-    listing(1, "LAL", "Out", false, "2025-26", 2, "2025-11-01T23:00Z"),
-    listing(2, "LAL", "Questionable", true, "2025-26", 3, "2025-11-03T00:00Z"),
+    { ...listing(1, "LAL", "Out", false, "2025-26", 2, "2025-11-01T23:00Z"), game: "one" },
+    { ...listing(2, "LAL", "Questionable", true, "2025-26", 3, "2025-11-01T23:00Z"), game: "one" },
   ]);
   assert.equal(r.since, "2024-25");
-  assert.equal(r.games, 4);
+  assert.equal(r.games, 3);
   assert.deepEqual(r.statuses.Questionable, { listed: 3, played: 2 });
   assert.deepEqual(r.statuses.Out, { listed: 1, played: 0 });
   assert.deepEqual(r.statuses.Probable, { listed: 0, played: 0 });
