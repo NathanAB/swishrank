@@ -7,7 +7,9 @@ import list from "../data/seasons.json" with { type: "json" };
 import type { DraftFile } from "./draft.ts";
 import { compute, dayKey, type Abbr, type Game, type ModelInputs, type Season, type SeasonData, type Team } from "./elo.ts";
 import { seasonLabel } from "./format.ts";
+import { injuryRecordOf, listingsOf, type InjuryRecord } from "./injury-record.ts";
 import { modelInputs } from "./inputs.ts";
+import { parseNbaArchive } from "./nba-report.ts";
 import { playerName } from "./names.ts";
 import type { ChartData, TeamLook } from "./player-chart.ts";
 import { buildTimeline } from "./player-timeline.ts";
@@ -203,6 +205,16 @@ export const playerChart = (): ChartData =>
     const table = buildTimeline(seasons.map((s) => ({ id: s.id, label: s.label, current: s.current, data: s.model.data, inputs: seasonInputs(s.id) ?? {} })), playerName);
     return { ...table, teams };
   })());
+
+let injuries: InjuryRecord | undefined;
+/** How often each status on the NBA's injury report has played, over every season with a report (lib/injury-record.ts). */
+export const injuryRecord = (): InjuryRecord =>
+  (injuries ??= injuryRecordOf(
+    [...ENTRIES.all].reverse().flatMap(({ id }) => {
+      const raw = file(NBA_REPORT_FILES, "nba-reports", id), box = seasonInputs(id)?.players?.box;
+      return raw === undefined || !box ? [] : listingsOf({ id, games: seasonData(id).games, archive: parseNbaArchive(raw, id), box });
+    }),
+  ));
 
 // Read through the bundler rather than scripts/vegas.ts loadVegas: that resolves the file against its own module's
 // URL, which in a built page is the bundle's chunk, so it would find no file and return no lines.

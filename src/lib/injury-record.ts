@@ -56,8 +56,8 @@ export type InjuryRecord = {
   /** Games whose report listed at least one player. */
   games: number;
   statuses: Record<NbaStatus, Tally>;
-  /** Newest first. */
-  seasons: { id: string; statuses: Record<NbaStatus, Tally> }[];
+  /** Newest first, each with the tip-off of its first game with a listing. */
+  seasons: { id: string; from: string; statuses: Record<NbaStatus, Tally> }[];
   /** Every team listed, by the share of its Questionable listings who played, highest first. */
   teams: { team: Abbr; questionable: Tally }[];
   /** Players with MIN_QUESTIONABLE or more Questionable listings, most listings first. */
@@ -76,7 +76,7 @@ const groups = <K>(ls: readonly Listing[], key: (l: Listing) => K): Map<K, Listi
 };
 
 /** Every season's listings, given in the order the games tipped off, tallied by status, season, team and player. */
-export function injuryRecord(listings: readonly Listing[]): InjuryRecord {
+export function injuryRecordOf(listings: readonly Listing[]): InjuryRecord {
   const questionable = listings.filter((l) => l.status === "Questionable");
   const seasons = [...groups(listings, (l) => l.season)].sort(([x], [y]) => y.localeCompare(x));
   const teams = [...groups(questionable, (l) => l.team)]
@@ -96,7 +96,7 @@ export function injuryRecord(listings: readonly Listing[]): InjuryRecord {
     since: seasons.at(-1)?.[0] ?? "",
     games: new Set(listings.map((l) => l.game)).size,
     statuses: byStatus(listings),
-    seasons: seasons.map(([id, ls]) => ({ id, statuses: byStatus(ls) })),
+    seasons: seasons.map(([id, ls]) => ({ id, from: ls[0].t, statuses: byStatus(ls) })),
     teams,
     players,
   };

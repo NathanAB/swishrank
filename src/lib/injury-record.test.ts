@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { injuryRecord, listingsOf, MIN_QUESTIONABLE, type Listing } from "./injury-record.ts";
+import { injuryRecordOf, listingsOf, MIN_QUESTIONABLE, type Listing } from "./injury-record.ts";
 import type { NbaStatus } from "./nba-report.ts";
 import type { BoxLine } from "./players.ts";
 
@@ -40,16 +40,16 @@ test("each final game's report lists its players, in the order the games tipped 
   );
 });
 
-const listing = (athlete: number, team: string, status: NbaStatus, played: boolean, season = "2025-26", i = 0): Listing =>
-  ({ season, game: `${season}-${team}-${athlete}-${i}`, t: "", team, athlete, status, played });
+const listing = (athlete: number, team: string, status: NbaStatus, played: boolean, season = "2025-26", i = 0, t = ""): Listing =>
+  ({ season, game: `${season}-${team}-${athlete}-${i}`, t, team, athlete, status, played });
 const times = (n: number, make: (i: number) => Listing) => Array.from({ length: n }, (_, i) => make(i));
 
-test("the record tallies how often each status played, overall and season by season, newest season first", () => {
-  const r = injuryRecord([
-    listing(1, "LAL", "Questionable", true, "2024-25"),
-    listing(2, "LAL", "Questionable", false, "2024-25"),
-    listing(1, "LAL", "Out", false, "2025-26"),
-    listing(2, "LAL", "Questionable", true, "2025-26"),
+test("the record tallies how often each status played, overall and season by season, newest season first from its first listing", () => {
+  const r = injuryRecordOf([
+    listing(1, "LAL", "Questionable", true, "2024-25", 0, "2024-11-01T00:00Z"),
+    listing(2, "LAL", "Questionable", false, "2024-25", 1, "2024-11-02T00:00Z"),
+    listing(1, "LAL", "Out", false, "2025-26", 2, "2025-11-01T23:00Z"),
+    listing(2, "LAL", "Questionable", true, "2025-26", 3, "2025-11-03T00:00Z"),
   ]);
   assert.equal(r.since, "2024-25");
   assert.equal(r.games, 4);
@@ -57,16 +57,16 @@ test("the record tallies how often each status played, overall and season by sea
   assert.deepEqual(r.statuses.Out, { listed: 1, played: 0 });
   assert.deepEqual(r.statuses.Probable, { listed: 0, played: 0 });
   assert.deepEqual(
-    r.seasons.map((s) => [s.id, s.statuses.Questionable, s.statuses.Out]),
+    r.seasons.map((s) => [s.id, s.from, s.statuses.Questionable, s.statuses.Out]),
     [
-      ["2025-26", { listed: 1, played: 1 }, { listed: 1, played: 0 }],
-      ["2024-25", { listed: 2, played: 1 }, { listed: 0, played: 0 }],
+      ["2025-26", "2025-11-01T23:00Z", { listed: 1, played: 1 }, { listed: 1, played: 0 }],
+      ["2024-25", "2024-11-01T00:00Z", { listed: 2, played: 1 }, { listed: 0, played: 0 }],
     ],
   );
 });
 
 test(`the player table keeps players with ${MIN_QUESTIONABLE} or more Questionable listings, most first, with their Probable listings beside them`, () => {
-  const r = injuryRecord([
+  const r = injuryRecordOf([
     ...times(20, (i) => listing(1, "LAL", "Questionable", i < 15, "2025-26", i)),
     ...times(3, (i) => listing(1, "LAL", "Probable", i < 2, "2025-26", 100 + i)),
     ...times(19, (i) => listing(2, "BOS", "Questionable", true, "2025-26", i)),
@@ -83,7 +83,7 @@ test(`the player table keeps players with ${MIN_QUESTIONABLE} or more Questionab
 });
 
 test("a player's teams run in the order he was last listed with each, so his newest team comes last", () => {
-  const r = injuryRecord([
+  const r = injuryRecordOf([
     ...times(10, (i) => listing(1, "LAL", "Questionable", true, "2024-25", i)),
     ...times(10, (i) => listing(1, "DAL", "Questionable", true, "2025-26", i)),
     listing(1, "LAL", "Out", false, "2025-26", 50),
@@ -93,7 +93,7 @@ test("a player's teams run in the order he was last listed with each, so his new
 });
 
 test("each team's Questionable listings are tallied, ignoring other statuses, and the teams run from the highest share who played", () => {
-  const r = injuryRecord([
+  const r = injuryRecordOf([
     ...times(4, (i) => listing(1, "IND", "Questionable", i < 1, "2025-26", i)), // 1 of 4
     ...times(3, (i) => listing(2, "LAL", "Questionable", i < 2, "2025-26", i)), // 2 of 3
     ...times(5, (i) => listing(2, "LAL", "Probable", true, "2025-26", 10 + i)),
