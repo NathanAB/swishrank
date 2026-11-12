@@ -29,12 +29,12 @@ const description = playersDescription(d.seasons[0].label, { name: view.lead.nam
 // (lib/player-chart.ts fitSteps, rowSteps), and narrower than the next width, which lays the row out again.
 const fits = STRIP_STEPS.map((w, k) => {
   const next = STRIP_STEPS[k + 1];
-  return `@container lane (min-width: ${w}px)${next ? ` and (max-width: ${next - 0.02}px)` : ""} { .players .strip [data-fit~="${w}"] > span, .players .xs > [data-fit~="${w}"] { display: block; } }`;
+  return `@container lane (width >= ${w}px)${next ? ` and (width < ${next}px)` : ""} { .players .strip [data-fit~="${w}"] > span, .players .xs > [data-fit~="${w}"] { display: block; } }`;
 }).join("\n");
 ---
 
 <Base title="Players" docTitle={PLAYERS_TITLE} description={description} route={{ kind: "players" }} ownHeading>
-  <Fragment set:html={`<style>${fits}</style>`} />
+  <style is:inline set:html={fits} />
   <div class="players" data-players data-src={src}>
     <header class="top" style={`--tint: ${view.lead.tint}`} data-top>
       <div class="when">
@@ -131,7 +131,7 @@ const fits = STRIP_STEPS.map((w, k) => {
   .players .board li { display: grid; grid-template-columns: 22px minmax(0, 1fr) 30px; grid-template-areas: "rk nm num" ". bar bar"; align-items: baseline; column-gap: 8px; padding: 9px 0 10px; border-bottom: 1px solid var(--rule); background: var(--surface); }
   .players .board li:last-child { border-bottom: 0; }
   .players .board .rk { grid-area: rk; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .players .board .nm { grid-area: nm; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players .board .nm { grid-area: nm; min-width: 0; font-weight: 500; }
   .players .board .nm i { margin-left: 8px; font-style: normal; font-weight: 400; color: var(--muted); }
   .players .board .num { grid-area: num; text-align: right; font-weight: 600; }
   .players .board .bar { grid-area: bar; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--seg-track); }

@@ -44,6 +44,7 @@ function start(root: HTMLElement, d: ChartData) {
   let runs: Run[] = runsAtTop(d, f.from, f.to);
   let held = last;
   let shown = last;
+  let lines = front.innerHTML;
 
   function show(i: number) {
     if (i === shown) return;
@@ -55,7 +56,8 @@ function start(root: HTMLElement, d: ChartData) {
     top.style.setProperty("--tint", v.lead.tint);
     figures.forEach((el, k) => (el.textContent = v.figures[k]?.value ?? ""));
     back.hidden = i === last;
-    front.innerHTML = v.lines;
+    // Most days keep the day before's top five, whose lines are then the same markup: it is not parsed again.
+    if (v.lines !== lines) front.innerHTML = lines = v.lines;
     marks.innerHTML = v.marks;
     day.style.left = v.at;
     for (const b of stripEl.querySelectorAll<HTMLElement>("[data-run]")) b.classList.toggle("on", Number(b.dataset.run) === v.run);

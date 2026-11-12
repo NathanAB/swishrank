@@ -58,17 +58,12 @@ const memo = <K extends object, V>(make: (k: K) => V) => {
   const cache = new WeakMap<K, V>();
   return (k: K) => (cache.has(k) ? cache.get(k)! : (cache.set(k, make(k)), cache.get(k)!));
 };
-const rankings = memo((_: PlayerTimeline) => new Map<number, TimelinePlayer[]>());
+const rankings = memo((t: PlayerTimeline) =>
+  t.days.map((_, i) => t.players.filter((p) => p.v[i] !== null).sort((a, b) => b.v[i]! - a.v[i]! || a.name.localeCompare(b.name))),
+);
 
 /** The players with a rating at sample `i`, best first; an exact tie goes to the name first in the alphabet. */
-export function ranking(t: PlayerTimeline, i: number): TimelinePlayer[] {
-  const cache = rankings(t);
-  const hit = cache.get(i);
-  if (hit) return hit;
-  const order = t.players.filter((p) => p.v[i] !== null).sort((a, b) => b.v[i]! - a.v[i]! || a.name.localeCompare(b.name));
-  cache.set(i, order);
-  return order;
-}
+export const ranking = (t: PlayerTimeline, i: number): TimelinePlayer[] => rankings(t)[i];
 
 /** The first sample with a full list: before it, too few players have their minutes for a ranking to mean much. */
 export const firstFull = memo((t: PlayerTimeline) => Math.max(0, t.days.findIndex((_, i) => ranking(t, i).length >= BOARD)));
@@ -124,8 +119,11 @@ export function rangeLabel(t: PlayerTimeline, range: Range): string {
   }
 }
 
-/** A range drawn on PLOT: its samples, where each falls across, where each rating falls down, and the axis's ticks. */
-export type Frame = { from: number; to: number; x: (i: number) => number; y: (v: number) => number; ticks: number[] };
+/**
+ * A range drawn on PLOT: its samples, where each falls across (`x`), as any place on the timeline does (`across`, by
+ * its position in days), where each rating falls down, and the axis's ticks.
+ */
+export type Frame = { from: number; to: number; x: (i: number) => number; across: (position: number) => number; y: (v: number) => number; ticks: number[] };
 
 /** The frame of `range`, its rating axis reaching just past the highest rating in it. */
 export function frame(t: PlayerTimeline, range: Range): Frame {
@@ -137,7 +135,8 @@ export function frame(t: PlayerTimeline, range: Range): Frame {
   const hi = Math.ceil(max / 10) * 10 + 5;
   const ticks: number[] = [];
   for (let v = AXIS.lo + AXIS.step; v <= hi; v += AXIS.step) ticks.push(v);
-  return { from, to, x: (i) => ((u[i] - u[from]) / span) * PLOT.w, y: (v) => (1 - (v - AXIS.lo) / (hi - AXIS.lo)) * PLOT.h, ticks };
+  const across = (position: number) => ((position - u[from]) / span) * PLOT.w;
+  return { from, to, x: (i) => across(u[i]), across, y: (v) => (1 - (v - AXIS.lo) / (hi - AXIS.lo)) * PLOT.h, ticks };
 }
 
 /** The sample of `f` nearest a point `share` of the way across the plot. */
@@ -288,10 +287,9 @@ export function strip(d: ChartData, f: Frame, runs: readonly Run[]): string {
 export function axisLabels(t: PlayerTimeline, f: Frame): string {
   const u = positions(t);
   const seasons = t.seasons.filter((s) => s.to > f.from);
-  const at = (i: number, extra = 0) => ((u[i] + extra - u[f.from]) / (u[f.to] - u[f.from] || 1)) * PLOT.w;
   const marks = seasons.length > 1
-    ? seasons.map((s) => ({ text: s.label, x: at(Math.max(s.from, f.from)) }))
-    : monthsIn(t.days[f.from], t.days[f.to]).map((m) => ({ text: monthShort(m), x: at(f.from, epochDay(`${m}-01`) - epochDay(t.days[f.from])) }));
+    ? seasons.map((s) => ({ text: s.label, x: f.x(Math.max(s.from, f.from)) }))
+    : monthsIn(t.days[f.from], t.days[f.to]).map((m) => ({ text: monthShort(m), x: f.across(u[f.from] + epochDay(`${m}-01`) - epochDay(t.days[f.from])) }));
   const steps = rowSteps(marks.map((m) => ({ text: m.text, share: m.x / PLOT.w })), LABEL_PX.small);
   return marks.map((m, k) => `<span${fit(steps[k])} style="left:${pct(m.x)}">${esc(m.text)}</span>`).join("");
 }

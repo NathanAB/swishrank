@@ -178,7 +178,7 @@ export const gamePaths = () =>
 
 /** The season a page shows; the about, seasons and players pages have none. */
 export const routeSeason = (route: Route): SeasonView | null =>
-  route.kind === "about" || route.kind === "seasons" || route.kind === "players" ? null : (allSeasons().find((s) => s.id === route.season.id) ?? null);
+  "season" in route ? (allSeasons().find((s) => s.id === route.season.id) ?? null) : null;
 
 /** The season menu for a page: one link per season, newest first, to the same page in that season. */
 export const seasonSwitch = (route: Route) =>
@@ -195,14 +195,14 @@ let players: ChartData | undefined;
  * The players page's table (lib/player-timeline.ts), with each team it names in its newest season's short name and
  * line colour, built once per build for the page, its league-lines file and the copy its script fetches.
  */
-export function playerChart(): ChartData {
-  if (players) return players;
-  const seasons = allSeasons();
-  const teams: Record<Abbr, TeamLook> = {};
-  for (const s of seasons) for (const [a, t] of Object.entries(s.model.data.teams)) teams[a] ??= { short: t.short, tint: lineColor(t) };
-  const table = buildTimeline(seasons.map((s) => ({ id: s.id, label: s.label, current: s.current, data: s.model.data, inputs: seasonInputs(s.id) ?? {} })), playerName);
-  return (players = { ...table, teams });
-}
+export const playerChart = (): ChartData =>
+  (players ??= (() => {
+    const seasons = allSeasons();
+    const teams: Record<Abbr, TeamLook> = {};
+    for (const s of seasons) for (const [a, t] of Object.entries(s.model.data.teams)) teams[a] ??= { short: t.short, tint: lineColor(t) };
+    const table = buildTimeline(seasons.map((s) => ({ id: s.id, label: s.label, current: s.current, data: s.model.data, inputs: seasonInputs(s.id) ?? {} })), playerName);
+    return { ...table, teams };
+  })());
 
 /** What a list of games still to play says when it has none. */
 export const noGamesAhead = (season: SeasonView) =>
