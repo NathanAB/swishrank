@@ -45,10 +45,11 @@ test("the summary gives the share of games the favourite won, an even game count
   assert.ok(Math.abs(got.logLoss - 0.6314321611) < 1e-9, `log loss ${got.logLoss}`);
 });
 
-test("the three-way comparison scores each source on the games Vegas priced and no others", () => {
+test("the comparison scores the model and Vegas on the games Vegas priced and no others", () => {
   const calls = [call("a", 0.6, 1), call("b", 0.7, 0), call("c", 0.4, 0)];
-  const got = sameGames(calls, { a: 0.5, b: 0.9, c: 0.55 }, { a: 0.65, c: 0.3 });
-  assert.deepEqual([got.model.games, got.elo.games, got.vegas.games], [2, 2, 2]);
-  // a: every source's favourite is home, and home won. c: the model's and Vegas's away favourite won; the old Elo had home at 55%.
-  assert.deepEqual([got.model.favouriteWon, got.elo.favouriteWon, got.vegas.favouriteWon], [1, 0.5, 1]);
+  const got = sameGames(calls, { a: 0.65, c: 0.7 });
+  assert.deepEqual([got.model.games, got.vegas.games], [2, 2]);
+  // a: both favourites are home, and home won. c: the model's away favourite won; Vegas had home at 70%, and home lost.
+  // b, which the model missed, has no line, so it counts against neither.
+  assert.deepEqual([got.model.favouriteWon, got.vegas.favouriteWon], [1, 0.5]);
 });

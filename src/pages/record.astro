@@ -1,6 +1,6 @@
 ---
 // How the model's pre-game chances have scored: every played game since the first season, by band of stated chance,
-// beside the old Elo and Vegas on the games Vegas priced, and season by season. lib/record.ts works out every figure;
+// beside Vegas on the games Vegas priced, and season by season. lib/record.ts works out every figure;
 // this page lays them out, and its fine print says what the chances are and why the finished seasons flatter them.
 import Panel from "../components/Panel.astro";
 import Base from "../layouts/Base.astro";
@@ -23,10 +23,9 @@ const lo = Math.min(50, ...t.bands.map((b) => Math.floor(won(b) * 10) * 10));
 const at = (v: number) => ((v - lo) / (100 - lo)) * 100;
 const ticks = Array.from({ length: (100 - lo) / 10 + 1 }, (_, i) => lo + i * 10);
 
-const { model, elo, vegas } = t.same;
+const { model, vegas } = t.same;
 const rows = [
   { name: "This model", s: model },
-  { name: "The old Elo", s: elo },
   { name: "Vegas", s: vegas },
 ];
 const gap = (a: Summary, b: Summary) => Math.abs(a.logLoss - b.logLoss).toFixed(4);
@@ -34,10 +33,6 @@ const vsVegas =
   vegas.logLoss < model.logLoss
     ? `Vegas scored better than this model on these games, by ${gap(vegas, model)} of log loss: the betting market's chances are the more accurate.`
     : `This model scored better than Vegas on these games, by ${gap(vegas, model)} of log loss.`;
-const vsElo =
-  model.logLoss < elo.logLoss
-    ? `This model scored better than the old Elo, by ${gap(model, elo)}.`
-    : `The old Elo scored better than this model, by ${gap(model, elo)}.`;
 
 const description = recordDescription(t.since, int(t.all.games), pctTenth(t.all.favouriteWon), { model: loss(model), vegas: loss(vegas) });
 const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/docs/${file}`;
@@ -93,8 +88,8 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
       </div>
     </Panel>
 
-    <Panel title="Against the old Elo and Vegas">
-      <p class="key">The same {int(model.games)} games for all three: every game with a betting line on file. The old Elo is the plain FiveThirtyEight-style Elo this site ran before this model. Vegas is the sportsbooks' moneylines with their cut taken out.</p>
+    <Panel title="Against Vegas">
+      <p class="key">The same {int(model.games)} games for both: every game with a betting line on file. Vegas is the sportsbooks' moneylines with their cut taken out.</p>
       <div class="wide">
         <table class="ruled">
           <thead>
@@ -117,7 +112,7 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
           </tbody>
         </table>
       </div>
-      <p class="say">{vsVegas} {vsElo}</p>
+      <p class="say">{vsVegas}</p>
       <p class="note">Log loss scores each chance by how much it gave the side that won, and costs a confident miss the most. Picking the favorite alone ignores how sure each chance was.</p>
     </Panel>
 
