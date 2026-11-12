@@ -49,15 +49,15 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
       <p class="lede">Before every game the model gives each team a chance to win. This page scores those chances on {int(t.all.games)} games since {t.since}, regular season and playoffs, against how each game went.</p>
       <dl class="figs">
         <div><dt>Games scored</dt><dd class="num">{int(t.all.games)}</dd></div>
-        <div><dt>The favourite won</dt><dd class="num">{pctTenth(t.all.favouriteWon)}</dd></div>
-        {seventy && <div><dt>Favourites given {bandName(70)} won</dt><dd class="num">{pctTenth(won(seventy))}</dd></div>}
+        <div><dt>The favorite won</dt><dd class="num">{pctTenth(t.all.favouriteWon)}</dd></div>
+        {seventy && <div><dt>Favorites given {bandName(70)} won</dt><dd class="num">{pctTenth(won(seventy))}</dd></div>}
       </dl>
     </Panel>
 
     <Panel title="Calibration">
-      <p class="key">If the chances are right, a team given 70% wins about 70 games in 100. Each dot is one band of the favourite's chance: across, the chance the model gave on average; up, how often the favourite won. A dot on the line happened as often as the model said, above it more often, below it less often.</p>
+      <p class="key">If the chances are right, a team given 70% wins about 70 games in 100. Each dot is one band of the favorite's chance: across, the chance the model gave on average; up, how often the favorite won. A dot on the line happened as often as the model said, above it more often, below it less often.</p>
       <div class="cal" aria-hidden="true">
-        <p class="ytitle">Favourite won</p>
+        <p class="ytitle">Favorite won</p>
         <div class="yticks">{ticks.map((v) => <span style={`top: ${100 - at(v)}%`}>{v}%</span>)}</div>
         <div class="plot">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -67,13 +67,13 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
           {t.bands.map((b) => <span class="dot" style={`left: ${at(b.stated * 100)}%; top: ${100 - at(won(b) * 100)}%`}></span>)}
         </div>
         <div class="xticks">{ticks.map((v) => <span style={`left: ${at(v)}%`}>{v}%</span>)}</div>
-        <p class="xtitle">Chance the model gave the favourite</p>
+        <p class="xtitle">Chance the model gave the favorite</p>
       </div>
       <div class="wide" slot="side">
         <table class="ruled">
           <thead>
             <tr>
-              <th scope="col">Favourite's chance</th>
+              <th scope="col">Favorite's chance</th>
               <th scope="col" class="n">Games</th>
               <th scope="col" class="n">Said</th>
               <th scope="col" class="n">Won</th>
@@ -101,7 +101,7 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
             <tr>
               <th scope="col">Chances from</th>
               <th scope="col" class="n">Games</th>
-              <th scope="col" class="n">Favourite won</th>
+              <th scope="col" class="n">Favorite won</th>
               <th scope="col" class="n">Log loss (lower is better)</th>
             </tr>
           </thead>
@@ -118,7 +118,7 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
         </table>
       </div>
       <p class="say">{vsVegas} {vsElo}</p>
-      <p class="note">Log loss scores each chance by how much it gave the side that won, and costs a confident miss the most. Picking the favourite alone ignores how sure each chance was.</p>
+      <p class="note">Log loss scores each chance by how much it gave the side that won, and costs a confident miss the most. Picking the favorite alone ignores how sure each chance was.</p>
     </Panel>
 
     <Panel title="Season by season">
@@ -128,7 +128,7 @@ const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/d
             <tr>
               <th scope="col">Season</th>
               <th scope="col" class="n">Games</th>
-              <th scope="col" class="n">Favourite won</th>
+              <th scope="col" class="n">Favorite won</th>
               <th scope="col" class="n">Log loss</th>
               <th scope="col"><span class="sr">Status</span></th>
             </tr>
