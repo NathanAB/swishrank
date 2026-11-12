@@ -86,6 +86,13 @@ export function gameDescription(season: Pick<SeasonView, "model">, view: GameVie
 /** The players page's document title, led by the words people search for. */
 export const PLAYERS_TITLE = "Best NBA players by rating";
 
+/** The track record page's document title, led by the words people search for. */
+export const RECORD_TITLE = "NBA prediction accuracy and track record";
+
+/** "How SwishRank's pre-game win chances score on 13,452 NBA games since 2015–16 …", with the figures the page shows. */
+export const recordDescription = (since: string, games: string, won: string, logLoss: { model: string; vegas: string }) =>
+  `How SwishRank's pre-game win chances score on ${games} NBA games since ${since}: the favourite won ${won}. On the games Vegas priced, the model's log loss is ${logLoss.model} and Vegas's ${logLoss.vegas}, where lower is better.`;
+
 /** "Every NBA player's rating since 2015–16 … Nikola Jokic is No. 1 at 99, as he has been since Mar 2023." */
 export const playersDescription = (since: string, lead: { name: string; rating: string; from: string }) =>
   `Every NBA player's rating since ${since}, in points over a full 48 minutes against an average player, and who was No. 1 when. ${lead.name} is No. 1 at ${lead.rating}, as he has been since ${lead.from}.`;

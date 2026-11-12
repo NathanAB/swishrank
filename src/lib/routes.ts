@@ -22,6 +22,8 @@ export type Route =
   | { kind: "seasons" }
   /** The best players in the league and how that changed, across every season: it has no season of its own. */
   | { kind: "players" }
+  /** How every pre-game chance since the first season has scored: it has no season of its own. */
+  | { kind: "record" }
   | { kind: "about" };
 
 /** What a game's URL is made of. */
@@ -57,6 +59,8 @@ export function routePath(route: Route): string {
       return "/seasons/";
     case "players":
       return "/players/";
+    case "record":
+      return "/record/";
     case "about":
       return "/about/";
     default: {
@@ -85,6 +89,7 @@ export function shareImage(route: Route | undefined, current: SeasonRef): ShareI
       return { kind: "season", season: route.season };
     case "seasons":
     case "players":
+    case "record":
     case "about":
       return { kind: "season", season: current };
     default: {
@@ -128,6 +133,7 @@ export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string
       return { ...route, season: to };
     case "seasons":
     case "players":
+    case "record":
     case "about":
       return { kind: "home", season: to };
     case "games":

@@ -1,0 +1,209 @@
+---
+// How the model's pre-game chances have scored: every played game since the first season, by band of stated chance,
+// beside the old Elo and Vegas on the games Vegas priced, and season by season. lib/record.ts works out every figure;
+// this page lays them out, and its fine print says what the chances are and why the finished seasons flatter them.
+import Panel from "../components/Panel.astro";
+import Base from "../layouts/Base.astro";
+import { int, pctTenth } from "../lib/format.ts";
+import { RECORD_TITLE, recordDescription } from "../lib/meta.ts";
+import { BAND_WIDTH, trackRecord, type Summary } from "../lib/record.ts";
+import { href } from "../lib/routes.ts";
+import { allSeasons, currentSeason, vegasChances } from "../lib/season.ts";
+
+const t = trackRecord(allSeasons().map((s) => ({ ...s, vegas: vegasChances(s.id) })));
+const current = currentSeason();
+const loss = (s: Summary) => s.logLoss.toFixed(4);
+const bandName = (lo: number) => `${lo}–${lo + BAND_WIDTH}%`;
+const won = (b: { won: number; games: number }) => b.won / b.games;
+const seventy = t.bands.find((b) => b.lo === 70);
+
+// The plot: stated chance across, how often the favourite won up, on one scale so the diagonal is "it happened as
+// often as it said". The scale runs from 50%, or lower if a band's favourites won less often than that.
+const lo = Math.min(50, ...t.bands.map((b) => Math.floor(won(b) * 10) * 10));
+const at = (v: number) => ((v - lo) / (100 - lo)) * 100;
+const ticks = Array.from({ length: (100 - lo) / 10 + 1 }, (_, i) => lo + i * 10);
+
+const { model, elo, vegas } = t.same;
+const rows = [
+  { name: "This model", s: model },
+  { name: "The old Elo", s: elo },
+  { name: "Vegas", s: vegas },
+];
+const gap = (a: Summary, b: Summary) => Math.abs(a.logLoss - b.logLoss).toFixed(4);
+const vsVegas =
+  vegas.logLoss < model.logLoss
+    ? `Vegas scored better than this model on these games, by ${gap(vegas, model)} of log loss: the betting market's chances are the more accurate.`
+    : `This model scored better than Vegas on these games, by ${gap(vegas, model)} of log loss.`;
+const vsElo =
+  model.logLoss < elo.logLoss
+    ? `This model scored better than the old Elo, by ${gap(model, elo)}.`
+    : `The old Elo scored better than this model, by ${gap(model, elo)}.`;
+
+const description = recordDescription(t.since, int(t.all.games), pctTenth(t.all.favouriteWon), { model: loss(model), vegas: loss(vegas) });
+const doc = (file: string) => `https://github.com/NathanAB/swishrank/blob/main/docs/${file}`;
+---
+
+<Base title="Track record" docTitle={RECORD_TITLE} description={description} route={{ kind: "record" }} ownHeading>
+  <div class="record">
+    <Panel level={1} title="Track record">
+      <p class="lede">Before every game the model gives each team a chance to win. This page scores those chances on {int(t.all.games)} games since {t.since}, regular season and playoffs, against how each game went.</p>
+      <dl class="figs">
+        <div><dt>Games scored</dt><dd class="num">{int(t.all.games)}</dd></div>
+        <div><dt>The favourite won</dt><dd class="num">{pctTenth(t.all.favouriteWon)}</dd></div>
+        {seventy && <div><dt>Favourites given {bandName(70)} won</dt><dd class="num">{pctTenth(won(seventy))}</dd></div>}
+      </dl>
+    </Panel>
+
+    <Panel title="Calibration">
+      <p class="key">If the chances are right, a team given 70% wins about 70 games in 100. Each dot is one band of the favourite's chance: across, the chance the model gave on average; up, how often the favourite won. A dot on the line happened as often as the model said, above it more often, below it less often.</p>
+      <div class="cal" aria-hidden="true">
+        <p class="ytitle">Favourite won</p>
+        <div class="yticks">{ticks.map((v) => <span style={`top: ${100 - at(v)}%`}>{v}%</span>)}</div>
+        <div class="plot">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            {ticks.map((v) => <path class="grid" d={`M0 ${100 - at(v)} H100 M${at(v)} 0 V100`} />)}
+            <path class="diag" d="M0 100 L100 0" />
+          </svg>
+          {t.bands.map((b) => <span class="dot" style={`left: ${at(b.stated * 100)}%; top: ${100 - at(won(b) * 100)}%`}></span>)}
+        </div>
+        <div class="xticks">{ticks.map((v) => <span style={`left: ${at(v)}%`}>{v}%</span>)}</div>
+        <p class="xtitle">Chance the model gave the favourite</p>
+      </div>
+      <div class="wide" slot="side">
+        <table class="ruled">
+          <thead>
+            <tr>
+              <th scope="col">Favourite's chance</th>
+              <th scope="col" class="n">Games</th>
+              <th scope="col" class="n">Said</th>
+              <th scope="col" class="n">Won</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.bands.map((b) => (
+              <tr>
+                <th scope="row">{bandName(b.lo)}</th>
+                <td class="n">{int(b.games)}</td>
+                <td class="n">{pctTenth(b.stated)}</td>
+                <td class="n v">{pctTenth(won(b))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+
+    <Panel title="Against the old Elo and Vegas">
+      <p class="key">The same {int(model.games)} games for all three: every game with a betting line on file. The old Elo is the plain FiveThirtyEight-style Elo this site ran before this model. Vegas is the sportsbooks' moneylines with their cut taken out.</p>
+      <div class="wide">
+        <table class="ruled">
+          <thead>
+            <tr>
+              <th scope="col">Chances from</th>
+              <th scope="col" class="n">Games</th>
+              <th scope="col" class="n">Favourite won</th>
+              <th scope="col" class="n">Log loss (lower is better)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr>
+                <th scope="row">{r.name}</th>
+                <td class="n">{int(r.s.games)}</td>
+                <td class="n">{pctTenth(r.s.favouriteWon)}</td>
+                <td class="n v">{loss(r.s)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="say">{vsVegas} {vsElo}</p>
+      <p class="note">Log loss scores each chance by how much it gave the side that won, and costs a confident miss the most. Picking the favourite alone ignores how sure each chance was.</p>
+    </Panel>
+
+    <Panel title="Season by season">
+      <div class="wide">
+        <table class="ruled">
+          <thead>
+            <tr>
+              <th scope="col">Season</th>
+              <th scope="col" class="n">Games</th>
+              <th scope="col" class="n">Favourite won</th>
+              <th scope="col" class="n">Log loss</th>
+              <th scope="col"><span class="sr">Status</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.seasons.map((s) => (
+              <tr>
+                <th scope="row">{s.label}</th>
+                <td class="n">{int(s.games)}</td>
+                <td class="n">{pctTenth(s.favouriteWon)}</td>
+                <td class="n v">{s.logLoss.toFixed(4)}</td>
+                <td class="state">{s.current && "scored as it is played"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+
+    <Panel title="Fine print">
+      <div class="print">
+        <p>A pre-game chance here is the chance the model gives a game from what was known before tip-off: the results of earlier games, and who was expected to play.</p>
+        <p>For a finished season these are the chances today's model gives each game, worked out again with today's settings, not chances the site published at the time. Those settings were fitted on 2015–16 to 2022–23, and 2023–24 to 2025–26 were in view when later versions of the model were chosen. Every finished season on this page was seen while the model was built, so its scores flatter it.</p>
+        <p>{current.label} is scored as it is played. Each change to the model works out its earlier games again too, so its figures are today's model's, like the finished seasons'. The current version was settled on November 1, 2026, with 2026–27's games to that day in view. 2027–28 is the season it is tested on, by a plan written before that season starts.</p>
+        <p>How the model was chosen and tested: <a href={doc("model.md")}>the first version's backtest</a> and <a href={doc("model-v4.md")}>the plan for the current version</a>. <a href={href({ kind: "home", season: current })}>Back to the ratings</a>.</p>
+      </div>
+    </Panel>
+  </div>
+</Base>
+
+<style>
+  .record { display: grid; gap: var(--gap); }
+  .lede { font-size: 15px; line-height: 22px; color: var(--muted); }
+  .figs { display: flex; flex-wrap: wrap; gap: 12px 40px; margin-top: 16px; }
+  .figs dt { margin-bottom: 2px; color: var(--muted); font-size: var(--fs-small); }
+  .figs dd { font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em; }
+  .key { margin-bottom: 16px; color: var(--muted); }
+  .say { margin-top: 14px; }
+  .print { display: grid; gap: 10px; color: var(--muted); }
+  .print a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
+
+  /* The calibration plot: tick lane, square plot; the axis titles above and below. */
+  .cal { display: grid; grid-template-columns: 36px minmax(0, 1fr); width: 100%; max-width: 420px; }
+  .ytitle, .xtitle { grid-column: 2; font-size: var(--fs-small); color: var(--muted); }
+  .ytitle { margin-bottom: 8px; }
+  .xtitle { margin-top: 4px; }
+  .yticks { position: relative; }
+  .yticks span { position: absolute; right: 8px; transform: translateY(-50%); }
+  .plot { position: relative; aspect-ratio: 1; }
+  .plot svg { width: 100%; height: 100%; overflow: visible; }
+  .plot path { fill: none; vector-effect: non-scaling-stroke; }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .diag { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--surface); }
+  .xticks { grid-column: 2; position: relative; height: 20px; }
+  .xticks span { position: absolute; top: 4px; transform: translateX(-50%); }
+  :is(.yticks, .xticks) span { font-size: var(--fs-tiny); line-height: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* Tables: a phone scrolls a wide one inside its card, never the page. */
+  .wide { overflow-x: auto; }
+  th, td { height: 36px; padding: 0 12px 0 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+  th { font-size: var(--fs-small); }
+  /* A row's heading is ruled as its cells are, not as the column headings. */
+  tbody th { font-size: var(--fs-body); font-weight: 500; color: var(--text); border-bottom-color: var(--rule); }
+  tbody tr:last-child th { border-bottom: 0; }
+  .n { text-align: right; }
+  .v { color: var(--text); font-weight: 600; }
+  .state { width: 100%; padding-left: 16px; text-align: right; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  @media (max-width: 640px) {
+    .figs { gap: 12px 28px; }
+    .figs dd { font-size: 22px; line-height: 26px; }
+    :is(thead th, .state) { white-space: normal; }
+    th, td { padding-right: 8px; }
+    .state { padding-left: 8px; }
+  }
+</style>

@@ -102,6 +102,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
         <p>
           {season.current ? <>Updated <LocalTime at={BUILT_AT.toISOString()} kind="stamp" />.</> : <>The {season.label} season is over.</>} Not affiliated with the NBA or its teams.
         </p>
+        <a class="foot-link" href={href({ kind: "record" })}>Track record</a>
       </div>
     </footer>
     <script>
@@ -149,6 +150,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
     max-width: calc(var(--col) + 2 * var(--pad)); margin: 0 auto; padding: 20px var(--pad) 32px;
     display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 24px; text-align: center;
   }
+  .foot-link { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
 
   /* On a phone the name keeps to the left and the links to the right, so the two never read as one phrase. The first
      link's auto margin does it, and gives way to nothing when the links fill the row and scroll. */

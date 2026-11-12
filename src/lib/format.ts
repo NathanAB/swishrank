@@ -36,6 +36,9 @@ export const percent = (p: number) => Math.round(p * 100);
 /** A probability as a whole percentage: 64%. */
 export const pct = (p: number) => `${percent(p)}%`;
 
+/** A share as a percentage to a tenth, where whole percents would hide a gap: 65.8%. */
+export const pctTenth = (p: number) => `${(p * 100).toFixed(1)}%`;
+
 const ordinal = (n: number) => {
   const tens = n % 100;
   const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
