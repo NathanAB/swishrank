@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fitSteps, frame, parseChartData, positions, rangeFrom, ranking, reignStart, rowSteps, runsAtTop, segments, spread, weeksAtTop } from "./player-chart.ts";
+import { readFileSync } from "node:fs";
+import { dayView, fitSteps, frame, LABEL_PX, parseChartData, positions, rangeFrom, rangeLabel, ranking, reignStart, rowSteps, runsAtTop, segments, spread, weeksAtTop } from "./player-chart.ts";
 import type { PlayerTimeline, TimelinePlayer } from "./player-timeline.ts";
 
 const player = (name: string, v: (number | null)[], stints: [number, string][] = [[0, "A"]]): TimelinePlayer => ({ id: name.charCodeAt(0), name, v, stints });
@@ -89,4 +90,30 @@ test("the fetched table is taken only when every part of it has its shape", () =
   assert.deepEqual(parseChartData(good), good);
   assert.equal(parseChartData({ ...good, players: [{ id: 1, name: "Al", v: [9, 8], stints: [] }] }), null, "a rating per day, no more");
   assert.equal(parseChartData({ ...good, teams: { A: { short: "Aces" } } }), null, "a team without its colour");
+});
+
+test("the switch names the newest season with ratings by its label, so it is right before a new season's first game too", () => {
+  const t = table(player("Al", [9, 9, 9, 9, 9, 9]));
+  assert.equal(rangeLabel(t, "season"), "2025–26");
+  assert.equal(rangeLabel(t, "three"), "3 seasons");
+  assert.equal(rangeLabel(t, "all"), "Since 2024");
+});
+
+test("a label is measured at the size global.css sets it", () => {
+  const css = readFileSync(new URL("../styles/global.css", import.meta.url), "utf8");
+  const px = (token: string) => Number(css.match(new RegExp(`--${token}: (\\d+)px;`))?.[1]);
+  assert.deepEqual(LABEL_PX, { tiny: px("fs-tiny"), small: px("fs-small") });
+});
+
+test("a day's header gives the No. 1's rating, his lead as the gap between the two ratings shown, and his time at No. 1", () => {
+  // Al, 9.6, shows as 10 and Bo, 5.4, as 5: the lead reads +5, though the ratings are 4.2 apart.
+  const t = table(player("Al", [9.6, 9.6, 9.6, 9.6, 9.6, 9.6]), player("Bo", [5.4, 5.4, 5.4, 5.4, 5.4, 5.4]));
+  const d = { ...t, teams: { A: { short: "Aces", tint: "#123456" } } };
+  const f = frame(d, "all");
+  const view = dayView(d, f, runsAtTop(d, f.from, f.to), 5);
+  assert.equal(view.date, "Oct 22, 2025");
+  assert.deepEqual(view.lead, { name: "Al", team: "Aces", tint: "#123456", rating: "10", since: "Oct 2024" });
+  assert.deepEqual(view.figures.map((fig) => fig.value), ["10", "+5", "Oct 2024", "5"]);
+  assert.deepEqual(view.board.slice(0, 2).map((row) => row.id), [65, 66]);
+  assert.equal(view.board.length, 10);
 });

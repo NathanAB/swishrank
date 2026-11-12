@@ -47,7 +47,9 @@ export const AXIS = { lo: 20, step: 20 } as const;
 /** The widths, in px, at which the strip under the plot is laid out again: a name shows from the first that fits it. */
 export const STRIP_STEPS = [240, 360, 480, 600, 720, 840, 960, 1080] as const;
 
+/** How far back the plot reaches: the newest season, the last three, or everything since the first full sample. */
 export type Range = "season" | "three" | "all";
+/** The ranges in the order the switch lists them. */
 export const RANGES: readonly Range[] = ["season", "three", "all"];
 /** The range the page opens on, and the one its league-lines file draws. */
 export const DEFAULT_RANGE: Range = "all";
@@ -103,11 +105,14 @@ export function rangeFrom(t: PlayerTimeline, range: Range): number {
   return range === "all" ? firstFull(t) : Math.max(firstFull(t), t.seasons[at].from);
 }
 
-/** A range's name on the switch: "Since 2015" for the whole table. */
+/**
+ * A range's name on the switch: "Since 2015" for the whole table, and the newest season by its own label, since
+ * before a new season's first game the newest one with ratings is still the last.
+ */
 export function rangeLabel(t: PlayerTimeline, range: Range): string {
   switch (range) {
     case "season":
-      return "This season";
+      return t.seasons[t.seasons.length - 1].label;
     case "three":
       return "3 seasons";
     case "all":
@@ -122,6 +127,7 @@ export function rangeLabel(t: PlayerTimeline, range: Range): string {
 /** A range drawn on PLOT: its samples, where each falls across, where each rating falls down, and the axis's ticks. */
 export type Frame = { from: number; to: number; x: (i: number) => number; y: (v: number) => number; ticks: number[] };
 
+/** The frame of `range`, its rating axis reaching just past the highest rating in it. */
 export function frame(t: PlayerTimeline, range: Range): Frame {
   const from = rangeFrom(t, range), to = t.days.length - 1;
   const u = positions(t);
@@ -247,8 +253,8 @@ const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;"
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ESCAPES[c]);
 const pct = (px: number) => `${((px / PLOT.w) * 100).toFixed(3)}%`;
 const look = (d: ChartData, abbr: Abbr | undefined): TeamLook => (abbr && d.teams[abbr]) || { short: abbr ?? "", tint: "var(--line-other)" };
-/** A strip name's and a season label's size in px: the tokens --fs-tiny and --fs-small. */
-const TINY = 11, SMALL = 12;
+/** A strip name's and a season label's size in px, as global.css sets --fs-tiny and --fs-small: a label is measured at the size it is set. */
+export const LABEL_PX = { tiny: 11, small: 12 } as const;
 const fit = (steps: readonly number[]) => (steps.length ? ` data-fit="${steps.join(" ")}"` : "");
 
 /** Every kept player's line in grey, one polyline per stretch: the league-lines file's and the plot's background. */
@@ -274,7 +280,7 @@ export function strip(d: ChartData, f: Frame, runs: readonly Run[]): string {
   return runs.map((r, k) => {
     const left = f.x(r.from), right = k + 1 < runs.length ? f.x(runs[k + 1].from) : f.x(r.to);
     const name = surname(r.player.name);
-    return `<button type="button" tabindex="-1" data-run="${k}"${fit(fitSteps(name, TINY, (right - left) / PLOT.w))} title="${esc(`${r.player.name}, ${dayWithYear(d.days[r.from])}`)}" style="left:${pct(left)};width:calc(${pct(right - left)} - ${STRIP_GAP}px);--tint:${look(d, teamAt(r.player, r.from)).tint}"><span>${esc(name)}</span></button>`;
+    return `<button type="button" tabindex="-1" data-run="${k}"${fit(fitSteps(name, LABEL_PX.tiny, (right - left) / PLOT.w))} title="${esc(`${r.player.name}, ${dayWithYear(d.days[r.from])}`)}" style="left:${pct(left)};width:calc(${pct(right - left)} - ${STRIP_GAP}px);--tint:${look(d, teamAt(r.player, r.from)).tint}"><span>${esc(name)}</span></button>`;
   }).join("");
 }
 
@@ -286,7 +292,7 @@ export function axisLabels(t: PlayerTimeline, f: Frame): string {
   const marks = seasons.length > 1
     ? seasons.map((s) => ({ text: s.label, x: at(Math.max(s.from, f.from)) }))
     : monthsIn(t.days[f.from], t.days[f.to]).map((m) => ({ text: monthShort(m), x: at(f.from, epochDay(`${m}-01`) - epochDay(t.days[f.from])) }));
-  const steps = rowSteps(marks.map((m) => ({ text: m.text, share: m.x / PLOT.w })), SMALL);
+  const steps = rowSteps(marks.map((m) => ({ text: m.text, share: m.x / PLOT.w })), LABEL_PX.small);
   return marks.map((m, k) => `<span${fit(steps[k])} style="left:${pct(m.x)}">${esc(m.text)}</span>`).join("");
 }
 
@@ -327,6 +333,7 @@ const FLIP = 0.78;
 /** px between two labels' tops. */
 const PITCH = 16;
 
+/** Sample `i` as the page shows it on frame `f`, whose runs at No. 1 are `runs`. */
 export function dayView(d: ChartData, f: Frame, runs: readonly Run[], i: number): DayView {
   const order = ranking(d, i);
   const top = order.slice(0, BOARD), five = top.slice(0, FRONT);
@@ -346,7 +353,7 @@ export function dayView(d: ChartData, f: Frame, runs: readonly Run[], i: number)
       { label: "Rating", value: rating(best) },
       { label: "Lead over No. 2", value: second ? signed(Math.round(best) - Math.round(second.v[i]!)) : "–" },
       { label: "No. 1 since", value: since },
-      { label: "Weeks at No. 1", value: String(Math.round(weeksAtTop(d, lead, i))) },
+      { label: "Total weeks at No. 1", value: String(Math.round(weeksAtTop(d, lead, i))) },
     ],
     lines: [...five].reverse().flatMap((p) => segments(p, f).map((s) => `<polyline class="hl" style="--tint:${look(d, s.team).tint}" points="${s.points}"/>`)).join(""),
     marks: five.map((p, k) => {

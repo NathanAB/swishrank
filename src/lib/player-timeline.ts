@@ -40,6 +40,7 @@ export type SeasonIn = { id: string; label: string; current: boolean; data: Seas
  */
 const SCALE = ELO_PER_SIGMA / PARAMS.sigma;
 
+/** The table for `seasons`, walked oldest first whatever their order, each player named by `nameOf`. */
 export function buildTimeline(seasons: readonly SeasonIn[], nameOf: (a: Athlete) => string | undefined): PlayerTimeline {
   const days: string[] = [];
   const spans: PlayerTimeline["seasons"] = [];
