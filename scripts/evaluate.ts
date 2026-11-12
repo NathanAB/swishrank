@@ -77,9 +77,11 @@ export function eloScored(data: SeasonData, like: Row[]): Scored[] {
 const CLAMP = 1e-15;
 export const loss = (p: number, y: 0 | 1) => -Math.log(Math.min(1 - CLAMP, Math.max(CLAMP, y ? p : 1 - p)));
 export const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
-export const logLoss = (s: Scored[]) => mean(s.map((x) => loss(x.p, x.y)));
-export const brier = (s: Scored[]) => mean(s.map((x) => (x.p - x.y) ** 2));
-export const accuracy = (s: Scored[]) => mean(s.map((x) => ((x.p >= 0.5) === (x.y === 1) ? 1 : 0)));
+/** A chance and how the game went: all the scores below read of a Scored row. */
+type Called = Pick<Scored, "p" | "y">;
+export const logLoss = (s: readonly Called[]) => mean(s.map((x) => loss(x.p, x.y)));
+export const brier = (s: readonly Called[]) => mean(s.map((x) => (x.p - x.y) ** 2));
+export const accuracy = (s: readonly Called[]) => mean(s.map((x) => ((x.p >= 0.5) === (x.y === 1) ? 1 : 0)));
 
 /** SIGMA by maximum likelihood: golden-section search on log SIGMA, where the log loss is unimodal. */
 export const fitSigma = (rows: Row[]): number => scaleByLikelihood(rows, 1);

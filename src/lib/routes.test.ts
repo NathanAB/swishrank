@@ -49,6 +49,12 @@ test("the players page lives at /players/, shares the current season's picture, 
   assert.deepEqual(switchTarget({ kind: "players" }, past, anyTeam), { kind: "home", season: past });
 });
 
+test("the track record lives at /record/, shares the current season's picture, and picking a season from it goes to that season's home", () => {
+  assert.equal(routePath({ kind: "record" }), "/record/");
+  assert.equal(sharePath(shareImage({ kind: "record" }, now)), "/share/2026-27.png");
+  assert.deepEqual(switchTarget({ kind: "record" }, past, anyTeam), { kind: "home", season: past });
+});
+
 test("a mistyped path leads to the page it meant: any case, the current season by its id, a team by its name", () => {
   const aliases = { ny: "ny", knicks: "ny", "new-york-knicks": "ny", "trail-blazers": "por" };
   const guess = (path: string) => guessPath(path, { current: now.id, aliases, months: {} });

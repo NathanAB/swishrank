@@ -204,6 +204,23 @@ export const playerChart = (): ChartData =>
     return { ...table, teams };
   })());
 
+// Read through the bundler rather than scripts/vegas.ts loadVegas: that resolves the file against its own module's
+// URL, which in a built page is the bundle's chunk, so it would find no file and return no lines.
+const VEGAS_FILES = import.meta.glob<unknown>("/scripts/vegas/*.json", { eager: true, import: "default" });
+
+/** Vegas's chance for each of a season's games it priced, game id to the home side's chance (scripts/vegas.ts). */
+export function vegasChances(id: string): Record<string, number> {
+  const raw = VEGAS_FILES[`/scripts/vegas/${id}.json`];
+  if (raw === undefined) return {};
+  if (!isRecord(raw) || raw.season !== id || !isRecord(raw.chances)) throw new Error(`scripts/vegas/${id}.json: expected { season: "${id}", chances }`);
+  const out: Record<string, number> = {};
+  for (const [game, p] of Object.entries(raw.chances)) {
+    if (typeof p !== "number" || !(p >= 0 && p <= 1)) throw new Error(`scripts/vegas/${id}.json: game ${game} has no chance from 0 to 1`);
+    out[game] = p;
+  }
+  return out;
+}
+
 /** What a list of games still to play says when it has none. */
 export const noGamesAhead = (season: SeasonView) =>
   season.current ? "No games in the next seven days." : `The ${season.label} season is over.`;
