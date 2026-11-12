@@ -20,7 +20,11 @@ const list = (items: readonly string[]) => (items.length < 2 ? items.join("") : 
 
 /** A season home's document title, led by the words people search for. */
 export const homeTitle = (season: Pick<SeasonView, "label">, conference?: Conference) =>
-  conference ? `${season.label} ${conference} power rankings` : `NBA power rankings ${season.label}`;
+  conference ? `${season.label} ${conference} power rankings` : `NBA Elo ratings and power rankings ${season.label}`;
+
+/** A season home's h1, and its share image's heading, which has room for one line at this length. */
+export const homeHeading = (season: Pick<SeasonView, "label">, conference?: Conference) =>
+  conference ? `${season.label} · ${conference}ern Conference` : `${season.label} NBA Elo ratings`;
 
 /** Who tops the league's table, or one conference's: "The Timberwolves lead at 1606." */
 export function leaders(season: Shown, conference?: Conference): string {

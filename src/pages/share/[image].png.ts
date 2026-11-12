@@ -12,7 +12,7 @@ import css from "../../styles/global.css?raw";
 import { dateTicks, runAndTrail, seasonEndMark, seasonPlot } from "../../lib/chart.ts";
 import type { Abbr } from "../../lib/elo.ts";
 import { rating } from "../../lib/format.ts";
-import { homeTitle, leaders, SHARE_SIZE, SITE_NAME } from "../../lib/meta.ts";
+import { homeHeading, leaders, SHARE_SIZE, SITE_NAME } from "../../lib/meta.ts";
 import { shareImage, shareName, type Route, type ShareImage } from "../../lib/routes.ts";
 import { allSeasons, currentSeason, type SeasonView } from "../../lib/season.ts";
 import { place } from "../../lib/teams.ts";
@@ -120,7 +120,7 @@ function chart(season: SeasonView, own: Abbr | null): El {
 function card(season: SeasonView, image: ShareImage): El {
   const m = season.model;
   const own = image.kind === "team" ? image.abbr : null;
-  const heading = own ? m.data.teams[own].name : homeTitle(season);
+  const heading = own ? m.data.teams[own].name : homeHeading(season);
   const standing = own && `${season.current ? "" : "finished "}${place(m, own)} of ${m.abbrs.length} at ${rating(m.r[own])} · ${season.label}`;
   const fact = standing ? `${standing[0].toUpperCase()}${standing.slice(1)}` : leaders(season);
   return h(
