@@ -1,0 +1,78 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { fitStep, frame, positions, rangeFrom, ranking, reignStart, runsAtTop, segments, spread, weeksAtTop } from "./player-chart.ts";
+import type { PlayerTimeline, TimelinePlayer } from "./player-timeline.ts";
+
+const player = (name: string, v: (number | null)[], stints: [number, string][] = [[0, "A"]]): TimelinePlayer => ({ id: name.charCodeAt(0), name, v, stints });
+/** Eight players rated 0 throughout, so with two more every sample has a full list of ten. */
+const fillers = (n: number) => Array.from({ length: 8 }, (_, k) => ({ ...player(`f${k}`, Array(n).fill(0)), id: 1000 + k }));
+
+// Two seasons of three samples each: Oct 1, 8 and 15 of 2024, then Oct 1, 8 and 22 of 2025.
+const days = ["2024-10-01", "2024-10-08", "2024-10-15", "2025-10-01", "2025-10-08", "2025-10-22"];
+const seasons = [{ id: "2024-25", label: "2024–25", from: 0, to: 2 }, { id: "2025-26", label: "2025–26", from: 3, to: 5 }];
+const table = (...players: TimelinePlayer[]): PlayerTimeline => ({ days, seasons, players: [...players, ...fillers(days.length)] });
+
+test("a day's ranking runs best first, an exact tie going to the name first in the alphabet, and leaves out the unranked", () => {
+  const t = table(player("Bo", [10, 0, 0, 0, 0, 0]), player("Al", [10, 0, 0, 0, 0, 0]), player("Cy", [12, 0, 0, 0, 0, 0]), player("Di", [null, 0, 0, 0, 0, 0]));
+  assert.deepEqual(ranking(t, 0).slice(0, 3).map((p) => p.name), ["Cy", "Al", "Bo"]);
+  assert.equal(ranking(t, 0).length, 11, "Di has no rating on the first day");
+});
+
+test("runs at No. 1 join the samples one player led in a row, and break where another leads", () => {
+  // Al leads the first two samples and the last two, Bo the two between.
+  const t = table(player("Al", [9, 9, 1, 1, 9, 9]), player("Bo", [5, 5, 5, 5, 5, 5]));
+  assert.deepEqual(runsAtTop(t, 0, 5).map((r) => [r.player.name, r.from, r.to]), [["Al", 0, 1], ["Bo", 2, 3], ["Al", 4, 5]]);
+  assert.equal(reignStart(t, 5), 4, "Al's latest run began at sample 4");
+  assert.equal(reignStart(t, 3), 2);
+});
+
+test("time at No. 1 adds each stretch from a sample a player led to the next, and leaves the summer out", () => {
+  // Al leads every sample: 7 + 7 days in 2024-25, the summer to Oct 1, 2025 not counted, then 7 + 14 days.
+  const t = table(player("Al", [9, 9, 9, 9, 9, 9]), player("Bo", [5, 5, 5, 5, 5, 5]));
+  const al = t.players[0];
+  assert.equal(weeksAtTop(t, al, 5), 5);
+  assert.equal(weeksAtTop(t, al, 4), 3, "only time already passed by the day counts");
+});
+
+test("the timeline sets seasons end to end, each as long as its days, with a 10-day gap for the summer", () => {
+  assert.deepEqual(positions(table()), [0, 7, 14, 24, 31, 45]);
+});
+
+test("a range starts at this season's first sample, three seasons back, or the first sample with a full list", () => {
+  // With Al rated from the second sample on, the list is full of ten from there.
+  const t = table(player("Al", [null, 9, 9, 9, 9, 9]), player("Bo", [5, 5, 5, 5, 5, 5]));
+  assert.equal(rangeFrom(t, "season"), 3);
+  assert.equal(rangeFrom(t, "three"), 1);
+  assert.equal(rangeFrom(t, "all"), 1);
+  // Four seasons of one sample each: three seasons back is the second.
+  const four: PlayerTimeline = {
+    days: ["2022-10-01", "2023-10-01", "2024-10-01", "2025-10-01"],
+    seasons: [0, 1, 2, 3].map((k) => ({ id: `s${k}`, label: `s${k}`, from: k, to: k })),
+    players: [player("Al", [9, 9, 9, 9]), player("Bo", [5, 5, 5, 5]), ...fillers(4)],
+  };
+  assert.equal(rangeFrom(four, "three"), 1);
+});
+
+test("a line is cut into one stretch per team, the two sharing the point where he changed, and broken where he has no rating", () => {
+  // The axis runs from its floor, 20, to 85, five above the top rating rounded up to ten, down the plot's 420 px. The
+  // samples sit 0, 7, 14, 24, 31 and 45 days along the 45 the timeline spans, across its 1000.
+  const p = player("Al", [40, 40, 40, null, 80, 80], [[0, "A"], [2, "B"]]);
+  const f = frame(table(p), "all");
+  assert.deepEqual(segments(p, f), [
+    { team: "A", points: "0.0,290.8 155.6,290.8 311.1,290.8" },
+    { team: "B", points: "311.1,290.8" },
+    { team: "B", points: "688.9,32.3 1000.0,32.3" },
+  ]);
+});
+
+test("labels keep their points' heights where they can, at least a pitch apart and inside the plot", () => {
+  assert.deepEqual(spread([300, 100, 105], 16, 420), [300, 100, 116]);
+  assert.deepEqual(spread([410, 412], 16, 420), [396, 412], "two labels at the foot push up from it");
+});
+
+test("a strip name shows from the narrowest strip width at which its block holds it with room to spare", () => {
+  // "Al" is 0.727 + 0.329 em wide, 11.6 px at 11 px, plus 6 px of air and the 2 px gap: 19.6 px. A block a twentieth
+  // of the strip is 18 px wide at 360 and 24 px at 480.
+  assert.equal(fitStep("Al", 11, 0.05), 480);
+  assert.equal(fitStep("Al", 11, 0.01), null, "10.8 px even at 1080");
+});
