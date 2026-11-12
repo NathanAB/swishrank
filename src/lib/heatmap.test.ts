@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import names from "../data/players.json" with { type: "json" };
 import type { PlayerPart } from "./elo.ts";
-import { binOf, CUTS, FIGURE, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE, textWidth, tileNames } from "./heatmap.ts";
+import { binOf, CUTS, FIGURE, LINE, MIN_FONT, PAD, teamMap, TEAM_TALL, TEAM_WIDE, tileNames } from "./heatmap.ts";
+import { textWidth } from "./text-width.ts";
 
 // A rotation from a 36-minute starter down to a player who barely plays, one of them out for weeks.
 const ids = Object.keys(names).map(Number);
