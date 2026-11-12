@@ -37,9 +37,10 @@ test("a band counts its games, the favourite's wins and the mean chance it was g
 });
 
 test("the summary gives the share of games the favourite won, an even game counting the home side as favourite, and the log loss", () => {
-  const got = summary([call("a", 0.8, 1), call("b", 0.4, 1), call("c", 0.5, 1), call("d", 0.5, 0)]);
+  // a: home favourite won. b: away favourite lost. c and d: even games the home side won, so the favourite won.
+  const got = summary([call("a", 0.8, 1), call("b", 0.4, 1), call("c", 0.5, 1), call("d", 0.5, 1)]);
   assert.equal(got.games, 4);
-  assert.equal(got.favouriteWon, 0.5);
+  assert.equal(got.favouriteWon, 0.75);
   // -(ln 0.8 + ln 0.4 + ln 0.5 + ln 0.5) / 4
   assert.ok(Math.abs(got.logLoss - 0.6314321611) < 1e-9, `log loss ${got.logLoss}`);
 });
