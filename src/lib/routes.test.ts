@@ -43,6 +43,12 @@ test("the season switch keeps the page but not a month, and a team the other sea
   assert.deepEqual(switchTarget({ kind: "team", season: now, abbr: "SEA" }, past, () => false), { kind: "home", season: past });
 });
 
+test("the players page lives at /players/, shares the current season's picture, and picking a season from it goes to that season's home", () => {
+  assert.equal(routePath({ kind: "players" }), "/players/");
+  assert.equal(sharePath(shareImage({ kind: "players" }, now)), "/share/2026-27.png");
+  assert.deepEqual(switchTarget({ kind: "players" }, past, anyTeam), { kind: "home", season: past });
+});
+
 test("a mistyped path leads to the page it meant: any case, the current season by its id, a team by its name", () => {
   const aliases = { ny: "ny", knicks: "ny", "new-york-knicks": "ny", "trail-blazers": "por" };
   const guess = (path: string) => guessPath(path, { current: now.id, aliases, months: {} });

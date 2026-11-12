@@ -91,6 +91,16 @@ export function ratingScale(min: number, max: number, margin = Math.max(1, max -
   return { lo, hi, ticks: ratingTicks(min, max).ticks.filter((t) => t >= lo && t <= hi) };
 }
 
+/**
+ * A short tag that changes with a file's content, for its URL's ?v=, so a page never draws over a stale copy of a
+ * file it reuses from the cache. FNV-1a, 32 bits: enough to tell one day's file from the next.
+ */
+export function contentVersion(content: string): string {
+  let v = 0x811c9dc5;
+  for (const ch of content) v = Math.imul(v ^ ch.charCodeAt(0), 0x01000193);
+  return (v >>> 0).toString(36);
+}
+
 /** A rating chart's plot: its viewBox width, its height in px (the same at every width) and its inner padding. */
 export const PLOT = { w: 1000, h: 300, pad: 8 };
 
@@ -153,12 +163,7 @@ export function seasonPlot(model: Season, { w = PLOT.w, h = PLOT.h, pad = PLOT.p
     const lines = model.abbrs.map((a) => `<polyline vector-effect="non-scaling-stroke" points="${pts(a).join(" ")}"/>`).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}"><g id="lines" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">${lines}</g></svg>`;
   });
-  // FNV-1a, 32 bits: enough to tell one day's file from the next.
-  const version = once(() => {
-    let v = 0x811c9dc5;
-    for (const ch of leagueLines()) v = Math.imul(v ^ ch.charCodeAt(0), 0x01000193);
-    return (v >>> 0).toString(36);
-  });
+  const version = once(() => contentVersion(leagueLines()));
   const plot: SeasonPlot = { n, lo, hi, ticks, x, y, pts, ranks: (a) => ranksAttr(dayRanks().map((r) => r[a])), leagueLines, version };
   bySize.set(key, plot);
   return plot;

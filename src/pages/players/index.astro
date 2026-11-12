@@ -1,0 +1,151 @@
+---
+// The best player in the league and how that changed, since the first season with box scores. The page's header names
+// the No. 1 on the shown day, as a team's page names its team (TeamHeader.astro). The chart draws every kept player's
+// rating in grey, the day's top five in full in the colours of the teams they played for, and under it a strip of who
+// was No. 1 when; the Top 10 beside it lists the day's ranking. All of it is worked out from one table
+// (lib/player-timeline.ts) by lib/player-chart.ts, here for the default view, today over the newest season, so
+// the page reads whole without script, and in the browser by scripts/players.ts, which fetches the table once the page
+// has loaded and lets the reader move through time and change the range.
+import Panel from "../../components/Panel.astro";
+import Segmented from "../../components/Segmented.astro";
+import Base from "../../layouts/Base.astro";
+import { contentVersion } from "../../lib/chart.ts";
+import { PLAYERS_TITLE, playersDescription } from "../../lib/meta.ts";
+import {
+  axisLabels, dayView, DEFAULT_RANGE, frame, gridLines, linesFile, PLOT, rangeLabel, RANGES, runsAtTop, strip, STRIP_STEPS, tickLabels,
+} from "../../lib/player-chart.ts";
+import { MIN_MINUTES } from "../../lib/player-timeline.ts";
+import { withBase } from "../../lib/routes.ts";
+import { playerChart } from "../../lib/season.ts";
+
+const d = playerChart();
+const f = frame(d, DEFAULT_RANGE);
+const runs = runsAtTop(d, f.from, f.to);
+const view = dayView(d, f, runs, f.to);
+const lines = withBase(`/players/lines.svg?v=${contentVersion(linesFile(d))}#lines`);
+const src = withBase(`/players/timeline.json?v=${contentVersion(JSON.stringify(d))}`);
+const description = playersDescription(d.seasons[0].label, { name: view.lead.name, rating: view.lead.rating, from: view.lead.since });
+// A strip name, or a season label under it, shows where the strip is at least one of the widths it fits at
+// (lib/player-chart.ts fitSteps, rowSteps), and narrower than the next width, which lays the row out again.
+const fits = STRIP_STEPS.map((w, k) => {
+  const next = STRIP_STEPS[k + 1];
+  return `@container lane (width >= ${w}px)${next ? ` and (width < ${next}px)` : ""} { .players .strip [data-fit~="${w}"] > span, .players .xs > [data-fit~="${w}"] { display: block; } }`;
+}).join("\n");
+---
+
+<Base title="Players" docTitle={PLAYERS_TITLE} description={description} route={{ kind: "players" }} ownHeading>
+  <style is:inline set:html={fits} />
+  <div class="players" data-players data-src={src}>
+    <header class="top" style={`--tint: ${view.lead.tint}`} data-top>
+      <div class="when">
+        <h1>The best player in the league on <span data-date>{view.date}</span></h1>
+        <button type="button" class="back" data-back hidden>Back to the latest day</button>
+      </div>
+      <p class="name"><span data-name>{view.lead.name}</span><span class="team" data-team-name>{view.lead.team}</span></p>
+      <dl class="figs" aria-label="The No. 1 in numbers">
+        {view.figures.map((fig) => <div><dt>{fig.label}</dt><dd class="num" data-figure>{fig.value}</dd></div>)}
+      </dl>
+    </header>
+
+    <div class="cols">
+      <Panel title="Every rating, and who was No. 1">
+        <div slot="aside" data-range>
+          <Segmented label="Range" options={RANGES.map((r) => ({ label: rangeLabel(d, r), value: r, pressed: r === DEFAULT_RANGE }))} />
+        </div>
+        <p class="key">A player's rating is what he is worth to a team over a full 48 minutes, in rating points, against an average player. Move across the chart to see any day, and click to hold it.</p>
+        <div class="rg" tabindex="0" role="group" aria-label="Player ratings over time. Left and right arrows move through time." data-chart-area>
+          <div class="ticks" data-ticks set:html={tickLabels(f)} />
+          <div class="plot" style={`height: ${PLOT.h}px`} data-plot-area>
+            <svg viewBox={`0 0 ${PLOT.w} ${PLOT.h}`} preserveAspectRatio="none" height={PLOT.h} aria-hidden="true">
+              <g data-grid set:html={gridLines(d, f)} />
+              <g class="bg" data-bg><use href={lines} /></g>
+              <g data-front set:html={view.lines} />
+            </svg>
+            <div class="day" style={`left: ${view.at}`} data-day></div>
+            <div data-marks set:html={view.marks} />
+          </div>
+          <div class="strip-name">No. 1</div>
+          <div class="strip" data-strip set:html={strip(d, f, runs)} />
+          <div class="xs" data-axis set:html={axisLabels(d, f)} />
+        </div>
+        <p class="note">Finished seasons are read once a week. A player is ranked once he has played {MIN_MINUTES} minutes.</p>
+      </Panel>
+      <Panel title="Top 10" meta={view.date} data-board-card>
+        <ol class="board" data-board>
+          {view.board.map((row) => <li data-p={row.id} style={`--tint: ${row.tint}`} set:html={row.row} />)}
+        </ol>
+      </Panel>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import "../../scripts/players.ts";
+</script>
+
+<style is:global>
+  /* The day's No. 1, on the page as a team's header is (TeamHeader.astro), on a rule in his team's colour. */
+  .players .top { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "when when" "name figs"; align-items: end; gap: 2px 48px; padding-bottom: 16px; border-bottom: 2px solid var(--tint); transition: border-color 200ms ease; }
+  .players .when { grid-area: when; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
+  .players .when h1 { font-size: 15px; line-height: 24px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
+  .players .back { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
+  .players .back[hidden] { display: none; }
+  .players .name { grid-area: name; font-size: 48px; line-height: 52px; font-weight: 700; letter-spacing: -0.02em; }
+  .players .name .team { margin-left: 14px; font-size: 20px; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+  .players .figs { grid-area: figs; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 40px; }
+  .players .figs dt { margin-bottom: 2px; color: var(--muted); font-size: var(--fs-small); }
+  .players .figs dd { font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em; }
+
+  .players .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: var(--gap); align-items: start; margin-top: var(--gap); }
+  .players .key { margin-bottom: 16px; color: var(--muted); }
+
+  /* The chart: the tick lane, then the plot, the strip of who was No. 1 and the season labels, one over the next. */
+  .players .rg { display: grid; grid-template-columns: 40px minmax(0, 1fr); border-radius: 4px; }
+  .players .ticks { position: relative; }
+  .players .ticks span { position: absolute; right: 8px; transform: translateY(-50%); font-size: var(--fs-tiny); line-height: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .players .plot { position: relative; min-width: 0; cursor: crosshair; touch-action: pan-y; }
+  .players .plot svg { width: 100%; overflow: hidden; }
+  .players .plot :is(path, polyline) { fill: none; vector-effect: non-scaling-stroke; }
+  .players .grid { stroke: var(--grid); stroke-width: 1; }
+  .players .bg { color: var(--line-other); opacity: 0.32; }
+  .players .bg polyline { stroke: currentColor; stroke-width: 1; }
+  .players .hl { stroke: var(--tint); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .players .day { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--text); opacity: 0.35; pointer-events: none; }
+  .players .dot { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--tint); box-shadow: 0 0 0 2px var(--surface); pointer-events: none; }
+  .players .lab { position: absolute; margin: -8px 0 0 10px; padding: 0 4px; font-size: var(--fs-small); line-height: 16px; font-weight: 500; white-space: nowrap; background: color-mix(in oklab, var(--surface) 82%, transparent); border-radius: 3px; pointer-events: none; }
+  .players .lab.flip { margin-left: -10px; transform: translateX(-100%); }
+  .players .lab b { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .players .strip-name { grid-column: 1; align-self: start; margin-top: 12px; font-size: var(--fs-tiny); line-height: 12px; color: var(--muted); }
+  .players :is(.strip, .xs) { grid-column: 2; position: relative; container: lane / inline-size; }
+  .players .strip { height: 34px; margin-top: 12px; }
+  .players .strip button { position: absolute; top: 0; height: 12px; min-width: 1px; border-radius: 2px; background: var(--tint); opacity: 0.5; text-align: left; transition: opacity 120ms ease; }
+  .players .strip button:hover, .players .strip button.on { opacity: 1; }
+  /* A name that does not fit is left out of the layout, not only unseen: an unseen one past the strip's end would widen the page. */
+  .players .strip span { position: absolute; top: 16px; left: 0; display: none; font-size: var(--fs-tiny); line-height: 14px; color: var(--muted); white-space: nowrap; }
+  .players .strip .on span { color: var(--text); }
+  .players .xs { height: 20px; }
+  .players .xs span { position: absolute; top: 4px; padding-left: 4px; display: none; font-size: var(--fs-small); line-height: 16px; color: var(--muted); white-space: nowrap; }
+
+  /* The day's Top 10: rank, name and team, rating, and a bar of the rating against the No. 1's. */
+  .players .board { display: grid; }
+  .players .board li { display: grid; grid-template-columns: 22px minmax(0, 1fr) 30px; grid-template-areas: "rk nm num" ". bar bar"; align-items: baseline; column-gap: 8px; padding: 9px 0 10px; border-bottom: 1px solid var(--rule); background: var(--surface); }
+  .players .board li:last-child { border-bottom: 0; }
+  .players .board .rk { grid-area: rk; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .players .board .nm { grid-area: nm; min-width: 0; font-weight: 500; }
+  .players .board .nm i { margin-left: 8px; font-style: normal; font-weight: 400; color: var(--muted); }
+  .players .board .num { grid-area: num; text-align: right; font-weight: 600; }
+  .players .board .bar { grid-area: bar; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--seg-track); }
+  .players .board .bar i { display: block; height: 100%; border-radius: 2px; background: var(--tint); transition: width 200ms ease, background-color 200ms ease; }
+  .players .board li:first-child .nm { font-weight: 700; }
+
+  @media (max-width: 999px) {
+    .players .cols { grid-template-columns: minmax(0, 1fr); }
+    .players .top { grid-template-areas: "when when" "name name" "figs figs"; }
+    .players .figs { justify-content: flex-start; gap: 8px 28px; margin-top: 10px; }
+  }
+  @media (max-width: 640px) {
+    .players .name { font-size: 30px; line-height: 34px; }
+    .players .name .team { display: block; margin: 2px 0 0; font-size: 15px; line-height: 20px; }
+    .players .figs dd { font-size: 22px; line-height: 26px; }
+  }
+</style>

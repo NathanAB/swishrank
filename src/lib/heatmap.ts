@@ -7,6 +7,7 @@
 import { winProb, type PlayerPart } from "./elo.ts";
 import { signed, signedPercent } from "./format.ts";
 import { playerName } from "./names.ts";
+import { textWidth } from "./text-width.ts";
 import { inset, squarify, type Rect } from "./treemap.ts";
 
 /** A colour step on the site's diverging pair: 0 the neutral grey, 1 to 4 stronger rises, −1 to −4 stronger drops. */
@@ -51,28 +52,6 @@ export type Tile = Rect & {
   /** The tile's figure in each mode: the text, or "out" for his points while he is out. */
   figures: Record<Mode, string>;
 };
-// Public Sans Bold's advance widths in thousandths of an em for ASCII from the space to the tilde, read from the face
-// the site serves by scripts/glyph-widths.mjs; labels are bold or lighter, and lighter weights run narrower. Kerning
-// only narrows a word.
-const BOLD = [
-  226, 282, 480, 616, 681, 939, 784, 261, 333, 337, 473, 589, 277, 393, 270, 381, 645, 428, 635, 665, 656, 675, 661, 626, 671, 659, 270, 279,
-  578, 589, 578, 535, 828, 727, 685, 718, 720, 635, 614, 759, 770, 308, 402, 717, 578, 918, 782, 761, 653, 773, 696, 692, 616, 724, 704, 969,
-  717, 668, 670, 337, 381, 337, 484, 553, 264, 567, 609, 547, 609, 577, 397, 629, 593, 267, 289, 580, 329, 896, 593, 576, 607, 607, 412, 527,
-  417, 595, 521, 789, 588, 563, 497, 385, 269, 384, 612,
-];
-const MINUS_WIDTH = 589;
-const WIDEST = 969;
-
-/** A text's width in em, bold, its accents left off as they sit over their letters; a glyph outside the table counts as the widest. */
-export function textWidth(text: string): number {
-  let w = 0;
-  for (const ch of text.normalize("NFD")) {
-    if (/\p{M}/u.test(ch)) continue;
-    w += ch === "−" ? MINUS_WIDTH : (BOLD[(ch.codePointAt(0) ?? 0) - 32] ?? WIDEST);
-  }
-  return w / 1000;
-}
-
 // The page's tile box model, in canvas px and em, which Heatmap.astro's styles draw with.
 export const PAD = { x: 3, y: 2 };
 export const LINE = 1.15;

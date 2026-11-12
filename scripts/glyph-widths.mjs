@@ -1,5 +1,5 @@
 // Prints Public Sans Bold's advance widths, in thousandths of an em, for ASCII from the space to the tilde and for the
-// minus sign: the BOLD, MINUS_WIDTH and WIDEST tables src/lib/heatmap.ts measures labels with. Reads the woff files
+// minus sign: the BOLD, MINUS_WIDTH and WIDEST tables src/lib/text-width.ts measures labels with. Reads the woff files
 // Astro downloads for the site's fonts, so run it after a build or `astro dev`: node scripts/glyph-widths.mjs [dir]
 import { readFileSync, readdirSync } from "node:fs";
 import { inflateSync } from "node:zlib";
