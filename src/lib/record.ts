@@ -1,7 +1,6 @@
 // The track record page's figures: every pre-game chance the model gave a game that has since been played, scored
-// against how the game went, by band of stated chance, by season, and beside the old Elo's and Vegas's chances on
+// against how the game went, by band of stated chance, by season, and beside Vegas's chances on
 // the games Vegas priced. The scores are the backtests' own (scripts/evaluate.ts).
-import { eloChances } from "../../scripts/elo538.ts";
 import { accuracy, logLoss } from "../../scripts/evaluate.ts";
 import type { Result, Season } from "./elo.ts";
 import type { SeasonView } from "./season.ts";
@@ -49,22 +48,16 @@ export const summary = (calls: readonly Pick<Call, "p" | "y">[]): Summary => ({ 
 /** A source of chances: game id to the home side's chance. */
 export type Chances = Readonly<Record<string, number>>;
 
-/** The model, the old Elo and Vegas, each scored on the same games: those Vegas has a line for. */
-export type SameGames = { model: Summary; elo: Summary; vegas: Summary };
+/** The model and Vegas, each scored on the same games: those Vegas has a line for. */
+export type SameGames = { model: Summary; vegas: Summary };
 
-export function sameGames(calls: readonly Call[], elo: Chances, vegas: Chances): SameGames {
+export function sameGames(calls: readonly Call[], vegas: Chances): SameGames {
   const priced = calls.filter((c) => c.id in vegas);
-  const by = (chances: Chances) =>
-    summary(priced.map((c) => {
-      const p = chances[c.id];
-      if (p === undefined) throw new Error(`record: no old Elo chance for game ${c.id}`);
-      return { p, y: c.y };
-    }));
-  return { model: summary(priced), elo: by(elo), vegas: by(vegas) };
+  return { model: summary(priced), vegas: summary(priced.map((c) => ({ p: vegas[c.id], y: c.y }))) };
 }
 
-/** What the page reads of a season: the model's results and games, and Vegas's chances for its games. */
-export type SeasonInput = Pick<SeasonView, "id" | "label" | "current"> & { model: Pick<Season, "data" | "results">; vegas: Chances };
+/** What the page reads of a season: the model's results, and Vegas's chances for its games. */
+export type SeasonInput = Pick<SeasonView, "id" | "label" | "current"> & { model: Pick<Season, "results">; vegas: Chances };
 
 export type TrackRecord = {
   /** The first season scored, "2015–16". */
@@ -76,17 +69,16 @@ export type TrackRecord = {
   same: SameGames;
 };
 
-/** Every season's calls scored together, by band, by season, and beside the old Elo and Vegas. */
+/** Every season's calls scored together, by band, by season, and beside Vegas. */
 export function trackRecord(seasons: readonly SeasonInput[]): TrackRecord {
   const per = seasons.map((s) => ({ s, calls: callsOf(s.id, s.model.results) }));
   const calls = per.flatMap((x) => x.calls);
-  const elo = Object.fromEntries(seasons.flatMap((s) => eloChances(s.model.data).map((x) => [x.id, x.p])));
   const vegas = Object.assign({}, ...seasons.map((s) => s.vegas));
   return {
     since: seasons[seasons.length - 1].label,
     all: summary(calls),
     bands: bands(calls),
     seasons: per.map(({ s, calls }) => ({ id: s.id, label: s.label, current: s.current, ...summary(calls) })),
-    same: sameGames(calls, elo, vegas),
+    same: sameGames(calls, vegas),
   };
 }
