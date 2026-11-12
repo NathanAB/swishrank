@@ -16,9 +16,11 @@ import { ledger } from "../../../lib/ledger.ts";
 import Base from "../../../layouts/Base.astro";
 import type { Abbr } from "../../../lib/elo.ts";
 import { fixtureDays } from "../../../lib/fixtures.ts";
+import { pct, seasonLabel } from "../../../lib/format.ts";
+import { share } from "../../../lib/injury-record.ts";
 import { teamDescription } from "../../../lib/meta.ts";
-import type { Route } from "../../../lib/routes.ts";
-import { TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
+import { href, type Route } from "../../../lib/routes.ts";
+import { injuryRecord, TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
 import { nextGames, teamGames } from "../../../lib/teams.ts";
 import { currentOdds } from "../../../lib/season-odds.ts";
 import { teamPaint } from "../../../lib/tint.ts";
@@ -41,6 +43,8 @@ const log = teamGames(m, abbr).reverse();
 const rows = ledger(season, abbr);
 const ahead = season.current ? fixtureDays(m, nextGames(m, abbr, TODAY)) : null;
 const odds = season.current ? currentOdds() : null;
+const injuries = season.current ? injuryRecord() : null;
+const questionable = injuries?.teams.find((t) => t.team === abbr)?.questionable;
 ---
 
 <Base
@@ -73,6 +77,9 @@ const odds = season.current ? currentOdds() : null;
       {m.players[abbr].length > 0 && (
         <Panel title="Players">
           <Heatmap players={m.players[abbr]} label={`${me.short} players`} teamRating={m.r[abbr]} />
+          {injuries && questionable && (
+            <p class="note">{me.short} players <a class="link" href={href({ kind: "injury-report" })}>listed Questionable</a> have played {pct(share(questionable))} of the time since {seasonLabel(injuries.since)}.</p>
+          )}
         </Panel>
       )}
       <Panel title="History">
@@ -92,6 +99,7 @@ const odds = season.current ? currentOdds() : null;
   .side { position: sticky; top: var(--gap); }
   .main > :global(* + *) { margin-top: var(--gap); }
   .days { display: grid; gap: 16px; }
+  .link { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
   @media (max-width: 1023px) {
     .cols { grid-template-columns: minmax(0, 1fr); }
     .side { position: static; }
