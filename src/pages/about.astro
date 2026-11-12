@@ -16,6 +16,7 @@ import Base from "../layouts/Base.astro";
 import { EARLY, ELO_PER_SIGMA, PARAMS, START, winProb } from "../lib/elo.ts";
 import { UPSET } from "../lib/facts.ts";
 import { int, pct, signed, weekdayDay } from "../lib/format.ts";
+import { ABOUT_TITLE } from "../lib/meta.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
 
@@ -50,6 +51,7 @@ const game = opener && {
 
 <Base
   title="How the ratings work"
+  docTitle={ABOUT_TITLE}
   description="Every NBA team starts the season from its preseason odds, and every rating is worked out again after each day of games."
   route={{ kind: "about" }}
 >

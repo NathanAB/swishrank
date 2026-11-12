@@ -102,6 +102,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
         <p>
           {season.current ? <>Updated <LocalTime at={BUILT_AT.toISOString()} kind="stamp" />.</> : <>The {season.label} season is over.</>} Not affiliated with the NBA or its teams.
         </p>
+        <a class="foot-link" href={href({ kind: "about" })}>How it works</a>
         <a class="foot-link" href={href({ kind: "record" })}>Track record</a>
       </div>
     </footer>
