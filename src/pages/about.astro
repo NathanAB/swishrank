@@ -16,6 +16,7 @@ import Base from "../layouts/Base.astro";
 import { EARLY, ELO_PER_SIGMA, PARAMS, START, winProb } from "../lib/elo.ts";
 import { UPSET } from "../lib/facts.ts";
 import { int, pct, signed, weekdayDay } from "../lib/format.ts";
+import { href } from "../lib/routes.ts";
 import { ABOUT_TITLE } from "../lib/meta.ts";
 import { examples, offDay, type ContrastKind } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
@@ -85,7 +86,7 @@ const game = opener && {
     </Panel></li>
 
     <li><Panel title="Every rating is redone each game day">
-      <p class="say">Each time a team plays, its rating uses every result so far. A win counts for more once the beaten team proves strong, and that shows the next time the team plays. A team that doesn't play keeps its rating.</p>
+      <p class="say">Each time a team plays, its rating uses every result so far. A win counts for more once the beaten team proves strong, and the rating picks that up the next time the team plays. A team that doesn't play keeps its rating.</p>
       <Fragment slot="side">
         {rest ? <DayOff season={season!} /> : game && (
           <div class="game">
@@ -127,13 +128,15 @@ const game = opener && {
       <dt>Early games</dt>
       <dd>Until both teams have played {EARLY.games}, the chances stay closer to 50%, because a few games say little about a team.</dd>
       <dt>Injuries</dt>
-      <dd>A game's chances read the NBA's injury report, the latest before tip-off. Players it lists as out or doubtful sit, a questionable one counts for half his minutes, a regular it leaves off after he missed only his team's last game counts as back, and the minutes of those who sit count a little lower, because backups play them worse than the regulars. A team the report doesn't cover yet loses the players that morning's ESPN report lists as out. A team's rating leaves out those out for weeks: the rest of the rotation takes their minutes, counted a little lower because backups play them worse than the regulars, until the team's last 10 games show who plays them.</dd>
+      <dd>A game's chances read the NBA's injury report, the latest before tip-off. Players it lists as out or doubtful sit. A questionable player counts for half his minutes. A regular who missed only his team's last game and isn't on the report counts as back. The minutes of those who sit count a little lower, because backups play them worse than the regulars. A team the report doesn't cover yet loses the players that morning's ESPN report lists as out. A team's rating leaves out players who are out for weeks. The rest of the rotation takes their minutes, also counted a little lower, until the team's last 10 games show who plays them.</dd>
       <dt>Home court</dt>
       <dd>Its worth is measured each season from the three seasons before.</dd>
       <dt>Back-to-backs</dt>
       <dd>A tired team's chance drops, but its rating doesn't.</dd>
       <dt>Upsets</dt>
       <dd>A win by a team given under {UPSET}% is marked as an <UpsetBadge /></dd>
+      <dt>Accuracy</dt>
+      <dd><a href={href({ kind: "record" })}>The track record</a> scores every pre-game chance against how the game went.</dd>
     </dl>
   </section>
 </Base>
@@ -150,6 +153,7 @@ const game = opener && {
   .notes { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 24px; line-height: 22px; }
   .notes dt { font-weight: 500; }
   .notes dd { color: var(--muted); }
+  .notes a { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
   @media (max-width: 640px) {
     .notes { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
     .notes dd + dt { margin-top: 12px; }

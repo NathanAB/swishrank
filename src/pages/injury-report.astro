@@ -39,7 +39,7 @@ const live = r.seasons.find((s) => s.id === current.id);
 <Base title="What the injury report really means" docTitle={INJURY_REPORT_TITLE} description={description} route={{ kind: "injury-report" }} ownHeading>
   <div class="injuries">
     <Panel level={1} title="What the injury report really means">
-      <p class="lede">How often does a player listed on the NBA's injury report play that night? Over {int(r.games)} games since {since}, a player listed Questionable played {played(Questionable)} of the time.</p>
+      <p class="lede">How often does a player listed on the NBA's injury report play that night? Over {int(r.games)} games since {since}, a player listed Questionable played {played(Questionable)} of the time.{most && <> {name(most.athlete)} was listed Questionable {int(most.questionable.listed)} times, the most of anyone, and played in {int(most.questionable.played)}.</>}</p>
       <dl class="figs">
         {figs.map((f) => (
           <div>
@@ -52,7 +52,7 @@ const live = r.seasons.find((s) => s.id === current.id);
     </Panel>
 
     <Panel title="When he's listed Questionable">
-      <p class="key">Every player listed Questionable {MIN_QUESTIONABLE} times or more since {since}, most listings first, with the teams he was listed with, his latest last. The bar under his share is how often he played, and its mark is the league's {played(Questionable)}.</p>
+      <p class="key">Every player listed Questionable {MIN_QUESTIONABLE} times or more since {since}, most listings first. Under each name are the teams he was listed with. The bar shows how often he played, and the mark on it is the league's {played(Questionable)}.</p>
       <label class="find" data-find hidden>
         <span class="sr">Find a player</span>
         <input type="search" placeholder="Find a player" autocomplete="off" spellcheck="false" />
@@ -86,7 +86,7 @@ const live = r.seasons.find((s) => s.id === current.id);
     </Panel>
 
     <Panel title="By team">
-      <p class="key">Each team's players listed Questionable since {since}, by how often they played, most often first.</p>
+      <p class="key">How often each team's Questionable players played, since {since}. The team whose players played most often is first.</p>
       <div class="wide">
         <table class="ruled">
           <thead>
@@ -110,7 +110,7 @@ const live = r.seasons.find((s) => s.id === current.id);
     </Panel>
 
     <Panel title="Season by season">
-      <p class="key">How often a player played, by his status, each season.</p>
+      <p class="key">How often a listed player played each season, by status.</p>
       <div class="wide">
         <table class="ruled">
           <thead>
@@ -140,8 +140,8 @@ const live = r.seasons.find((s) => s.id === current.id);
     <Panel title="Fine print">
       <div class="print">
         <p>The figures come from the NBA's official injury report and the league's box scores: every game, regular season and playoffs, with a report on file since {since}, {int(r.games)} games in all.</p>
-        <p>The league publishes the report several times a day, and each game here carries one of them. Through 2025–26 it is the afternoon report: the latest published on the hour at least 90 minutes before tip-off, no later than 5 PM and no earlier than 11 AM Eastern. Before 2021–22 the league published three a day, at 1, 5 and 8 PM, and a game takes the latest of those by that hour. A game that tipped off before 12:30 PM Eastern has no afternoon report and is left out.</p>
-        {live && <p>For {current.label} it is the latest report the site saved before tip-off, checked every half hour, from {dayWithYear(dayKey(live.from))} on. That report comes closer to the game, when fewer players are still listed Questionable, so {current.label}'s figures do not compare with the earlier seasons'.</p>}
+        <p>The league publishes the report several times a day, and each game here carries one of them. Through 2025–26 it is the afternoon report: the latest published on the hour at least 90 minutes before tip-off, no later than 5 PM and no earlier than 11 AM Eastern. Before 2021–22 the league published only three a day, at 1, 5 and 8 PM, so a game carries the 1 PM or the 5 PM report, whichever is the later one that meets that cutoff. A game that tipped off before 12:30 PM Eastern has no afternoon report and is left out.</p>
+        {live && <p>For {current.label} it is the last report the site saved before tip-off, starting {dayWithYear(dayKey(live.from))}. The site checks for a new one every half hour. That report is closer to the game, when fewer players are still listed Questionable, so this season's figures can't be compared with earlier seasons'.</p>}
         <p>A player played if he logged any minutes. A status can change after that report, so these figures say what a status means when you see it that afternoon, not what the team finally decided.</p>
         <p>Each name on the report is matched to a player who has played for that team that season. A player the report names who never played for that team that season is not counted.</p>
       </div>
