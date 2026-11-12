@@ -1,5 +1,5 @@
-// The players page's interactions (src/pages/players/index.astro). The page arrives drawn for today since the first
-// full ranking; once it has loaded, this fetches the table behind it and draws any other day or range with the same
+// The players page's interactions (src/pages/players/index.astro). The page arrives drawn for today over the newest
+// season; once it has loaded, this fetches the table behind it and draws any other day or range with the same
 // functions the build used (lib/player-chart.ts). Pointing across the plot shows that day everywhere: the header,
 // the top five's lines and labels, the strip's run and the Top 10, whose rows slide to their new places. A click
 // holds the day, and leaving the plot returns to the held day, today until one is held. A strip block holds the

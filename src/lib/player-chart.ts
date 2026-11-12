@@ -52,7 +52,7 @@ export type Range = "season" | "three" | "all";
 /** The ranges in the order the switch lists them. */
 export const RANGES: readonly Range[] = ["season", "three", "all"];
 /** The range the page opens on, and the one its league-lines file draws. */
-export const DEFAULT_RANGE: Range = "all";
+export const DEFAULT_RANGE: Range = "season";
 
 const memo = <K extends object, V>(make: (k: K) => V) => {
   const cache = new WeakMap<K, V>();

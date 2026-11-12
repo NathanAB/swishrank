@@ -1,4 +1,4 @@
-// Every kept player's rating line since the first full ranking, in grey, for the players page to draw behind the
+// Every kept player's rating line over the page's default range, the newest season, in grey, for the players page to draw behind the
 // day's top five through <use>. Inline, its few hundred lines would add some 100 KB to the page; as a file the
 // browser caches it. lib/player-chart.ts linesFile draws it on the same frame as the page's own lines.
 import type { APIRoute } from "astro";
