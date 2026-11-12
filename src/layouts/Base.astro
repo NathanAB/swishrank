@@ -31,14 +31,13 @@ interface Props {
 const { title, docTitle = title, description = "Elo ratings for all 30 NBA teams. Every team starts the season from its preseason odds.", route, ownHeading = false } = Astro.props;
 
 const season = (route && routeSeason(route)) ?? currentSeason();
-const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route; wide?: true }[] = [
+const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
   { label: "Ratings", kinds: ["home"], to: (s) => ({ kind: "home", season: s }) },
   { label: "Players", kinds: ["players"], to: () => ({ kind: "players" }) },
   { label: "Games", kinds: ["games", "game"], to: (s) => ({ kind: "games", season: s }) },
   // Only the season in progress has odds, so from a finished season the tab goes to the current one's.
   { label: "Odds", kinds: ["odds"], to: (s) => ({ kind: "odds", season: s.current ? s : currentSeason() }) },
-  // The bar is full at phone width, so this one shows from 641px up; the footer links the page at every width.
-  { label: "How it works", kinds: ["about"], to: () => ({ kind: "about" }), wide: true },
+  { label: "How it works", kinds: ["about"], to: () => ({ kind: "about" }) },
 ];
 const home = href({ kind: "home", season: currentSeason() });
 
@@ -82,7 +81,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
         </a>
         <nav class="nav" aria-label="Site">
           {NAV.map((item) => (
-            <a class:list={{ wide: item.wide }} href={href(item.to(season))} aria-current={route && item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
+            <a href={href(item.to(season))} aria-current={route && item.kinds.includes(route.kind) ? "page" : undefined}>{item.label}</a>
           ))}
         </nav>
       </div>
@@ -156,19 +155,24 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
   }
   .foot-link { color: var(--text); text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
 
-  /* On a phone the name keeps to the left and the links to the right, so the two never read as one phrase. The first
-     link's auto margin does it, and gives way to nothing when the links fill the row and scroll. */
+  /* On a narrow screen the name keeps to the left and the links to the right, so the two never read as one phrase.
+     The first link's auto margin does it. */
   @media (max-width: 640px) {
     .bar-in { gap: 8px; }
     .nav { gap: 20px; }
     .nav a:first-child { margin-left: auto; }
-    .nav a.wide { display: none; }
     .brand { font-size: 16px; }
     .brand svg { width: 22px; height: 22px; }
   }
+  /* A phone has no room for the name and every link in one row, so the bar takes two: the name, then the links
+     spread from edge to edge, in line with the cards under them. Narrower than the links, the row scrolls. */
+  @media (max-width: 560px) {
+    .bar-in { height: auto; flex-wrap: wrap; gap: 0; }
+    .brand { align-self: auto; height: 42px; }
+    .nav { flex: 0 0 100%; height: 41px; gap: 12px; justify-content: space-between; font-size: 14px; }
+    .nav a:first-child { margin-left: 0; }
+  }
   @media (max-width: 399px) {
-    .bar-in { gap: 6px; }
-    .nav { gap: 16px; font-size: 14px; }
     .brand { font-size: 15px; }
   }
 </style>
