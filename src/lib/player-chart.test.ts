@@ -39,19 +39,11 @@ test("the timeline sets seasons end to end, each as long as its days, with a 10-
   assert.deepEqual(positions(table()), [0, 7, 14, 24, 31, 45]);
 });
 
-test("a range starts at this season's first sample, three seasons back, or the first sample with a full list", () => {
+test("a range starts at the newest season's first sample, or the first sample with a full list", () => {
   // With Al rated from the second sample on, the list is full of ten from there.
   const t = table(player("Al", [null, 9, 9, 9, 9, 9]), player("Bo", [5, 5, 5, 5, 5, 5]));
   assert.equal(rangeFrom(t, "season"), 3);
-  assert.equal(rangeFrom(t, "three"), 1);
   assert.equal(rangeFrom(t, "all"), 1);
-  // Four seasons of one sample each: three seasons back is the second.
-  const four: PlayerTimeline = {
-    days: ["2022-10-01", "2023-10-01", "2024-10-01", "2025-10-01"],
-    seasons: [0, 1, 2, 3].map((k) => ({ id: `s${k}`, label: `s${k}`, from: k, to: k })),
-    players: [player("Al", [9, 9, 9, 9]), player("Bo", [5, 5, 5, 5]), ...fillers(4)],
-  };
-  assert.equal(rangeFrom(four, "three"), 1);
 });
 
 test("a line is cut into one stretch per team, the two sharing the point where he changed, and broken where he has no rating", () => {
@@ -95,7 +87,6 @@ test("the fetched table is taken only when every part of it has its shape", () =
 test("the switch names the newest season with ratings by its label, so it is right before a new season's first game too", () => {
   const t = table(player("Al", [9, 9, 9, 9, 9, 9]));
   assert.equal(rangeLabel(t, "season"), "2025–26");
-  assert.equal(rangeLabel(t, "three"), "3 seasons");
   assert.equal(rangeLabel(t, "all"), "Since 2024");
 });
 

@@ -47,10 +47,10 @@ export const AXIS = { lo: 20, step: 20 } as const;
 /** The widths, in px, at which the strip under the plot is laid out again: a name shows from the first that fits it. */
 export const STRIP_STEPS = [240, 360, 480, 600, 720, 840, 960, 1080] as const;
 
-/** How far back the plot reaches: the newest season, the last three, or everything since the first full sample. */
-export type Range = "season" | "three" | "all";
+/** How far back the plot reaches: the newest season, or everything since the first full sample. */
+export type Range = "season" | "all";
 /** The ranges in the order the switch lists them. */
-export const RANGES: readonly Range[] = ["season", "three", "all"];
+export const RANGES: readonly Range[] = ["season", "all"];
 /** The range the page opens on, and the one its league-lines file draws. */
 export const DEFAULT_RANGE: Range = "season";
 
@@ -94,11 +94,9 @@ export const positions = memo((t: PlayerTimeline) => {
   return u;
 });
 
-/** A range's first sample: this season's, the last three seasons', or the first full sample's. */
-export function rangeFrom(t: PlayerTimeline, range: Range): number {
-  const at = range === "season" ? t.seasons.length - 1 : range === "three" ? Math.max(0, t.seasons.length - 3) : 0;
-  return range === "all" ? firstFull(t) : Math.max(firstFull(t), t.seasons[at].from);
-}
+/** A range's first sample: the newest season's, or the first full sample's. */
+export const rangeFrom = (t: PlayerTimeline, range: Range): number =>
+  range === "all" ? firstFull(t) : Math.max(firstFull(t), t.seasons[t.seasons.length - 1].from);
 
 /**
  * A range's name on the switch: "Since 2015" for the whole table, and the newest season by its own label, since
@@ -108,8 +106,6 @@ export function rangeLabel(t: PlayerTimeline, range: Range): string {
   switch (range) {
     case "season":
       return t.seasons[t.seasons.length - 1].label;
-    case "three":
-      return "3 seasons";
     case "all":
       return `Since ${t.days[firstFull(t)].slice(0, 4)}`;
     default: {
