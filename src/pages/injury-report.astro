@@ -1,0 +1,220 @@
+---
+// How often a player on the NBA's injury report plays that night: each status since the first season with a report,
+// every player listed Questionable often, every team and every season. lib/injury-record.ts works out every figure;
+// this page lays them out, and its fine print says which report each game carries and what "played" means.
+import Panel from "../components/Panel.astro";
+import Base from "../layouts/Base.astro";
+import { dayKey } from "../lib/elo.ts";
+import { dayWithYear, int, pctTenth, seasonLabel } from "../lib/format.ts";
+import { MIN_QUESTIONABLE, share, type Tally } from "../lib/injury-record.ts";
+import { INJURY_REPORT_TITLE, injuryReportDescription } from "../lib/meta.ts";
+import { playerName } from "../lib/names.ts";
+import { href } from "../lib/routes.ts";
+import { currentSeason, injuryRecord } from "../lib/season.ts";
+
+const r = injuryRecord();
+const current = currentSeason();
+const since = seasonLabel(r.since);
+const name = (athlete: number) => playerName(athlete) ?? `Player ${athlete}`;
+const teamName = (abbr: string) => current.model.data.teams[abbr]?.name ?? abbr;
+const { Probable, Questionable, Doubtful, Out } = r.statuses;
+const league = share(Questionable);
+const figs = [
+  { status: "Probable", t: Probable },
+  { status: "Questionable", t: Questionable },
+  { status: "Doubtful", t: Doubtful },
+  { status: "Out", t: Out },
+];
+const played = (t: Tally) => pctTenth(share(t));
+const most = r.players[0];
+const description = injuryReportDescription(
+  since,
+  int(r.games),
+  { probable: played(Probable), questionable: played(Questionable), doubtful: played(Doubtful), out: played(Out) },
+  most && { name: name(most.athlete), listed: int(most.questionable.listed), played: int(most.questionable.played) },
+);
+const live = r.seasons.find((s) => s.id === current.id);
+---
+
+<Base title="What the injury report really means" docTitle={INJURY_REPORT_TITLE} description={description} route={{ kind: "injury-report" }} ownHeading>
+  <div class="injuries">
+    <Panel level={1} title="What the injury report really means">
+      <p class="lede">How often does a player listed on the NBA's injury report play that night? Over {int(r.games)} games since {since}, a player listed Questionable played {played(Questionable)} of the time.</p>
+      <dl class="figs">
+        {figs.map((f) => (
+          <div>
+            <dt>{f.status} played</dt>
+            <dd class="num">{played(f.t)}</dd>
+            <dd class="of">{int(f.t.played)} of {int(f.t.listed)}</dd>
+          </div>
+        ))}
+      </dl>
+    </Panel>
+
+    <Panel title="When he's listed Questionable">
+      <p class="key">Every player listed Questionable {MIN_QUESTIONABLE} times or more since {since}, most listings first, with the teams he was listed with, his latest last. The bar under his share is how often he played, and its mark is the league's {played(Questionable)}.</p>
+      <label class="find" data-find hidden>
+        <span class="sr">Find a player</span>
+        <input type="search" placeholder="Find a player" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="wide">
+        <table class="ruled players">
+          <thead>
+            <tr>
+              <th scope="col">Player</th>
+              <th scope="col" class="n">Listed</th>
+              <th scope="col" class="n">Played</th>
+              <th scope="col" class="n">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.players.map((p) => (
+              <tr data-player>
+                <th scope="row"><span class="who">{name(p.athlete)}</span><span class="teams">{p.teams.join(", ")}</span></th>
+                <td class="n">{int(p.questionable.listed)}</td>
+                <td class="n">{int(p.questionable.played)}</td>
+                <td class="n v share">
+                  {played(p.questionable)}
+                  <span class="bar" aria-hidden="true"><span class="fill" style={`width: ${share(p.questionable) * 100}%`}></span><span class="mark" style={`left: ${league * 100}%`}></span></span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="note" data-none hidden>No player listed Questionable {MIN_QUESTIONABLE} times or more has that name.</p>
+    </Panel>
+
+    <Panel title="By team">
+      <p class="key">Each team's players listed Questionable since {since}, by how often they played, most often first.</p>
+      <div class="wide">
+        <table class="ruled">
+          <thead>
+            <tr>
+              <th scope="col">Team</th>
+              <th scope="col" class="n">Listed</th>
+              <th scope="col" class="n">Played</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.teams.map((t) => (
+              <tr>
+                <th scope="row"><a href={href({ kind: "team", season: current, abbr: t.team })}>{teamName(t.team)}</a></th>
+                <td class="n">{int(t.questionable.listed)}</td>
+                <td class="n v">{played(t.questionable)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+
+    <Panel title="Season by season">
+      <p class="key">How often a player played, by his status, each season.</p>
+      <div class="wide">
+        <table class="ruled">
+          <thead>
+            <tr>
+              <th scope="col">Season</th>
+              <th scope="col" class="n">Listed Questionable</th>
+              <th scope="col" class="n">Questionable</th>
+              <th scope="col" class="n">Doubtful</th>
+              <th scope="col" class="n">Probable</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.seasons.map((s) => (
+              <tr>
+                <th scope="row">{seasonLabel(s.id)}</th>
+                <td class="n">{int(s.statuses.Questionable.listed)}</td>
+                <td class="n v">{s.statuses.Questionable.listed ? played(s.statuses.Questionable) : "–"}</td>
+                <td class="n">{s.statuses.Doubtful.listed ? played(s.statuses.Doubtful) : "–"}</td>
+                <td class="n">{s.statuses.Probable.listed ? played(s.statuses.Probable) : "–"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+
+    <Panel title="Fine print">
+      <div class="print">
+        <p>The figures come from the NBA's official injury report and the league's box scores: every game, regular season and playoffs, with a report on file since {since}, {int(r.games)} games in all.</p>
+        <p>The league publishes the report several times a day, and each game here carries one of them. Through 2025–26 it is the afternoon report: the latest published on the hour at least 90 minutes before tip-off, no later than 5 PM and no earlier than 11 AM Eastern. Before 2021–22 the league published three a day, at 1, 5 and 8 PM, and a game takes the latest of those by that hour. A game that tipped off before 12:30 PM Eastern has no afternoon report and is left out.</p>
+        {live && <p>For {current.label} it is the latest report the site saved before tip-off, checked every half hour, from {dayWithYear(dayKey(live.from))} on. That report comes closer to the game, when fewer players are still listed Questionable, so {current.label}'s figures do not compare with the earlier seasons'.</p>}
+        <p>A player played if he logged any minutes. A status can change after that report, so these figures say what a status means when you see it that afternoon, not what the team finally decided.</p>
+        <p>Each name on the report is matched to a player who has played for that team that season. A player the report names who never played for that team that season is not counted.</p>
+      </div>
+    </Panel>
+  </div>
+</Base>
+
+<script>
+  // Without script the field stays hidden and the whole table shows.
+  const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  const field = document.querySelector<HTMLLabelElement>("[data-find]");
+  const input = field?.querySelector("input");
+  const rows = [...document.querySelectorAll<HTMLTableRowElement>("tr[data-player]")];
+  const none = document.querySelector<HTMLElement>("[data-none]");
+  if (field && input) {
+    field.hidden = false;
+    const names = rows.map((row) => strip(row.querySelector(".who")?.textContent ?? ""));
+    input.addEventListener("input", () => {
+      const q = strip(input.value);
+      let shown = 0;
+      rows.forEach((row, i) => {
+        row.hidden = !names[i].includes(q);
+        if (!row.hidden) shown++;
+      });
+      if (none) none.hidden = shown > 0;
+    });
+  }
+</script>
+
+<style>
+  .injuries { display: grid; gap: var(--gap); }
+  .lede { font-size: 15px; line-height: 22px; color: var(--muted); }
+  .figs { display: flex; flex-wrap: wrap; gap: 12px 40px; margin-top: 16px; }
+  .figs dt { margin-bottom: 2px; color: var(--muted); font-size: var(--fs-small); }
+  .figs dd { font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em; }
+  .figs .of { margin-top: 2px; font-size: var(--fs-small); line-height: 16px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
+  .key { margin-bottom: 16px; color: var(--muted); }
+  .print { display: grid; gap: 10px; color: var(--muted); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .find { display: block; margin-bottom: 12px; }
+  .find[hidden] { display: none; }
+  .find input {
+    width: 100%; max-width: 320px; height: var(--control-h); padding: 0 12px; border: 0; border-radius: 8px;
+    background: var(--seg-track); color: var(--text); font: inherit;
+  }
+  .find input::placeholder { color: var(--muted); }
+
+  /* Tables: a phone scrolls a wide one inside its card, never the page. */
+  .wide { position: relative; overflow-x: auto; }
+  th, td { height: 36px; padding: 0 12px 0 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+  th { font-size: var(--fs-small); }
+  /* A row's heading is ruled as its cells are, not as the column headings. */
+  tbody th { font-size: var(--fs-body); font-weight: 500; color: var(--text); border-bottom-color: var(--rule); }
+  tbody tr:last-child th { border-bottom: 0; }
+  tbody th a { text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
+  .n { text-align: right; }
+  .v { color: var(--text); font-weight: 600; }
+
+  /* A player's teams sit under his name, and the bar under his share, so the table keeps to a phone's width. */
+  .players tbody :is(th, td) { height: 52px; }
+  .players tbody th { width: 100%; white-space: normal; }
+  .who, .teams { display: block; }
+  .teams { font-size: var(--fs-small); line-height: 16px; font-weight: 400; color: var(--muted); }
+  .share { min-width: 72px; }
+  .bar { position: relative; display: block; height: 6px; margin-top: 4px; border-radius: 3px; background: var(--grid); }
+  .fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--accent); }
+  .mark { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); }
+  @media (max-width: 640px) {
+    .figs { gap: 12px 28px; }
+    .figs dd { font-size: 22px; line-height: 26px; }
+    thead th { white-space: normal; }
+    th, td { padding-right: 8px; }
+  }
+</style>

@@ -96,6 +96,18 @@ export const RECORD_TITLE = "NBA prediction accuracy and track record";
 export const recordDescription = (since: string, games: string, won: string, logLoss: { model: string; vegas: string }) =>
   `How SwishRank's pre-game win chances score on ${games} NBA games since ${since}: the favorite won ${won}. On the games Vegas priced, the model's log loss is ${logLoss.model} and Vegas's ${logLoss.vegas}, where lower is better.`;
 
+/** The injury report page's document title, led by the words people search for. */
+export const INJURY_REPORT_TITLE = "NBA injury report: how often Questionable players actually play";
+
+/** "How often an NBA player on the injury report plays that night … LeBron James was listed Questionable 177 times and played in 161.", with the figures the page shows. */
+export const injuryReportDescription = (
+  since: string,
+  games: string,
+  played: { probable: string; questionable: string; doubtful: string; out: string },
+  most?: { name: string; listed: string; played: string },
+) =>
+  `How often an NBA player on the injury report plays that night, over ${games} games since ${since}: Probable ${played.probable} of the time, Questionable ${played.questionable}, Doubtful ${played.doubtful} and Out ${played.out}.${most ? ` ${most.name} was listed Questionable ${most.listed} times, the most of any player, and played in ${most.played}.` : ""}`;
+
 /** "Every NBA player's rating since 2015–16 … Nikola Jokic is No. 1 at 99, as he has been since Mar 2023." */
 export const playersDescription = (since: string, lead: { name: string; rating: string; from: string }) =>
   `Every NBA player's rating since ${since}, in points over a full 48 minutes against an average player, and who was No. 1 when. ${lead.name} is No. 1 at ${lead.rating}, as he has been since ${lead.from}.`;

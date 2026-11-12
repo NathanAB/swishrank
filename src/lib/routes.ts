@@ -24,6 +24,8 @@ export type Route =
   | { kind: "players" }
   /** How every pre-game chance since the first season has scored: it has no season of its own. */
   | { kind: "record" }
+  /** How often a player on the NBA's injury report plays, by status, player and team: it has no season of its own. */
+  | { kind: "injury-report" }
   | { kind: "about" };
 
 /** What a game's URL is made of. */
@@ -61,6 +63,8 @@ export function routePath(route: Route): string {
       return "/players/";
     case "record":
       return "/record/";
+    case "injury-report":
+      return "/injury-report/";
     case "about":
       return "/about/";
     default: {
@@ -90,6 +94,7 @@ export function shareImage(route: Route | undefined, current: SeasonRef): ShareI
     case "seasons":
     case "players":
     case "record":
+    case "injury-report":
     case "about":
       return { kind: "season", season: current };
     default: {
@@ -134,6 +139,7 @@ export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string
     case "seasons":
     case "players":
     case "record":
+    case "injury-report":
     case "about":
       return { kind: "home", season: to };
     case "games":
