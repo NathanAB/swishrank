@@ -18,23 +18,22 @@ import { UPSET } from "../lib/facts.ts";
 import { int, pct, signed, weekdayDay } from "../lib/format.ts";
 import { href } from "../lib/routes.ts";
 import { ABOUT_TITLE } from "../lib/meta.ts";
-import { examples, offDay, type ContrastKind } from "../lib/method.ts";
+import { examples, offDay, upsetRatio } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
 
 const season = allSeasons().find((s) => s.model.results.length > 0) ?? null;
 const model = season?.model ?? null;
-const { opener, contrasts } = examples(model?.results ?? []);
+const { opener } = examples(model?.results ?? []);
 const name = (abbr: string) => (season ? team(season, abbr).short : abbr);
 
 const edge = Math.round(model?.home ?? 0);
 const tired = Math.round((PARAMS.b2b * ELO_PER_SIGMA) / PARAMS.sigma);
 const GAP_ANSWER = "gap-answer";
 
-const gain = (kind: ContrastKind) => contrasts.find((c) => c.kind === kind)?.game.winner.change ?? 0;
-const upsetTimes = gain("close") > 0 ? Math.round(gain("upset") / gain("close")) : 0;
+const upsetTimes = Math.round(upsetRatio(model?.results ?? []) ?? 0);
 const TIMES: Record<number, string> = { 2: "twice", 3: "three times", 4: "four times", 5: "five times" };
 const upsetSay = upsetTimes >= 2
-  ? `An underdog's close win earns about ${TIMES[upsetTimes] ?? `${upsetTimes} times`} what a favorite's does, because it was unexpected.`
+  ? `An underdog's win earns about ${TIMES[upsetTimes] ?? `${upsetTimes} times`} what a favorite's does, because it was unexpected.`
   : "An underdog's win earns more than a favorite's, because it was unexpected.";
 
 const rest = model && offDay(model.results, model.series);
@@ -86,7 +85,7 @@ const game = opener && {
     </Panel></li>
 
     <li><Panel title="Every rating is redone each game day">
-      <p class="say">Each time a team plays, its rating uses every result so far. A win counts for more once the beaten team proves strong, and the rating picks that up the next time the team plays. A team that doesn't play keeps its rating.</p>
+      <p class="say">Each time a team plays, its rating is worked out again from all of its games so far. Each game counts the opponent as it was rated going in, so nothing that opponent does later changes an old result. A team that doesn't play keeps its rating.</p>
       <Fragment slot="side">
         {rest ? <DayOff season={season!} /> : game && (
           <div class="game">
@@ -118,7 +117,7 @@ const game = opener && {
     <h2 id="h-fine-print">The fine print</h2>
     <dl class="notes">
       <dt>Scale</dt>
-      <dd>Borrowed from chess's Elo ratings. Unlike Elo, which moves a rating after each game, these are refitted to the whole season every day.</dd>
+      <dd>Borrowed from chess's Elo ratings. Unlike Elo, which nudges a rating after each game, a team's rating here is refit to all of its games each time it plays.</dd>
       <dt>Players</dt>
       <dd>Each player has a value, measured from his box scores over past seasons and his team's results this season. A rookie has no past seasons, so his team's results move him sooner, and a top-three draft pick starts from the level such picks have played at. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
       <dt>Chances</dt>
