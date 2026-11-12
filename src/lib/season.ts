@@ -173,9 +173,9 @@ export const gamePaths = () =>
     }),
   );
 
-/** The season a page shows; the about and seasons pages have none. */
+/** The season a page shows; the about, seasons and players pages have none. */
 export const routeSeason = (route: Route): SeasonView | null =>
-  route.kind === "about" || route.kind === "seasons" ? null : (allSeasons().find((s) => s.id === route.season.id) ?? null);
+  route.kind === "about" || route.kind === "seasons" || route.kind === "players" ? null : (allSeasons().find((s) => s.id === route.season.id) ?? null);
 
 /** The season menu for a page: one link per season, newest first, to the same page in that season. */
 export const seasonSwitch = (route: Route) =>
