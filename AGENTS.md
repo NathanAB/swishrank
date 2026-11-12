@@ -8,6 +8,25 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+## Checking a change
+
+A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don't run it to check a change; the deploy runs it on every push to `main`.
+
+- **One page in the dev server:** start `astro dev --background`, then fetch or open the page.
+- **One page in a real build, about 15 seconds:** build a scratch copy that holds only the pages you changed. This catches data that loads in the dev server and not in a bundle.
+
+  ```
+  git worktree add --detach <scratch> HEAD
+  ln -s "$PWD/node_modules" <scratch>/node_modules
+  cd <scratch>
+  rm -rf 'src/pages/[...season]' src/pages/players src/pages/share src/pages/lines src/pages/seasons.astro
+  npx astro build
+  ```
+
+  Keep any of those directories that holds a page you changed. Read `dist/<page>/index.html`, then run `git worktree remove --force <scratch>`.
+- **Tests:** `node --test <file>` for the file you changed, and `npm test` (about three minutes) once before the pull request.
+- **Deploys:** each push to `main` starts a deploy of about 20 minutes, and deploys queue. Land related changes in one pull request.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
