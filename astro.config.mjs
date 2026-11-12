@@ -14,8 +14,6 @@ export default defineConfig({
   // Stylesheets as files the pages share and the browser caches, rather than a copy inside each of some fifteen
   // thousand pages (https://docs.astro.build/en/reference/configuration-reference/#buildinlinestylesheets).
   build: { inlineStylesheets: 'never' },
-  // How it works is hidden for now, as src/pages/_about.astro, which Astro skips; its old address goes home.
-  redirects: { '/about': '/' },
   // Astro downloads the face at build time and serves it from the site, with metric-matched fallbacks.
   fonts: [
     { ...publicSans, cssVariable: '--font-public-sans' },

@@ -86,6 +86,9 @@ export function gameDescription(season: Pick<SeasonView, "model">, view: GameVie
 /** The players page's document title, led by the words people search for. */
 export const PLAYERS_TITLE = "Best NBA players by rating";
 
+/** The how-it-works page's document title, led by the words people search for. */
+export const ABOUT_TITLE = "How NBA Elo ratings work";
+
 /** The track record page's document title, led by the words people search for. */
 export const RECORD_TITLE = "NBA prediction accuracy and track record";
 
