@@ -25,8 +25,12 @@ const view = dayView(d, f, runs, f.to);
 const lines = withBase(`/players/lines.svg?v=${contentVersion(linesFile(d))}#lines`);
 const src = withBase(`/players/timeline.json?v=${contentVersion(JSON.stringify(d))}`);
 const description = playersDescription(d.seasons[0].label, { name: view.lead.name, rating: view.lead.rating, from: view.lead.since });
-// A strip name, or a season label under it, shows at the strip widths it fits (lib/player-chart.ts fitSteps, rowSteps).
-const fits = STRIP_STEPS.map((w) => `@container lane (min-width: ${w}px) { .players .strip [data-fit~="${w}"] > span, .players .xs > [data-fit~="${w}"] { visibility: visible; } }`).join("\n");
+// A strip name, or a season label under it, shows where the strip is at least one of the widths it fits at
+// (lib/player-chart.ts fitSteps, rowSteps), and narrower than the next width, which lays the row out again.
+const fits = STRIP_STEPS.map((w, k) => {
+  const next = STRIP_STEPS[k + 1];
+  return `@container lane (min-width: ${w}px)${next ? ` and (max-width: ${next - 0.02}px)` : ""} { .players .strip [data-fit~="${w}"] > span, .players .xs > [data-fit~="${w}"] { visibility: visible; } }`;
+}).join("\n");
 ---
 
 <Base title="Players" docTitle={PLAYERS_TITLE} description={description} route={{ kind: "players" }} ownHeading>
