@@ -14,7 +14,7 @@ import Segmented from "./Segmented.astro";
 import TitleRace from "./TitleRace.astro";
 import { PROVISIONAL } from "../lib/elo.ts";
 import { weekChange, weekFinding } from "../lib/facts.ts";
-import { homeDescription, homeTitle, SITE_NAME } from "../lib/meta.ts";
+import { homeDescription, homeHeading, homeTitle, SITE_NAME } from "../lib/meta.ts";
 import { href, type Route } from "../lib/routes.ts";
 import { seasonSwitch, TODAY } from "../lib/season.ts";
 import { oddsHistory } from "../lib/season-odds.ts";
@@ -33,7 +33,6 @@ const preliminary = season.current && season.model.abbrs.some((a) => season.mode
 // The week's moves, for the season under way only: a finished season's last week is not news.
 const week = season.current ? weekChange(season.model, TODAY) : null;
 const moved = week && season.model.abbrs.some((a) => week.change[a] !== 0) ? week : undefined;
-const heading = (c?: Conference) => (c ? `${season.label} · ${c}ern Conference` : `${season.label} ratings`);
 const views = [undefined, ...CONFERENCE_ORDER].map((c) => ({
   conference: c,
   label: c ?? "All",
@@ -46,13 +45,13 @@ const race = oddsHistory(season);
 ---
 
 <Base
-  title={`${season.label} ratings`}
+  title={homeHeading(season)}
   docTitle={homeTitle(season, conference)}
   description={homeDescription(season, conference)}
   route={route}
   ownHeading
 >
-  <Panel level={1} title={heading(conference)} meta={season.note ?? undefined}>
+  <Panel level={1} title={homeHeading(season, conference)} meta={season.note ?? undefined}>
     <Fragment slot="aside">
       <Segmented label="Conference" options={views} />
       <SeasonMenu route={route} />
@@ -63,7 +62,7 @@ const race = oddsHistory(season);
       <div
         hidden={!v.current}
         data-view={v.href}
-        data-heading={heading(v.conference)}
+        data-heading={homeHeading(season, v.conference)}
         data-finding={v.finding ?? ""}
         data-doc-title={`${homeTitle(season, v.conference)} · ${SITE_NAME}`}
         data-seasons={JSON.stringify(seasonSwitch({ kind: "home", season, conference: v.conference }).map((o) => o.href))}
