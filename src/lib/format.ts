@@ -70,6 +70,8 @@ export const weekdayDay = (day: string) => dayPart(day, { weekday: "short", mont
 export const longDay = (day: string) => dayPart(day, { weekday: "long", month: "long", day: "numeric" });
 /** June 2026, from a YYYY-MM month key. With its year, since 2019-20 had two Octobers. */
 export const monthName = (month: string) => dayPart(`${month}-01`, { month: "long", year: "numeric" });
+/** Jun 2026, from a YYYY-MM month key, for a figure short of room */
+export const monthYear = (month: string) => dayPart(`${month}-01`, { month: "short", year: "numeric" });
 /** Jun, from a YYYY-MM month key, for axis labels */
 export const monthShort = (month: string) => dayPart(`${month}-01`, { month: "short" });
 
