@@ -9,13 +9,12 @@ import { parseBox, type Athlete, type BoxLine, type Lineup, type Sides } from ".
 import { blockBootstrap, loss, type Diff, type Paired } from "./evaluate.ts";
 
 /**
- * One season on file as a version may read it: its games, box scores, preseason totals and ESPN's injury reports as
- * read from JSON, and in `nbaReports` each game's last NBA report published at least 30 minutes before its tip-off
- * (scripts/nba-reports-at-tip/). `stints` is the season's play-by-play record as read from scripts/stints/, for
- * src/lib/stints.ts parseStints, undefined until it is on file. Data a later version reads joins here, and in
- * scripts/backtest-v5.ts's loader.
+ * One season on file as a version may read it: its games, box scores, preseason totals, ESPN's injury reports and
+ * its play-by-play record as read from JSON, and in `nbaReports` each game's last NBA report published at least 30
+ * minutes before its tip-off (scripts/nba-reports-at-tip/). Data a later version reads joins SeasonFiles
+ * (src/lib/inputs.ts), and scripts/backtest-v5.ts's loader.
  */
-export type Season = SeasonFiles & { stints?: unknown };
+export type Season = SeasonFiles;
 
 /** One game as a version priced it before its tip-off. */
 export type Call = {

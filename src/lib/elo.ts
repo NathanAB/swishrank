@@ -46,6 +46,8 @@ export type SeedRule = { scale: number; fade: number; carry: number };
 /**
  * Version 2's players: each one's value is pulled toward `a` times his box rating with `np` games. Version 3 pulls a
  * player new to the box scores, the season's `rookies`, with `rookieNp` games instead, so his results move him sooner.
+ * Version 5 pulls him toward `a` times his box rating plus `weight` times his on-court residual (src/lib/inputs.ts
+ * withOnCourt), which SeasonInputs' `ratings` carry in place of the box ratings.
  */
 export type PlayerRule = { a: number; np: number; halfLife: number; rookieNp?: number };
 /**
