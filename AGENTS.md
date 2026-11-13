@@ -27,6 +27,13 @@ A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don'
 - **Tests:** `node --test <file>` for the file you changed, and `npm test` (about three minutes) once before the pull request.
 - **Deploys:** each push to `main` starts a deploy of about 20 minutes, and deploys queue. Land related changes in one pull request.
 
+## Scoring a model change
+
+A change to the model is a candidate: one file in `scripts/candidates/` whose default export is a `Candidate` (`scripts/past-seasons.ts`; `scripts/candidates/v4.ts` is the example). `docs/adr/0002` is the rule it is judged by.
+
+- **One candidate, printed only:** `npm run backtest:v5 -- <file name without .ts>`.
+- **Every candidate, and the results part of `docs/model-v5.md` rewritten:** `npm run backtest:v5`. Version 4 alone takes about a minute.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
