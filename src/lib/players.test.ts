@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Game, SeasonData } from "./elo.ts";
-import { lineups, usualRotations, type BoxLine, type SeasonBox } from "./players.ts";
+import { boxRatings, lineups, usualRotations, type BoxLine, type SeasonBox } from "./players.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
 const game = (id: string, day: number): Game => ({
@@ -86,4 +86,11 @@ test("last season's minutes count at no more than a player's most minutes in a g
   const lineup = usualRotations(seasons).get("x")!.get("2026-10-13")!.A!;
   const usual = (3 * 4 + 0.75 * 4) / 4.75;
   assert.equal((lineup.find((p) => p.athlete === 4)!.share * 48).toFixed(6), ((240 * usual) / (48 + usual)).toFixed(6), "(3 * 4 + 0.75 * 4) / 4.75 a game, beside 24 and 24");
+});
+
+test("a season's box ratings list its players by first appearance, day by day, whatever order the box file holds its games in", () => {
+  // The later game has the smaller id, and a file's numeric keys read back in ascending order.
+  const data: SeasonData = { season: "x", teams: { A: team("A"), B: team("B") }, games: [game("9", 20), game("5", 22)] };
+  const box: SeasonBox = { season: "x", games: { 5: { A: [line(3, 30), line(1, 30)] }, 9: { A: [line(1, 30), line(2, 30)] } } };
+  assert.deepEqual(boxRatings([{ data, box }], 365).get("x")?.athletes, [1, 2, 3]);
 });
