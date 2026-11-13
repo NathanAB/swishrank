@@ -1,7 +1,7 @@
 # Builds the site and deploys it to Cloudflare with Cloudflare's own action
 # (https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/), plus a daily run that pulls the
 # night's scores from ESPN and commits them before building. The NBA report's workflow (nba-report.yml) also starts it
-# after each report it saves, as often as every half hour on game days, since version 4 prices games from that report.
+# after each report it saves, as often as every half hour on game days, since each game's lineup reads that report.
 # It passes `source: report`, and those runs skip the ESPN fetch, which the daily run makes. They still run the tests:
 # a newer run in the deploy group replaces one still waiting, so a report run can be the one that deploys a push.
 name: Refresh scores and deploy

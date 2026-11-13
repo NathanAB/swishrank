@@ -1,6 +1,6 @@
 # Saves the NBA's injury report onto every game still to come, so each game keeps the latest report saved before its
-# tip-off (docs/model-v4.md, scripts/fetch-nba-report.ts). The site runs
-# version 4, which prices each game from that report, so a run that commits a report starts the deploy workflow to
+# tip-off (docs/model-v4.md, scripts/fetch-nba-report.ts). The site builds
+# each game's lineup from that report, so a run that commits a report starts the deploy workflow to
 # rebuild the site: a push made with this workflow's token starts no other workflow, but a dispatch does. The dispatch
 # passes `source=report`, so that run only builds and deploys, without the tests or the ESPN fetch.
 name: Save the NBA injury report

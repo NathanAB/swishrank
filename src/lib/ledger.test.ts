@@ -18,13 +18,17 @@ const LOGS = [["2026-27", "OKC"], ["2024-25", "LAL"], ["2024-25", "OKC"], ["2023
 
 test("every row's walk adds up, part by part and in all, shows each player once, and keeps 1.0 out of the under-a-point lines", () => {
   const seasons = allSeasons();
-  let rows = 0;
+  let rows = 0, updates = 0;
   for (const [id, abbr] of LOGS) {
     const season = seasons.find((s) => s.id === id)!;
     for (const row of ledger(season, abbr)) {
       const at = `${id} ${abbr} ${row.day}`;
       const w = walk(season, row);
       rows++;
+      const court = w.parts.flatMap((p) => p.lines.flatMap((l) => (l.kind === "group" ? l.items : [l]).map((x) => ({ part: p.key, ...x })))).filter((x) => x.kind === "court");
+      const shown = Math.abs(row.court) >= 0.05 && w.parts.some((p) => p.key === "players");
+      if (shown) updates++;
+      assert.ok(court.length === Number(shown) && court.every((x) => x.part === "players" && x.points === row.court), `${at}: the on-court update of ${row.court} shows as ${JSON.stringify(court)}`);
       assert.equal(w.whole.result + w.whole.players, row.change, `${at}: the two parts add up to the change`);
       for (const part of w.parts) {
         assert.equal(part.lines.reduce((s, l) => s + l.whole, 0), part.whole, `${at}: ${part.label}'s lines add up to its figure`);
@@ -36,11 +40,14 @@ test("every row's walk adds up, part by part and in all, shows each player once,
     }
   }
   assert.ok(rows > 300, `walked ${rows} rows`);
+  assert.ok(updates > 20, `walked ${updates} on-court updates`);
 });
 
 /**
  * How far a game's Result may run against its surprise, in a finished season. Across every finished team-season one
- * runs 2 at most, IND's on 2025-12-18; the whole day's change, a new player's minutes included, ran one 13.
+ * runs 2 at most, IND's on 2025-12-18; the whole day's change, a new player's minutes included, ran one 13. Version 5's
+ * weekly on-court update moves every player's value at once, and the walk books it on its own players' line, never in
+ * the Result, which keeps it there.
  */
 const AGAINST = 2;
 
@@ -105,6 +112,25 @@ test(`no game's Result in a finished season runs more than ${AGAINST} points aga
     if (!season.end) continue;
     assert.ok(surprise > 0 ? w.whole.result >= -AGAINST : w.whole.result <= AGAINST, `${at}: did ${surprise > 0 ? "better" : "worse"} than expected, Result ${w.whole.result}`);
   }
+});
+
+/**
+ * How far the seed's line may move a team-day of 2025-26, a finished season, so the bound does not age: its fading,
+ * which runs largest after a week off. Version 4's largest was 3.64 and version 5's is 2.92, both DAL's on 2026-03-05;
+ * with version 5's on-court update booked in it, it reaches 18.88.
+ */
+const FADING = 4;
+
+test(`the seed's line moves no team-day of 2025-26 by ${FADING} points or more, and the on-court update a point or more only on some`, () => {
+  const season = allSeasons().find((s) => s.id === "2025-26")!;
+  let rows = 0, moved = 0;
+  for (const abbr of season.model.abbrs) for (const row of ledger(season, abbr)) {
+    rows++;
+    // A player who sat out a refit takes his update when he plays again, so small ones come on about half the days.
+    if (Math.abs(row.court) >= 1) moved++;
+    assert.ok(Math.abs(row.seed) < FADING, `${season.id} ${abbr} ${row.day}: the seed's line is ${row.seed}`);
+  }
+  assert.ok(moved > 0 && moved < rows / 2, `the on-court update moves ${moved} of ${rows} team-days by a point or more`);
 });
 
 test("minutes that change hands are credited to whoever caused the trade, a sitter never gains, and the rows still add up", () => {

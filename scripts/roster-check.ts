@@ -1,11 +1,11 @@
 // npm run roster-check: the prototype's check of roster-based lineups (issue 70), reproduced once. Rates are learned
-// from exactly 2019-20 to 2022-23, as the prototype learned them, and version 4's ratings run with the site's SIGMA and
+// from exactly 2019-20 to 2022-23, as the prototype learned them, and version 4's ratings run with its own SIGMA and
 // early widening; the scoreboard scores 2023-24 to 2025-26 against version 4 for each fill of scripts/roster-candidates.ts.
 // It prints the rates and the scores as Markdown tables and changes no file.
-import { EARLY, PARAMS } from "../src/lib/elo.ts";
 import { parseNbaArchive } from "../src/lib/nba-report.ts";
 import { parseBox } from "../src/lib/players.ts";
 import { rosterRates, type RosterRule } from "../src/lib/roster-lineups.ts";
+import { V4 } from "../src/lib/v4.ts";
 import version4 from "./candidates/v4.ts";
 import { pricedOnce, scoreboard, type Candidate } from "./past-seasons.ts";
 import { FILLS, version4With } from "./roster-candidates.ts";
@@ -57,7 +57,7 @@ const rows = FILLS.map((fill) => {
   const { logLoss: d, lineups: l } = line;
   return [fill, d.n, `${s4(d.d)} [${s4(d.lo)}, ${s4(d.hi)}]`, l.teamGames, l.misplaced.b.toFixed(2), l.misplaced.a.toFixed(2), l.valueError.baseline.toFixed(3), l.valueError.candidate.toFixed(3)];
 });
-out.push(`### Roster lineups against version 4, ${SCORED[0]} to ${SCORED[SCORED.length - 1]} pooled\n\nVersion 4's ratings, SIGMA ${PARAMS.sigma} and early widening ${EARLY.widen} in both; rates learned from ${FROM[0]} to ${FROM[FROM.length - 1]}.\n\n${table(
+out.push(`### Roster lineups against version 4, ${SCORED[0]} to ${SCORED[SCORED.length - 1]} pooled\n\nVersion 4's ratings, SIGMA ${V4.sigma} and early widening ${V4.widen} in both; rates learned from ${FROM[0]} to ${FROM[FROM.length - 1]}.\n\n${table(
   ["Fill", "Games", "Roster minus version 4 log loss [95%]", "Team-games", "Version 4 minutes misplaced", "Roster minutes misplaced", "Version 4 value error", "Roster value error"],
   rows,
 )}`);

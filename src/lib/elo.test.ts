@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, counted, fitSeason, PARAMS, phi, ranksOf, winProb, type Game, type SeasonData } from "./elo.ts";
+import { compute, counted, fitSeason, fitSeasonSteps, PARAMS, phi, playerPart, ranksOf, winProb, type Fit, type Game, type SeasonData, type SeasonInputs } from "./elo.ts";
+import type { BoxLine, BoxRatings, Lineup, SeasonBox } from "./players.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
 const teams = (...abbrs: string[]) => Object.fromEntries(abbrs.map((a) => [a, team(a)]));
@@ -77,6 +78,61 @@ test("the win chance shown for a rating gap is the model's own chance for that g
   const next = m.upcoming[0];
   // C plays on the 21st, so the 22nd is its second night.
   near(winProb(m.gaps[next.id]), phi((fit.r.A - fit.r.C + fit.home + PARAMS.b2b) / PARAMS.sigma), "A's chance against C");
+});
+
+/**
+ * A toy season of four teams in which one player's on-court part rises by 40 on the 21st, and player 2 carries one of
+ * 7 all along, which is no update: A's shown on-court update each game day, what the rise alone does to A's shown
+ * rating on the 23rd, from two whole fits that differ only in it, and the steps before the update with and without it.
+ */
+function onCourtSplit(games: Game[], box: SeasonBox, risen: number) {
+  const data: SeasonData = { season: "x", teams: teams("A", "B", "C", "D"), games };
+  const athletes = [1, 2, 3, 5, 6];
+  const boxed = (values: number[]) => Float64Array.from(values);
+  const boxRatings: BoxRatings = {
+    athletes, start: boxed([8, -3, 1, 0, 2]),
+    after: new Map([["2026-10-20", boxed([10, -5, 3, 0, 2])], ["2026-10-21", boxed([10, -5, 3, 1, 1])], ["2026-10-23", boxed([11, -4, 3, 2, 1])]]),
+  };
+  const plus = (rise: number): BoxRatings => {
+    const onCourt = (day: string) => athletes.map((a) => (a === 2 ? 7 : 0) + (a === risen && day >= "2026-10-21" ? rise : 0));
+    return { athletes, start: boxRatings.start.map((x, j) => x + onCourt("")[j]), after: new Map([...boxRatings.after].map(([day, b]) => [day, b.map((x, j) => x + onCourt(day)[j])])) };
+  };
+  const inputs = (rise: number): SeasonInputs => ({ players: { box, ratings: plus(rise), boxRatings, lineups: new Map() } });
+  const lineup: Lineup = [{ athlete: 1, share: 0.75 }, { athlete: 2, share: 0.625 }];
+  const shown = (fit: Fit) => fit.r.A + playerPart(fit, lineup);
+  const steps = fitSeasonSteps(data, PARAMS, inputs(40), "A");
+  return {
+    update: steps.map((s) => shown(s.after) - shown(s.unrefit)),
+    want: shown(fitSeason(data, PARAMS, inputs(40)).at(-1)!.after) - shown(fitSeason(data, PARAMS, inputs(0)).at(-1)!.after),
+    steps: (["priors", "others", "unrefit"] as const).map((k) => [k, shown(steps.at(-1)![k]), shown(fitSeasonSteps(data, PARAMS, inputs(0), "A").at(-1)![k])] as const),
+  };
+}
+const line = (athlete: number, minutes: number): BoxLine => [athlete, minutes, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+test("the on-court update a refit makes while a team rests lands on its next game day, apart from every other step", () => {
+  // A plays on the 20th and 23rd; its player 1 rises on the 21st, while only C and D play.
+  const { update, want, steps } = onCourtSplit(
+    [game("1", "2026-10-20T23:00Z", "A", "B", 110, 100), game("2", "2026-10-21T23:00Z", "C", "D", 105, 100), game("3", "2026-10-23T23:00Z", "A", "C", 100, 104)],
+    { season: "x", games: { 1: { A: [line(1, 36), line(2, 30)], B: [line(3, 36)] }, 2: { C: [line(5, 36)], D: [line(6, 36)] }, 3: { A: [line(1, 34), line(2, 32)], C: [line(5, 30)] } } },
+    1,
+  );
+  assert.ok(Math.abs(want) > 0.1, `the rise moves A by ${want}`);
+  assert.deepEqual(update.slice(0, 2), [0, 0], "nothing on the day before the refit, nor on the refit day A rests");
+  near(update[2], want, "A's on-court update on its next game day");
+  for (const [k, risen, flat] of steps) near(risen, flat, `${k} on the 23rd reads as the season without the rise`);
+});
+
+test("the on-court update of a player who sits out his team's game on a refit day lands on his next game", () => {
+  // A plays on the 20th, 21st and 23rd; its player 2 sits on the 21st, the day he rises.
+  const { update, want, steps } = onCourtSplit(
+    [game("1", "2026-10-20T23:00Z", "A", "B", 110, 100), game("2", "2026-10-21T23:00Z", "A", "D", 105, 100), game("3", "2026-10-23T23:00Z", "A", "C", 100, 104)],
+    { season: "x", games: { 1: { A: [line(1, 36), line(2, 30)], B: [line(3, 36)] }, 2: { A: [line(1, 38)], D: [line(6, 36)] }, 3: { A: [line(1, 34), line(2, 32)], C: [line(5, 30)] } } },
+    2,
+  );
+  assert.ok(Math.abs(want) > 0.1, `the rise moves A by ${want}`);
+  near(update[1], 0, "nothing on the refit day he sits");
+  near(update[2], want, "A's on-court update on his next game");
+  for (const [k, risen, flat] of steps) near(risen, flat, `${k} on the 23rd reads as the season without the rise`);
 });
 
 test("a 43-point win counts at most four times a 1-point win, and a loss counts as the same win negated", () => {

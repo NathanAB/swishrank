@@ -2,15 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { EARLY, PARAMS } from "../src/lib/elo.ts";
+import { V4 } from "../src/lib/v4.ts";
 
 const doc = readFileSync(new URL("../docs/model-v4.md", import.meta.url), "utf8");
 
-test("src/lib/elo.ts's SIGMA and widening are the fit docs/model-v4.md's Check line records", () => {
+test("src/lib/v4.ts V4's SIGMA and widening are the fit docs/model-v4.md's Check line records", () => {
   const check = /^src\/lib\/v4\.ts V4 matches the plan's fit, `(\{.*\})`\.$/m.exec(doc);
   assert.ok(check, "docs/model-v4.md's Check line says the settings match the plan's fit");
   const r = (x: number, places: number) => Math.round(x * 10 ** places) / 10 ** places;
-  assert.equal(JSON.stringify({ sigma: r(PARAMS.sigma, 3), widen: r(EARLY.widen, 2) }), check[1]);
+  assert.equal(JSON.stringify({ sigma: r(V4.sigma, 3), widen: r(V4.widen, 2) }), check[1]);
 });
 
 test("docs/model-v4.md's pre-registration is the text whose latest hash it records", () => {

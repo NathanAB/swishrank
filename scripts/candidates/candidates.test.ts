@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dayKey, EARLY, fitModel, PARAMS, seasonRule, type SeasonData } from "../../src/lib/elo.ts";
+import { compute, dayKey, EARLY, fitModel, seasonRule, type ModelInputs, type SeasonData } from "../../src/lib/elo.ts";
 import type { DraftFile } from "../../src/lib/draft.ts";
-import { modelInputs } from "../../src/lib/inputs.ts";
+import { modelInputs, siteInputs } from "../../src/lib/inputs.ts";
 import { fitSigma, fitWiden, logLoss, modelRows, price } from "../evaluate.ts";
 import { V4 } from "../../src/lib/v4.ts";
 import { V5 } from "../../src/lib/v5.ts";
@@ -98,7 +99,7 @@ for (const [f, candidate] of [...candidates, ["v5.ts with V5's settings", fixed]
 test("version 4's calls are the chances scripts/evaluate.ts prices, game by game", () => {
   const draft = read("src/data/draft.json") as DraftFile;
   const inputs = modelInputs([small], draft).get(ID)!;
-  const want = price(modelRows(small.data, seasonRule(inputs), inputs), PARAMS.sigma, EARLY.widen);
+  const want = price(modelRows(small.data, seasonRule(inputs), inputs), V4.sigma, V4.widen);
   const calls = version4.choose([]).price(small);
   assert.ok(want.length > 100 && want.some((r) => r.k < EARLY.games));
   assert.equal(calls.size, want.length);
@@ -111,6 +112,36 @@ test("version 4's chances for three real games do not move with version 5's on-c
   assert.equal(calls.get("401584689")?.p, 0.6072995577180842, "opening night, 2023-10-24");
   assert.equal(calls.get("401584749")?.p, 0.6166602765263318, "2023-11-01");
   assert.equal(calls.get("401584901")?.p, 0.609380487145311, "2023-11-30");
+});
+
+test("the site's chances are the ones the scoreboard gives version 5 with its settings on file, game by game", () => {
+  const draft = read("src/data/draft.json") as DraftFile;
+  const site = compute(small.data, siteInputs([early, small], draft).get(ID));
+  const want = priced([early], V5, V5.roster).price(small);
+  const before = (abbr: string, day: string) => site.log[abbr].filter((t) => t.result.day < day).length;
+  assert.ok(site.results.length > 100 && site.results.some((r) => Math.min(before(r.game.home, r.day), before(r.game.away, r.day)) < EARLY.games));
+  assert.equal(site.results.length, want.size);
+  for (const r of site.results) assert.equal(r.p, want.get(r.game.id)?.p, r.game.id);
+});
+
+test("siteInputs reads a season's play-by-play record from scripts/stints/ when it is handed none", () => {
+  const draft = read("src/data/draft.json") as DraftFile;
+  const season = { ...small, stints: undefined };
+  const ratings = (inputs: Map<string, ModelInputs>) => inputs.get(ID)!.players!.ratings;
+  const site = ratings(siteInputs([season], draft));
+  assert.deepEqual(site, ratings(modelInputs([{ ...season, stints: read(`scripts/stints/${ID}.json`) }], draft, V5.onCourt, V5.roster)));
+  assert.notDeepEqual(site, ratings(modelInputs([season], draft, undefined, V5.roster)));
+});
+
+test("siteInputs throws when the working directory has no scripts/stints/, in place of pricing without the play-by-play record", () => {
+  const draft = read("src/data/draft.json") as DraftFile;
+  const root = process.cwd();
+  process.chdir(tmpdir());
+  try {
+    assert.throws(() => siteInputs([{ ...small, stints: undefined }], draft), /no scripts\/stints\/ under .*Run from the repository root/);
+  } finally {
+    process.chdir(root);
+  }
 });
 
 /** Two rules far apart and three weights, the largest far past the search's, so the scores differ visibly. */
@@ -164,7 +195,7 @@ test("the fill is version 4's with no roster-priced earlier season, and otherwis
   const draft = read("src/data/draft.json") as DraftFile;
   const losses = FILLS.map((fill) => {
     const inputs = modelInputs([early, small], draft, undefined, { fill }).get(ID)!;
-    return logLoss(price(modelRows(small.data, seasonRule(inputs), inputs), PARAMS.sigma, EARLY.widen));
+    return logLoss(price(modelRows(small.data, seasonRule(inputs), inputs), V4.sigma, V4.widen));
   });
   assert.ok(Math.max(...losses) - Math.min(...losses) > 1e-4, "the fills score apart");
   const best = FILLS[losses.indexOf(Math.min(...losses))];

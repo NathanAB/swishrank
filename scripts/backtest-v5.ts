@@ -101,7 +101,7 @@ for (const file of files) {
     section(
       `${title}: log loss on real results`,
       versus === BASELINE_FILE
-        ? "Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is the site's (src/lib/inputs.ts) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps the site's settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4."
+        ? "Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is as the site ran it until the switch to version 5 (src/lib/inputs.ts modelInputs with no switches, src/lib/v4.ts V4) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps its own settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4."
         : `Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. The baseline is ${theirs} (scripts/candidates/${versus}.ts), its settings chosen from the same seasons.`,
       table(
         ["Season", "Settings chosen from", "Candidate's settings", "Games", `${them} log loss`, "Candidate log loss", `Candidate minus ${theirs} [95%]`, "Verdict"],
