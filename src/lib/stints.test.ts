@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
 import type { EspnSummary } from "./espn.ts";
-import type { Game } from "./elo.ts";
+import type { Game, SeasonData } from "./elo.ts";
+import { parseBox } from "./players.ts";
 import { boxThrees, formatStints, fromSummary, minutesGap, needsSummary, parseStints, stints, threes, type SeasonStints } from "./stints.ts";
 
 // Home athletes 11-16 and away 21-26, the first five of each starting unless `starters` says otherwise.
@@ -250,4 +252,64 @@ test("a record file with anything but numbers in a stint, or a stint of the wron
   assert.throws(() => parseStints(file([[1], [2], 1.5, 0, 2]), "2026-27"), /malformed stint/);
   assert.throws(() => parseStints(file([[1], [2], 1.5, "Jump Shot", 2, 1, 0, 2, 1]), "2026-27"), /malformed stint/);
   assert.throws(() => parseStints({ season: "2025-26", games: {} }, "2026-27"), /expected \{ season: "2026-27", games \}/);
+});
+
+// Per finished season: the least share of games, in percent, whose rebuilt minutes are all within two of the box score
+// (the prototype's share on the same games less a point; ESPN's feed misses substitutions in 2017-18 to 2019-20), and
+// the least share whose points add up to the final score (as measured less a point; ESPN's feed is a few points off
+// the final in about 1% of games). The season in progress has no floors: its shares move with each morning's games,
+// 4% of its first 174 were off the final score, and a floor there would fail the deploy over ESPN's feed.
+const FLOORS: Record<string, { minutes: number; points: number }> = {
+  "2015-16": { minutes: 98.4, points: 98.4 },
+  "2016-17": { minutes: 98.2, points: 98.7 },
+  "2017-18": { minutes: 83.7, points: 98.8 },
+  "2018-19": { minutes: 79.9, points: 99 },
+  "2019-20": { minutes: 83.2, points: 98.9 },
+  "2020-21": { minutes: 98.6, points: 98.9 },
+  "2021-22": { minutes: 98.8, points: 98.8 },
+  "2022-23": { minutes: 98, points: 98.8 },
+  "2023-24": { minutes: 98.4, points: 98.7 },
+  "2024-25": { minutes: 98.5, points: 98.6 },
+  "2025-26": { minutes: 98.6, points: 98.2 },
+};
+const finished = new Set((JSON.parse(readFileSync(new URL("../data/seasons.json", import.meta.url), "utf8")) as { id: string; end?: string }[]).filter((s) => s.end).map((s) => s.id));
+const stintsDir = new URL("../../scripts/stints/", import.meta.url);
+const dataFile = (dir: string, f: string): unknown => JSON.parse(readFileSync(new URL(`../data/${dir}/${f}`, import.meta.url), "utf8"));
+
+test("every committed record runs a game's length, adds up to its final score but in a few games, agrees with its box score, and counts the league's threes", () => {
+  for (const f of readdirSync(stintsDir).filter((f) => f.endsWith(".json"))) {
+    const season = f.replace(".json", "");
+    const record = parseStints(JSON.parse(readFileSync(new URL(f, stintsDir), "utf8")), season);
+    const finals = new Map((dataFile("games", f) as SeasonData).games.filter((g) => g.final).map((g) => [g.id, g]));
+    const box = parseBox(dataFile("box", f), season);
+    const ids = Object.keys(record.games);
+    let matched = 0, boxed = 0, within = 0, threesAttempted = 0, threesMade = 0;
+    for (const id of ids) {
+      const game = record.games[id], g = finals.get(id);
+      assert.ok(g, `${season} ${id} is not a final game`);
+      const seconds = game.reduce((t, s) => t + s[2], 0), overtimes = Math.round((seconds - 2880) / 300);
+      assert.ok(overtimes >= 0 && Math.abs(seconds - 2880 - 300 * overtimes) < 0.05, `${season} ${id} runs ${seconds} s`);
+      assert.ok(game.every((s) => s[6] <= s[5] && s[8] <= s[7]), `${season} ${id} has a stint with more threes made than attempted`);
+      threesAttempted += game.reduce((t, s) => t + s[5] + s[7], 0);
+      threesMade += game.reduce((t, s) => t + s[6] + s[8], 0);
+      const home = game.reduce((t, s) => t + s[3], 0), away = game.reduce((t, s) => t + s[4], 0);
+      if (home === g.hs && away === g.as) matched++;
+      assert.ok(Math.abs(home - (g.hs ?? 0)) <= 10 && Math.abs(away - (g.as ?? 0)) <= 10, `${season} ${id} adds up to ${home}-${away}`);
+      const lines = Object.values(box.games[id] ?? {}).flatMap((l) => l ?? []);
+      if (!lines.length) continue;
+      const played = new Map<number, number>();
+      for (const [h, a, s] of game) for (const p of [...h, ...a]) played.set(p, (played.get(p) ?? 0) + s);
+      boxed++;
+      if (lines.every((l) => Math.abs((played.get(l[0]) ?? 0) / 60 - l[1]) <= 2)) within++;
+    }
+    if (!finished.has(season)) continue;
+    const floor = FLOORS[season];
+    assert.ok(floor, `${season} has no floors`);
+    assert.ok((matched / ids.length) * 100 >= floor.points, `${season}: ${matched} of ${ids.length} add up to the final score`);
+    assert.ok((within / boxed) * 100 >= floor.minutes, `${season}: ${within} of ${boxed} within two minutes`);
+    // The league's seasons since 2015-16: 48 to 75 threes attempted a game by the two teams, 35.4% to 36.7% of them made.
+    const perGame = threesAttempted / ids.length, made = (threesMade / threesAttempted) * 100;
+    assert.ok(perGame >= 45 && perGame <= 80, `${season}: ${perGame.toFixed(1)} threes attempted a game`);
+    assert.ok(made >= 34.5 && made <= 37.5, `${season}: ${made.toFixed(1)}% of threes made`);
+  }
 });
