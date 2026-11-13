@@ -67,35 +67,58 @@ function withoutLongAbsent(lineup: Lineup, gone: ReadonlySet<Athlete>): Lineup {
   ];
 }
 
+/** After each game day, each team's players out for weeks, each with the return date his entry gives, if any. */
+export type LongAbsences = Map<string, Map<Abbr, Map<Athlete, string | undefined>>>;
+
 /**
- * A season's shown rotations with its injury reports read: after each game day, a player the next morning's report,
- * or the latest before it, lists as out with a projected return more than LONG_ABSENCE days away leaves his team's
- * rotation (withoutLongAbsent), and the team's usual rotation comes back once none of its players is. A player who has
- * played for the team since the day of his entry is back, whatever the entry still says: his minutes then count as
- * the usual rotation counts them, from the games he has played.
+ * Who is out for weeks after each game day. A player leaves when the next morning's report, or the latest before it,
+ * lists him as out with a projected return more than LONG_ABSENCE days away, and stays out while it lists him as out,
+ * whatever date it gives, until he plays for the team after the day of his entry. A return date coming within
+ * LONG_ABSENCE days does not bring him back: he still misses most of the team's next games.
  */
-function withLongAbsences(data: SeasonData, box: SeasonBox, rotation: SeasonRotations, archive: InjuryArchive): SeasonRotations {
+export function longAbsences(data: SeasonData, box: SeasonBox, archive: InjuryArchive): LongAbsences {
   const reportDays = Object.keys(archive.days).sort();
+  const out: LongAbsences = new Map();
+  const lastPlayed = new Map<string, string>();
+  let gone = new Set<string>();
+  for (const { day, games: today } of finalDays(data)) {
+    for (const g of today) for (const abbr of [g.home, g.away]) for (const l of box.games[g.id]?.[abbr] ?? []) lastPlayed.set(`${abbr}:${l[0]}`, day);
+    // The report saved the morning after the day's games, as the team's history reads it, or the latest before.
+    const reportDay = reportDays.filter((d) => d <= addDays(day, 1)).at(-1);
+    const teams = new Map<Abbr, Map<Athlete, string | undefined>>();
+    const still = new Set<string>();
+    for (const e of reportDay ? archive.days[reportDay].injuries : []) {
+      const key = `${e.team}:${e.athlete}`;
+      const back = (lastPlayed.get(key) ?? "") > dayKey(e.date);
+      if (!OUT_STATUSES.has(e.status) || back) continue;
+      if (!gone.has(key) && !(e.returnDate && e.returnDate > addDays(day, LONG_ABSENCE))) continue;
+      still.add(key);
+      teams.set(e.team, (teams.get(e.team) ?? new Map()).set(e.athlete, e.returnDate));
+    }
+    gone = still;
+    out.set(day, teams);
+  }
+  return out;
+}
+
+/**
+ * A season's shown rotations with its long absences read: after each game day, a player out for weeks leaves his
+ * team's rotation (withoutLongAbsent), and the team's usual rotation comes back once none of its players is. A player
+ * who is back counts as the usual rotation counts him, from the games he has played.
+ */
+function withLongAbsences(data: SeasonData, rotation: SeasonRotations, away: LongAbsences): SeasonRotations {
   const out: SeasonRotations = new Map();
   let usual: Partial<Record<Abbr, Lineup>> = {};
   const adjusted = new Set<Abbr>();
-  const lastPlayed = new Map<string, string>();
-  for (const { day, games: today } of finalDays(data)) {
-    for (const g of today) for (const abbr of [g.home, g.away]) for (const l of box.games[g.id]?.[abbr] ?? []) lastPlayed.set(`${abbr}:${l[0]}`, day);
+  for (const { day } of finalDays(data)) {
     const entries = rotation.get(day) ?? {};
     usual = { ...usual, ...entries };
-    // The report saved the morning after the day's games, as the team's history reads it, or the latest before.
-    const reportDay = reportDays.filter((d) => d <= addDays(day, 1)).at(-1);
-    const gone = new Map<Abbr, Set<Athlete>>();
-    for (const e of reportDay ? archive.days[reportDay].injuries : []) {
-      const back = (lastPlayed.get(`${e.team}:${e.athlete}`) ?? "") > dayKey(e.date);
-      if (OUT_STATUSES.has(e.status) && e.returnDate && e.returnDate > addDays(day, LONG_ABSENCE) && !back) gone.set(e.team, (gone.get(e.team) ?? new Set()).add(e.athlete));
-    }
+    const gone = away.get(day) ?? new Map();
     const shown: Partial<Record<Abbr, Lineup>> = { ...entries };
     for (const [abbr, lineup] of Object.entries(usual)) {
       const g = gone.get(abbr);
       if (lineup && g && lineup.some((p) => g.has(p.athlete))) {
-        shown[abbr] = withoutLongAbsent(lineup, g);
+        shown[abbr] = withoutLongAbsent(lineup, new Set(g.keys()));
         adjusted.add(abbr);
       } else if (adjusted.delete(abbr)) shown[abbr] = lineup;
     }
@@ -133,7 +156,7 @@ export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<Dra
         box,
         ratings: ratings.get(data.season)!,
         lineups: priced.get(data.season)!.lineups,
-        rotation: archive ? withLongAbsences(data, box, rotations.get(data.season)!, archive) : rotations.get(data.season)!,
+        rotation: archive ? withLongAbsences(data, rotations.get(data.season)!, longAbsences(data, box, archive)) : rotations.get(data.season)!,
         rookies: rookies.get(data.season),
       },
       extra: priced.get(data.season)!.extra,

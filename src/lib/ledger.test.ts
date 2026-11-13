@@ -134,10 +134,13 @@ test("minutes that change hands are credited to whoever caused the trade, a sitt
   assert.equal(fading.get(1)!.points, 2, "the fading gap goes to the teammate now counted for his minutes");
 });
 
-test("a player the rating counts again before he plays reads as expected back on his return date, not \"until\" it", () => {
+test("a player out for weeks stays out of his team's rating while the report still lists him out, however near his return date", () => {
+  // Ja Morant (POR, out Oct 30 to Dec 1), Paolo Banchero (ORL, to Nov 22) and Kawhi Leonard (TOR, to Nov 23) each
+  // came back into the rating 21 days before their return dates, while still out and missing nearly all of the next
+  // 10 games.
   const season = allSeasons().find((s) => s.id === "2026-27")!;
-  const phrases = ledger(season, "POR").flatMap((row) => walk(season, row).parts.flatMap((p) => p.lines.flatMap((l) => (l.kind === "group" ? l.items : [l]))))
-    .map((x) => x.phrase).filter((p) => p.startsWith("Expected back"));
-  assert.ok(phrases.length > 0, "Portland has an Expected back row");
-  for (const p of phrases) assert.match(p, /^Expected back( [A-Z][a-z]{2} \d{1,2})?$/);
+  const early = ["POR", "ORL", "TOR"].flatMap((abbr) => ledger(season, abbr).flatMap((row) => row.players
+    .filter((p) => p.status === "joined" && p.backups && p.played == null && p.injury?.status === "Out")
+    .map((p) => `${abbr} ${row.day} ${p.name}`)));
+  assert.deepEqual(early, []);
 });

@@ -1,13 +1,11 @@
-// The ratings a season's odds play its games with. A team's shown rating leaves out the players the injury report
-// lists as out for weeks (src/lib/inputs.ts LONG_ABSENCE), which is right for its next games and too harsh for the
-// rest of a season, so for the odds each such player comes back on the return date the report gives, at the minutes
-// he has played for the team this season, or last season's anywhere.
+// The ratings a season's odds play its games with. A team's shown rating leaves out the players out for weeks
+// (src/lib/inputs.ts longAbsences), which is right for its next games and too harsh for the rest of a season, so for
+// the odds each such player comes back on the return date the report gives, at the minutes he has played for the
+// team this season, or last season's anywhere.
 import { addDays, ELO_PER_SIGMA, PARAMS, playerPart, START, type Abbr, type Fit, type FitDay, type Season, type ShownLineups } from "./elo.ts";
-import { LONG_ABSENCE } from "./inputs.ts";
-import type { InjuryArchive } from "./injuries.ts";
+import type { LongAbsences } from "./inputs.ts";
 import { scaled, type Athlete, type Lineup, type SeasonBox } from "./players.ts";
 import { shownOutlook, type Outlook } from "./project.ts";
-import { OUT_STATUSES } from "./report-lineup.ts";
 
 /** A player's minutes a game: for `abbr` this season if he has played for it, else last season's anywhere, else 0. */
 export function minutesTable(box: SeasonBox, lastBox: SeasonBox | undefined): (athlete: Athlete, abbr: Abbr) => number {
@@ -25,31 +23,31 @@ export type ReturnsInputs = {
   fits: readonly FitDay[];
   /** Each team's usual rotation, the injury report left out (elo.ts shownLineups over players.ts usualRotations). */
   usual: ShownLineups;
-  archive: InjuryArchive | undefined;
+  /** Who the shown rating leaves out for weeks, after each game day; undefined without injury reports. */
+  away: LongAbsences | undefined;
   minutes: (athlete: Athlete, abbr: Abbr) => number;
   /** The regular season's last day: a return after it stays out. */
   end: string;
 };
 
 /**
- * Each team's ratings for the games after `day`: its shown rating that day, then a step up each time one of its
- * players out for weeks, by the report its rotation read that day (the next morning's, or the latest before), comes
- * back. A day before the first report brings no one back.
+ * Each team's ratings for the games after `day`: its shown rating that day, then a step up each time one of the
+ * players its rotation leaves out for weeks comes back, on his listed return date, or the next day when that date has
+ * passed. A player with no return date, or one after `end`, stays out. A day before the first game day reads the
+ * absences of the first, as the shown rating's opening rotation does.
  */
-export function returnsOutlook({ model, fits, usual, archive, minutes, end }: ReturnsInputs, day: string): Outlook {
+export function returnsOutlook({ model, fits, usual, away, minutes, end }: ReturnsInputs, day: string): Outlook {
   const outlook = shownOutlook(model, day);
-  const reportDay = archive && Object.keys(archive.days).sort().filter((d) => d <= addDays(day, 1)).at(-1);
-  if (!archive || !reportDay) return outlook;
   const upTo = fits.filter((f) => f.day <= day).at(-1);
   const fit: Fit = upTo?.after ?? fits[0]?.before;
-  if (!fit) return outlook;
+  const gone = away?.get(upTo?.day ?? fits[0]?.day ?? "");
+  if (!fit || !gone) return outlook;
   const rotation = (upTo && usual.after.get(upTo.day)) || usual.opening;
   const scale = ELO_PER_SIGMA / PARAMS.sigma;
   const out = new Map<Abbr, { athlete: Athlete; date: string }[]>();
-  for (const e of archive.days[reportDay].injuries) {
-    if (!OUT_STATUSES.has(e.status) || !e.returnDate || e.returnDate <= addDays(day, LONG_ABSENCE) || e.returnDate > end) continue;
-    if (!(e.team in outlook)) continue;
-    out.set(e.team, [...(out.get(e.team) ?? []), { athlete: e.athlete, date: e.returnDate }]);
+  for (const [abbr, players] of gone) for (const [athlete, date] of players) {
+    if (!date || date > end || !(abbr in outlook)) continue;
+    out.set(abbr, [...(out.get(abbr) ?? []), { athlete, date: date > day ? date : addDays(day, 1) }]);
   }
   for (const [abbr, list] of out) {
     const sorted = [...list].sort((x, y) => x.date.localeCompare(y.date));
