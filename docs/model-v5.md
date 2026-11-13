@@ -1,8 +1,11 @@
 # The rating model, version 5
 
-Version 5 changes what a player's value is pulled toward. In version 4 (`docs/model-v4.md`) the fit pulls each player's value toward his box rating. Version 5 pulls it toward his on-court rating too: his rating from the scoreline while he is on the floor, adjusted for the teammates and opponents out there with him (`GLOSSARY.md`). Everything else is version 4's.
+Version 5 is the model the site runs since November 2026 (`SITE` in `src/lib/site.ts`). It differs from version 4 (`docs/model-v4.md`) in two things, and everything else is version 4's.
 
-Version 5 also changes how a game's lineup is predicted: from the team's recent roster, each player counted at his chance of playing (Roster-based lineups, below). The site runs version 4 until `SITE_ON_COURT` and `SITE_ROSTER` in `src/lib/v5.ts` point it at version 5's settings (issue 71). The model's own preseason seed is the other part of version 5 (issue 65), and this file does not cover it yet.
+- **What a player value is pulled toward.** Version 4 pulls each player value toward his box rating. Version 5 pulls it toward his on-court rating too: his rating from the scoreline while he is on the floor, adjusted for the teammates and opponents out there with him (`GLOSSARY.md`).
+- **How a game's lineup is built.** Version 4 starts from the players of the team's previous game. Version 5 builds the lineup from the team's recent roster, each player at his chance of playing (Roster-based lineups, below).
+
+The model's own preseason seed was the third part of the plan (issue 65). It tied with sportsbooks' win totals and leaned worse, so the win totals stay (Every idea tried and Left for later, below).
 
 Version 5 is judged by `docs/adr/0002-versions-are-judged-on-past-seasons.md`: every new setting is chosen from the seasons before the one scored, and log loss on real results decides. No betting number trains, tunes or chooses anything (`docs/adr/0001-no-betting-lines-in-the-model.md`). `npm run backtest:v5` writes the Results below.
 
@@ -19,7 +22,7 @@ Version 5 is judged by `docs/adr/0002-versions-are-judged-on-past-seasons.md`: e
 - **A player with no play-by-play on record** has no such part, and keeps version 4's centre exactly. **A season with no record on file** adds no stints, and its players keep what the earlier seasons left them.
 - **Walking forward.** A day's on-court rating reads only games played on or before that day. `src/lib/on-court.test.ts` and `scripts/candidates/candidates.test.ts` change every later game and require every earlier rating and chance to stay exactly as it was.
 
-ESPN's play-by-play misses some substitutions in 2017-18 to 2019-20. Those seasons are used as they are.
+ESPN's play-by-play misses some substitutions in 2017-18 to 2019-20, and 2021-22's three-point attempts are read from play text. Those seasons are used as they are (Limits of the test, below).
 
 ## How the settings are chosen
 
@@ -35,17 +38,98 @@ The combination with the lowest log loss on those seasons is the one the next se
 
 The model's fit is linear in the players' prior centres, and a game's expected margin is linear in the fit. So each ridge, half-life and box prior is fitted once, at weight 0.1, and the expected margins at any other weight lie on the line through that fit's and version 4's. A test in `scripts/candidates/candidates.test.ts` checks this against a real fit at each weight.
 
-`V5` in `src/lib/v5.ts` holds the settings chosen from every finished season on file, 2015-16 to 2025-26, which are the ones the site would run: ridge 1,500, half-life 365 days, box prior 0.5, weight 0.12, SIGMA 3.194 and early widening 1.21. `npm run backtest:v5` fails when they differ from what the candidate chooses.
+`V5` in `src/lib/v5.ts` holds the settings chosen from every finished season on file, 2015-16 to 2025-26, which are the ones the site runs: ridge 1,500, half-life 365 days, box prior 0.5, weight 0.12, SIGMA 3.194 and early widening 1.21. `npm run backtest:v5` fails when they differ from what the candidate chooses.
 
 The choice among the best is close to a coin toss. On those eleven seasons the chosen combination scores 0.60433, the next eleven lie within 0.00011 of it, and every one of the twelve has box prior 0.5, a ridge of 1,500 or 3,000 and a weight of 0.10 to 0.16. The best combination with weight 0 scores 0.60671. These are the scores the settings were chosen on, so they say which settings fit, and the Results below say what the on-court rating is worth.
 
-## How many ideas were tried
+## Every idea tried
 
-The research (branch `prototype/model-v5`, `scripts/research/README.md`) tried about 131 variants of the on-court rating, with every season in view. Its best was ridge 3,000, half-life 730 days, box prior 0.5 and weight 0.12, with three-point luck taken out. It found these flat: garbage time, free-throw luck, a game-specific spread of outcomes, a rookie hold, a playoff weight, daily refits, lineup synergy, and stints as the fit's own rows. This build tries nothing beyond the search above.
+`docs/adr/0002-versions-are-judged-on-past-seasons.md` asks a write-up to report every idea that was tried, with its numbers, and to say how many there were. About 390 variants were scored in the research for version 5. The same past seasons judged every one of them, so the best results are somewhat inflated, and the three marked below are likely flukes or do not count.
 
-For lineups the research ran the roster rule in three forms: the chance of playing alone, with minutes moved toward the bench, and with moved players taken off their old team's roster. It scored each at fills of 0, -0.15, -0.3 and -0.45. This build tried three more things. The fills -0.6 and -0.75 joined the choice, because the fill chosen from every finished season sat at the end of the list, and neither is chosen in any season. A report now adds a player only once he has played this season, which the walk-forward check forced and which cost +0.0001 [-0.0000, +0.0003] in log loss on 2023-24 to 2025-26 on the research copy. The starting five was tested and not built.
+Each figure is a log loss difference against version 4 on real results. Negative is better. The intervals are 95%, from the weekly block bootstrap. "Earlier" is 2015-16 to 2022-23, the seasons the research chose its settings on. "Unseen" is 2023-24 to 2025-26. The research figures come from the prototype (branch `prototype/model-v5`, `scripts/research/`), not from the scoreboard, and where this record has no figure for an idea the table says so.
 
-The same past seasons judge every one of these, so the size of the best is somewhat inflated (`docs/adr/0002-versions-are-judged-on-past-seasons.md`).
+### What went into version 5
+
+These three are scoreboard figures: every setting chosen from the seasons before the one scored, 2019-20 to 2025-26 pooled (Results, below).
+
+| Part | Result |
+| --- | --- |
+| On-court rating beside the box rating | -0.0024 [-0.0037, -0.0010] |
+| Roster-based lineups, against version 5 with version 4's lineups | value error 0.276 to 0.248, log loss -0.0007 [-0.0018, +0.0003]. In by the lineup rule. |
+| Both together | -0.0031 [-0.0046, -0.0016] |
+
+### On-court rating: about 160 variants
+
+| Variant | Earlier | Unseen | Outcome |
+| --- | --- | --- | --- |
+| First form: ridge 8,000, half-life 365 days, box prior 0.5, weight 0.12 | -0.0009 [-0.0017, -0.0002] | -0.0020 [-0.0033, -0.0007] | A gain on both sets |
+| Longer memory, with three-point luck taken out of stints | -0.0017 [-0.0027, -0.0006] | -0.0037 [-0.0057, -0.0015] | A gain on both sets. The form that was built. |
+| The on-court rating in place of the box rating | no figure on record | no figure on record | A tie or worse |
+| Garbage time taken out of the rating or of the team fit | no figure on record | no figure on record | Flat |
+| Free-throw luck taken out | no figure on record | no figure on record | Flat |
+| A game's own spread of outcomes, from pace or three-point rate | no figure on record | no figure on record | Flat |
+| A rookie hold of 10 to 160 | no figure on record | no figure on record | Flat |
+| A playoff weight, a floor on possessions, a daily refit | no figure on record | no figure on record | Flat |
+| Stints as the season fit's own rows | no figure on record | no figure on record | Flat |
+| Lineup chemistry | no figure on record | no figure on record | No unit effect that lasts |
+
+### Lineups
+
+| Variant | Unseen | Outcome |
+| --- | --- | --- |
+| Roster-based lineups on the 5 PM reports | -0.0000 [-0.0015, +0.0014] | A tie |
+| Roster-based lineups on the pre-tip reports | -0.0017 [-0.0039, +0.0004] | Not clear of zero. Built, and judged by the lineup rule. |
+| Roster-based lineups without the fill term | +0.0009 to +0.0022 | Worse |
+| A traded player spotted on his new team's report | no figure on record | No change that could be measured |
+| The starting five as one more thing a rate looks up | -0.0009 [-0.0022, +0.0003] | It helps the lineup measure. Not built (Left for later, below). |
+
+The research ran the roster rule in three forms: the chance of playing alone, with minutes moved toward the bench, and with moved players taken off their old team's roster. It scored each at fills of 0, -0.15, -0.3 and -0.45. The build tried three more things. The fills -0.6 and -0.75 joined the choice, because the fill chosen from every finished season sat at the end of the list, and neither is chosen in any season. A report now adds a player only once he has played this season, which the walk-forward check forced and which cost +0.0001 [-0.0000, +0.0003] in log loss on 2023-24 to 2025-26 on the research copy. The starting five was tested and not built.
+
+### Version 4's settings: about 45 variants, and 17 more that weigh recent games
+
+These chose nothing. They test whether version 4's own settings were already near their best.
+
+- **Scored:** the team pull, the seed's fade, the margin power, the player weight and hold, the box rating's half-life, the fill size, the minutes window, the Questionable share and the back-to-back size.
+- **Result:** none moved log loss by more than 0.0004 either way on both sets, with one exception. A margin power of 0.4 was worse, by +0.0009 on the earlier seasons and +0.0026 on the unseen ones.
+- **Recent games weighted more**, 17 variants: no gain. A 30-day half-life was worse by +0.0017 to +0.0030.
+
+### Luck-adjusted margins in the team fit: 19 variants
+
+- At full strength: worse, by +0.0021 to +0.0074.
+- At half strength: a tie, -0.0003 to -0.0009 on the unseen seasons, with intervals across zero.
+
+### The preseason seed and the early season: 42 variants
+
+| Variant | Earlier | Unseen | Outcome |
+| --- | --- | --- | --- |
+| The model's own seed, from opening rosters, last season's ratings, an age curve and preseason form, in place of the win totals | +0.0004 [-0.0008, +0.0016] | +0.0006 [-0.0013, +0.0026] | A tie that leans worse. The win totals stay (`docs/adr/0001-no-betting-lines-in-the-model.md`). |
+| Last season's team part alone as the seed | +0.0015 | +0.0019 | Worse |
+| Preseason game results added to the win-total seed | -0.0006 [-0.0010, -0.0002] | -0.0002 [-0.0008, +0.0003] | **Possible fluke.** A gain only on the seasons it was tuned on. |
+| A real lineup for a team's first game | no figure on record | no figure on record | A tie overall. It leans toward a gain in each team's first ten games. |
+| Roster continuity scaling the seed's pull | no figure on record | no figure on record | A tie |
+| No early widening | no figure on record | no figure on record | A tie |
+
+### Data the model had never read: 67 features screened, 9 run singly, 8 combinations
+
+| Feature | Unseen | Outcome |
+| --- | --- | --- |
+| Referee crews, travel and time zones, a home edge by team, attendance, tip time and weekday, age, height, experience, return from absence, a new coach, team style and style matchups, playoff series state, a game's own spread of outcomes | no figure on record | No signal |
+| Nothing at stake for a team | -0.0003 [-0.0010, +0.0003] | A tie, with the same sign on both sets |
+| Heavy minutes in the last seven days | -0.0003 [-0.0008, +0.0002] | A tie, with the same sign on both sets |
+| Surprise starters as an adjustment | -0.0005 [-0.0013, +0.0002] | A tie, with the same sign on both sets |
+| National TV | +0.0012 [+0.0002, +0.0023] | Worse |
+| All 15 features that looked good on the earlier seasons, together | +0.0011 [-0.0013, +0.0035], after -0.0042 on the earlier seasons | **A fluke of selection.** The gain is gone on seasons the selection did not see. |
+| Five features picked partly by looking at the unseen seasons | -0.0013 [-0.0023, -0.0003] | **Does not count.** The pick saw the test. |
+
+### Ruled out by the rule against betting lines
+
+`docs/adr/0001-no-betting-lines-in-the-model.md` rules these out. They were measured before the rule was written, on 2018-19 to 2025-26.
+
+- A correction trained on past closing lines: -0.0012 [-0.0024, +0.0001].
+- The same correction with each team's earlier lines as an input: -0.0030.
+- The model blended with the market: no gain over the market.
+- Settings chosen by distance to the market's chance: the distance tracked results with a slope of 0.78, but it credited faster reaction to recent results, and results did not bear that out.
+- Box-score weights, a home edge by team and player corrections learned from lines: nothing.
 
 ## The port against the prototype
 
@@ -144,9 +228,12 @@ Measured on a developer's Mac on 2026-11-13, twice each.
 
 - **The model's inputs for all 12 seasons**, which a site build works out once: 1.0 second in version 4, 8.7 seconds with the on-court rating, which is 336 refits over 1,623 players.
 - **Fitting one finished season** after that: 0.2 seconds in both.
-- **A build of the site's four pages outside the seasons** (How it works, Track record, Injury report and the 404 page), which fits every season: 5.0 and 5.6 seconds on version 4, 13.8 and 13.9 seconds with `SITE_ON_COURT` set.
+- **A build of the site's four pages outside the seasons** (How it works, Track record, Injury report and the 404 page), which fits every season: 5.0 and 5.6 seconds on version 4, 13.8 and 13.9 seconds with the on-court rating on.
+- **The same four-page build after the switch**, with the on-court rating and roster-based lineups both on: a median of 13.0 seconds over five runs (12.4 to 14.2), against 4.5 seconds (3.9 to 5.1) on version 4 the same afternoon. The runs alternated between the two, on an 8-core Mac with another job running.
+- **Each team's history.** The on-court update's line costs one more fit for each team-day. A finished season's 30 histories take 17.0 seconds against 12.8 without the line, the median of three alternating runs (16.3 to 20.1 against 12.8 to 13.1), and the season in progress 0.4 seconds against 0.3. A deploy keeps the finished seasons' histories from one run to the next (`SWISHRANK_CACHE`), so a daily build pays the smaller figure. A build with none kept pays about 46 seconds more over the eleven finished seasons.
+- **A build of 817 pages** with no histories kept (every page but the players page and the finished seasons' game pages): 2 minutes 14 seconds on version 4 and 3 minutes 17 seconds on version 5, one run each, the second with other jobs running.
 
-The on-court rating therefore adds about 8.5 seconds to a build, once, however many pages it writes. The full build of about 15,000 pages takes over 40 minutes and was not run for this measurement.
+Version 5 therefore adds about 8.5 seconds to every build, once, however many pages it writes, and about 46 seconds more to a build that works out every finished season's histories again. Nearly all of the 8.5 seconds is the on-court rating's refits, which run on one core. The full build of about 15,000 pages takes over 40 minutes and was not run for this measurement.
 
 `npm run backtest:v5` takes 8 to 15 minutes with version 5 in it, against under a minute for version 4 alone, because the search fits 27 on-court ratings. The two candidates with roster-based lineups add about a minute: version 5's reuses version 5's search.
 
@@ -176,6 +263,48 @@ The lineups' own log-loss gain is not clear of zero. By season it is better in 2
 
 In the table that sets version 5 with roster-based lineups against version 4, the two value errors are not like for like, 0.248 against 0.228, because version 5's values spread wider. The table against version 5 is the one to read for lineups.
 
+## The switch
+
+The site runs version 5 since November 2026. `SITE` in `src/lib/site.ts` names the version, and three things read it: `PARAMS.sigma` and `EARLY.widen` in `src/lib/elo.ts`, and `siteInputs()` in `src/lib/inputs.ts`, which builds the inputs of every page and of every script that means the site's model.
+
+- **The settings.** The ones chosen from every finished season: ridge 1,500, half-life 365 days, box prior 0.5, weight 0.12, SIGMA 3.194, early widening 1.21 and a fill of -0.45. `npm run backtest:v5` fails when `V5` in `src/lib/v5.ts` differs from them.
+- **Version 4 stays runnable.** `V4` in `src/lib/v4.ts` holds its SIGMA, 2.986, and its early widening, 1.14, beside its lineup rule, as `V3` holds version 3's. `modelInputs()` with no switches builds its inputs. `scripts/candidates/v4.ts` is the baseline every later version is scored against. The switch moved none of its numbers: the Results below, `npm run backtest:v4` and `npm run backtest:v3` print the same figures as before it.
+- **A game page's chance is the scoreboard's.** For the same game and the same files, the site's model and the scoreboard's code (`priced()` in `scripts/candidates/v5.ts`, at `V5`'s settings) give the same chance to the last digit. This held for all 3,986 final games of 2020-21, 2023-24, 2025-26 and 2026-27 to 12 November, and 164 built game pages of 2026-27 print that chance to the percent. A test in `scripts/candidates/candidates.test.ts` holds it on 264 games of 2023-24. The scoreboard's own tables differ from the site's past chances for two reasons, both by design: a scored season's settings come from the seasons before it, and the scoreboard reads the pre-tip reports where the site's archive holds the 5 PM reports.
+
+### What a reader sees change
+
+Measured between two builds of the same data on 13 November 2026, version 4 and version 5.
+
+- **This season's ratings spread wider.** Their standard deviation goes from 104 to 119. The Spurs go from 1190 to 1237 and the Magic from 969 to 1035. 21 teams change rank, the Magic by the most, from 21st to 15th. Early in a season a team's rating rests mostly on its seed and its players' values, and the on-court rating spreads those values wider. The larger SIGMA takes back 7% of the spread, not all of it. Before the season's first game the spread was 99 on version 4 and is 119 on version 5: the Thunder open at 1321 where they opened at 1209, and the Celtics at 1173 where they opened at 1089. The league's average rating, which nothing re-centres, is 1021 where it was 1003.
+- **The wider spread is not overconfidence.** On every finished season, version 5 scores better than version 4 at every stage of a season: by 0.0034 in log loss where either side has played under 5 games, 0.0024 at 5 to 9, 0.0051 at 10 to 19, 0.0003 at 20 to 39 and 0.0038 after that. These figures read the pre-tip reports and `V5`'s settings, which saw these seasons.
+- **This season's chances** move by 4.1 points on average and 14.8 at most. On the 174 games played, log loss goes from 0.5693 to 0.5513, and in the season's first two weeks from 0.5929 to 0.5836. That many games cannot tell the versions apart.
+- **Finished seasons.** A team's final rating moves by 22 points on average and 72 at most, and 178 of 330 team-seasons change rank, by 5 places at most. A game's chance moves by 2.8 points on average.
+- **Each team's players.** The same players at the same minutes, in all 459 slots of this season's team pages. The points a player adds to his team's rating spread wider: their standard deviation goes from 11.7 to 14.5. Victor Wembanyama goes from 56 to 92 and Franz Wagner from 18 to 57.
+- **The odds.** They follow the ratings. The Magic's playoff chance goes from 35% to 58%, and the 76ers' title chance from 11.2% to 3.7%.
+- **How it works.** Home court reads 43 points where it read 45, and a back-to-back 37 where it read 40, because a point of rating is a larger share of SIGMA.
+- **Ratings now also move about once a week for a reason that is no game result.** The on-court rating is refitted after every 7th game day, and a team's rating takes the refit on its next game day. Team by team, the largest such move this season is 19 points, the Clippers on 2 November, and 37 of 359 team-days carry one of 5 points or more. The history under each team and game shows it on its own line, "Scoreline with each player on the floor".
+- **The finished seasons' title races** in `src/data/odds/` are rebuilt on version 5. They were already out of date: the 2015-16 file on record differed from a fresh version 4 rebuild in 6,274 of its 10,261 numbers, by up to 6.1 points, because no step rebuilds them when the model changes. `AGENTS.md` now names the command.
+
+### The refreshes
+
+Neither scheduled refresh needs a change. The morning run (`.github/workflows/deploy.yml`) already commits `scripts/stints/` with the scores, and the build reads it from disk. The injury-report run (`.github/workflows/nba-report.yml`) commits `src/data/nba-reports/` and starts a deploy, which builds from a full checkout. A game whose play-by-play ESPN does not have yet adds nothing to the on-court rating and holds nothing back. A report-triggered build reads the stints the morning run saved, so a day's games reach the on-court rating the next morning, as they reach the box rating.
+
+## Limits of the test
+
+- **The comparison favours version 4.** Version 4 keeps one set of settings in every scored season, and its plan chose them with these seasons in view. Version 5's settings for a season come from the seasons before it alone. The measured gain is therefore, if anything, understated on this count.
+- **The count of ideas inflates the gain.** About 390 variants were judged on the same seasons (Every idea tried, above). The on-court rating's research settings were chosen on 2015-16 to 2022-23, and the three seasons after them gain 0.0035 to 0.0037 each on the scoreboard, so the gain is not only selection.
+- **The check for reading later games runs on a sample of days.** `scripts/candidates/candidates.test.ts` changes every later score and removes every later box score, play-by-play record and report, then requires each earlier chance to stay as it was. It does so at four days of November 2023, in a 2023-24 season cut at 1 December, for each candidate, so it catches a leak only on the paths those games take.
+- **The play-by-play record is weaker in 2017-18 to 2019-20.** ESPN's feed misses some substitutions there. Every player's rebuilt minutes are within two of his box-score minutes in 87.1%, 81.0% and 84.2% of those seasons' games, against 99.1% or more in every other finished season. About 0.2 scoring plays a game land in the wrong stint there, against under 0.02 elsewhere. The seasons are used as they are. Of the scored seasons, 2019-20 is one of the three, and every later season reads them as history at a weight that halves with each half-life.
+- **2021-22's three-point attempts are read from play text.** ESPN's feed for that season does not mark a three-point attempt, so misses are read from each play's words. Makes equal the box score's exactly. Attempts come out 0.8% under it over the season, about half a shot a team a game, so the luck adjustment sees about 0.3 points a team a game too much shooting luck in that season.
+- **Version 5's SIGMA and early widening were fitted with version 4's lineups.** The scoreboard candidate keeps them when it adds roster-based lineups and changes only the lineups and the fill, so the site runs the same pairing the scoreboard scored. Fitted again with roster-based lineups in, on every finished season, they come out at 3.162 and 1.20 against the 3.194 and 1.21 on file. Keeping the ones on file costs 0.00003 in log loss on those seasons, 0.60371 against 0.60368.
+
+## Left for later
+
+- **The starting five.** It helps the lineup measure on unseen seasons (Roster-based lineups, above) and would go in by the lineup rule. It counts only if the site can read the five before tip-off, and issue 70 records what ESPN's public data shows before a game starts. It waits for that.
+- **The model's own preseason seed.** A seed from opening rosters, last season's ratings, an age curve and preseason form tied with sportsbooks' win totals and leaned worse, at +0.0004 [-0.0008, +0.0016] on the earlier seasons and +0.0006 [-0.0013, +0.0026] on the unseen ones. `docs/adr/0001-no-betting-lines-in-the-model.md` keeps the win totals until a seed of the model's own scores at least as well. They are the one betting number the model reads.
+- **The seed and the early widening, chosen again with the on-court rating in.** Version 5 keeps version 4's seed scale and widens chances for a team's first five games only. Where the less experienced side has played 5 to 9 games, the SIGMA that fits version 5's chances best is 3.51 on 2015-16 to 2025-26, over 845 games, against the 3.194 on file. Version 4's is 3.09 against 2.986. Version 5 still scores better than version 4 on those games, by 0.0024, so this is a possible gain and not a defect.
+- **Ideas seen and not tried:** lineup rates learned from 2015-16 to 2018-19 as well, and a roster carried over from last season for a team's first game.
+
 ## Results
 
 <!-- results:start -->
@@ -197,17 +326,17 @@ Both versions read scripts/nba-reports-at-tip/, built to hold each game's last N
 
 ### Version 4: log loss on real results
 
-Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is the site's (src/lib/inputs.ts) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps the site's settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4.
+Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is as the site ran it until the switch to version 5 (src/lib/inputs.ts modelInputs with no switches, src/lib/v4.ts V4) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps its own settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4.
 
 | Season | Settings chosen from | Candidate's settings | Games | Version 4 log loss | Candidate log loss | Candidate minus version 4 [95%] | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2019-20 | 2015-16 to 2018-19 | the site's: SIGMA 2.986, early widening 1.14 | 1143 | 0.6144 | 0.6144 | +0.0000 [+0.0000, +0.0000] | tie |
-| 2020-21 | 2015-16 to 2019-20 | the site's: SIGMA 2.986, early widening 1.14 | 1171 | 0.6289 | 0.6289 | +0.0000 [+0.0000, +0.0000] | tie |
-| 2021-22 | 2015-16 to 2020-21 | the site's: SIGMA 2.986, early widening 1.14 | 1323 | 0.6169 | 0.6169 | +0.0000 [+0.0000, +0.0000] | tie |
-| 2022-23 | 2015-16 to 2021-22 | the site's: SIGMA 2.986, early widening 1.14 | 1320 | 0.6323 | 0.6323 | +0.0000 [+0.0000, +0.0000] | tie |
-| 2023-24 | 2015-16 to 2022-23 | the site's: SIGMA 2.986, early widening 1.14 | 1319 | 0.5935 | 0.5935 | +0.0000 [+0.0000, +0.0000] | tie |
-| 2024-25 | 2015-16 to 2023-24 | the site's: SIGMA 2.986, early widening 1.14 | 1321 | 0.5988 | 0.5988 | +0.0000 [+0.0000, +0.0000] | tie |
-| 2025-26 | 2015-16 to 2024-25 | the site's: SIGMA 2.986, early widening 1.14 | 1322 | 0.5849 | 0.5849 | +0.0000 [+0.0000, +0.0000] | tie |
+| 2019-20 | 2015-16 to 2018-19 | version 4's: SIGMA 2.986, early widening 1.14 | 1143 | 0.6144 | 0.6144 | +0.0000 [+0.0000, +0.0000] | tie |
+| 2020-21 | 2015-16 to 2019-20 | version 4's: SIGMA 2.986, early widening 1.14 | 1171 | 0.6289 | 0.6289 | +0.0000 [+0.0000, +0.0000] | tie |
+| 2021-22 | 2015-16 to 2020-21 | version 4's: SIGMA 2.986, early widening 1.14 | 1323 | 0.6169 | 0.6169 | +0.0000 [+0.0000, +0.0000] | tie |
+| 2022-23 | 2015-16 to 2021-22 | version 4's: SIGMA 2.986, early widening 1.14 | 1320 | 0.6323 | 0.6323 | +0.0000 [+0.0000, +0.0000] | tie |
+| 2023-24 | 2015-16 to 2022-23 | version 4's: SIGMA 2.986, early widening 1.14 | 1319 | 0.5935 | 0.5935 | +0.0000 [+0.0000, +0.0000] | tie |
+| 2024-25 | 2015-16 to 2023-24 | version 4's: SIGMA 2.986, early widening 1.14 | 1321 | 0.5988 | 0.5988 | +0.0000 [+0.0000, +0.0000] | tie |
+| 2025-26 | 2015-16 to 2024-25 | version 4's: SIGMA 2.986, early widening 1.14 | 1322 | 0.5849 | 0.5849 | +0.0000 [+0.0000, +0.0000] | tie |
 | Pooled |  |  | 8919 | 0.6095 | 0.6095 | +0.0000 [+0.0000, +0.0000] | tie |
 
 ### Version 4 beside Vegas and Polymarket
@@ -249,17 +378,17 @@ Version 4 against itself: every difference is exactly 0.
 
 ### Version 4 with roster-based lineups: log loss on real results
 
-Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is the site's (src/lib/inputs.ts) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps the site's settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4.
+Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is as the site ran it until the switch to version 5 (src/lib/inputs.ts modelInputs with no switches, src/lib/v4.ts V4) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps its own settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4.
 
 | Season | Settings chosen from | Candidate's settings | Games | Version 4 log loss | Candidate log loss | Candidate minus version 4 [95%] | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2019-20 | 2015-16 to 2018-19 | the site's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.3 | 1143 | 0.6144 | 0.6144 | +0.0000 [+0.0000, +0.0000] | tie |
-| 2020-21 | 2015-16 to 2019-20 | the site's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.3 | 1171 | 0.6289 | 0.6292 | +0.0003 [-0.0018, +0.0025] | tie |
-| 2021-22 | 2015-16 to 2020-21 | the site's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.15 | 1323 | 0.6169 | 0.6174 | +0.0005 [-0.0019, +0.0029] | tie |
-| 2022-23 | 2015-16 to 2021-22 | the site's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.3 | 1320 | 0.6323 | 0.6312 | -0.0010 [-0.0036, +0.0017] | tie |
-| 2023-24 | 2015-16 to 2022-23 | the site's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.45 | 1319 | 0.5935 | 0.5912 | -0.0023 [-0.0045, -0.0001] | better |
-| 2024-25 | 2015-16 to 2023-24 | the site's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.45 | 1321 | 0.5988 | 0.5989 | +0.0001 [-0.0033, +0.0033] | tie |
-| 2025-26 | 2015-16 to 2024-25 | the site's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.45 | 1322 | 0.5849 | 0.5839 | -0.0011 [-0.0045, +0.0022] | tie |
+| 2019-20 | 2015-16 to 2018-19 | version 4's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.3 | 1143 | 0.6144 | 0.6144 | +0.0000 [+0.0000, +0.0000] | tie |
+| 2020-21 | 2015-16 to 2019-20 | version 4's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.3 | 1171 | 0.6289 | 0.6292 | +0.0003 [-0.0018, +0.0025] | tie |
+| 2021-22 | 2015-16 to 2020-21 | version 4's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.15 | 1323 | 0.6169 | 0.6174 | +0.0005 [-0.0019, +0.0029] | tie |
+| 2022-23 | 2015-16 to 2021-22 | version 4's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.3 | 1320 | 0.6323 | 0.6312 | -0.0010 [-0.0036, +0.0017] | tie |
+| 2023-24 | 2015-16 to 2022-23 | version 4's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.45 | 1319 | 0.5935 | 0.5912 | -0.0023 [-0.0045, -0.0001] | better |
+| 2024-25 | 2015-16 to 2023-24 | version 4's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.45 | 1321 | 0.5988 | 0.5989 | +0.0001 [-0.0033, +0.0033] | tie |
+| 2025-26 | 2015-16 to 2024-25 | version 4's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.45 | 1322 | 0.5849 | 0.5839 | -0.0011 [-0.0045, +0.0022] | tie |
 | Pooled |  |  | 8919 | 0.6095 | 0.6090 | -0.0005 [-0.0015, +0.0004] | tie |
 
 ### Version 4 with roster-based lineups beside Vegas and Polymarket
@@ -297,11 +426,11 @@ Over the team-games with a box score, played minutes scaled to 240 a side. Minut
 
 ### Version 4 with roster-based lineups: settings from every finished season
 
-Chosen from 2015-16 to 2025-26, the settings the season after them would run with: the site's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.45.
+Chosen from 2015-16 to 2025-26, the settings the season after them would run with: version 4's: SIGMA 2.986, early widening 1.14; roster lineups at fill -0.45.
 
 ### Version 5: log loss on real results
 
-Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is the site's (src/lib/inputs.ts) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps the site's settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4.
+Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is as the site ran it until the switch to version 5 (src/lib/inputs.ts modelInputs with no switches, src/lib/v4.ts V4) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps its own settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4.
 
 | Season | Settings chosen from | Candidate's settings | Games | Version 4 log loss | Candidate log loss | Candidate minus version 4 [95%] | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -353,7 +482,7 @@ Chosen from 2015-16 to 2025-26, the settings the season after them would run wit
 
 ### Version 5 with roster-based lineups: log loss on real results
 
-Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is the site's (src/lib/inputs.ts) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps the site's settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4.
+Each season is scored with the candidate's settings chosen from the seasons before it; the pooled row takes every scored game. Version 4 is as the site ran it until the switch to version 5 (src/lib/inputs.ts modelInputs with no switches, src/lib/v4.ts V4) on the reports of Table 1, so its numbers differ from docs/model-v4.md's, which read the 5 PM reports. It keeps its own settings in every season, and its plan chose them with these seasons in view, so the comparison favours version 4.
 
 | Season | Settings chosen from | Candidate's settings | Games | Version 4 log loss | Candidate log loss | Candidate minus version 4 [95%] | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
