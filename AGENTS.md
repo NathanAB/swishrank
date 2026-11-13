@@ -36,6 +36,15 @@ A change to the model is a candidate: one file in `scripts/candidates/` whose de
 - **A candidate against a second baseline:** export `against`, a list of candidate file names, from its file (`scripts/candidates/v5-roster.ts` is the example).
 - **After a change to roster-based lineups (`src/lib/roster-lineups.ts`):** `npm run roster-check`, about 30 seconds. It prints the learned rates and the lineup measures to hold beside the port's column in `docs/model-v5.md` (The lineups' port against the prototype).
 
+## Changing the site's model
+
+`SITE` in `src/lib/site.ts` names the version the site runs. A script that means the site's model builds its inputs with `siteInputs` (`src/lib/inputs.ts`), then calls `compute`. A script that means a frozen version reads that version's record, such as `V4` in `src/lib/v4.ts`, and prices with its SIGMA.
+
+After a change to `SITE`, or to anything the site's ratings read:
+
+- Rebuild every finished season's title race with `npm run odds -- --all` (about 20 seconds a season) and commit `src/data/odds/`. No workflow rebuilds these files and no test compares them with the model.
+- Reread `src/pages/about.astro` and the fine print of `src/pages/record.astro` against the new settings, then update the string that `src/lib/model-copy.test.ts` pins.
+
 ## Play-by-play record
 
 `scripts/stints/<season>.json` is written by code, never by hand. After a change to the rebuild in `src/lib/stints.ts`, run `npm run stints -- --cache <dir>` and commit the files it rewrites with the change. It takes 2 to 14 minutes from ESPN, and under 2 minutes once `<dir>` holds the summaries. The format is in `src/lib/stints.ts` (`Stint`).
