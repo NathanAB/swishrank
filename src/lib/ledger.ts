@@ -1,5 +1,6 @@
 // Every move of a team's shown rating split into its parts, so each row adds up exactly to the change shown.
-// Mirrors compute() in elo.ts day by day.
+// Mirrors compute() in elo.ts day by day, with each player's on-court part held where his last game left it until the
+// day's last step, the on-court update, brings it up to the day (fitSeasonSteps).
 import { ELO_PER_SIGMA, PARAMS, START, addDays, counted, dayKey, expected, fitSeasonSteps, gapValue, playerPart, restValue, seasonRule, shownChange, shownLineups, type Abbr, type Fit } from "./elo.ts";
 import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -46,7 +47,10 @@ export type LedgerGame = {
   beat: boolean;
 };
 
-/** One player's value change from the team's own game, his box score and his on-court rating, times his share of the minutes. */
+/**
+ * One player's value change from the team's own game and his box score, times his share of the minutes. His on-court
+ * part is held still here; its weekly update is the row's `court`, one number for the team.
+ */
 export type BoxPlayer = { athlete: number; name: string; points: number };
 
 export type LedgerRow = {
@@ -60,7 +64,7 @@ export type LedgerRow = {
    * The move in rating points, in the walk's two parts, which add up to it exactly. `result` is what the team's
    * own game did before its players' box scores counted, the team part's shift when they did, and the seed's
    * fading; `players` is each player's value change from his game, what his change in counted minutes did,
-   * and what the day's other games did to his value (`former`).
+   * what the day's other games did to his value (`former`), and the on-court update (`court`).
    */
   raw: Record<WalkKey, number>;
   /** Each player of the rotation the team took into the day, and his value change from his game (BoxPlayer). */
@@ -75,6 +79,12 @@ export type LedgerRow = {
   former: BoxPlayer[];
   /** What the seed's daily fading did. */
   seed: number;
+  /**
+   * What bringing every player's on-court part up to the day did, at once and for the whole rotation. It moves on a
+   * refit's day when the team plays, or on its first game day after one, about once a week, and on a player's first
+   * game after a refit he sat out; it is 0 on other days, and always on version 4.
+   */
+  court: number;
 };
 
 /** Whole numbers that add up to `total`, as close to `raw` as the largest-remainder rule allows. */
@@ -183,7 +193,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   let heldAt: number | null = null;
   const rows: LedgerRow[] = [];
 
-  for (const { day, games, before, after, priors, own, others } of days) {
+  for (const { day, games, before, after, priors, own, others, unrefit } of days) {
     const was = usual[abbr];
     usual = shown.after.get(day)!;
     const held = heldAt !== null;
@@ -203,7 +213,8 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
       return Math.abs(points) >= 0.005 ? [{ athlete: p.athlete, name: name(p.athlete), points }] : [];
     });
     const formerPoints = former.reduce((s, p) => s + p.points, 0);
-    const seed = rate(priors, was) - rate(before, was) + rate(after, usual[abbr]) - rate(others, usual[abbr]);
+    const seed = rate(priors, was) - rate(before, was) + rate(unrefit, usual[abbr]) - rate(others, usual[abbr]);
+    const court = rate(after, usual[abbr]) - rate(unrefit, usual[abbr]);
     const minutes = rate(mid, usual[abbr]) - rate(mid, was);
     const boxPoints = boxed.reduce((s, p) => s + p.points, 0);
     // The team part's own tie to the other games, through the same past games, and the gap slots' worth.
@@ -212,7 +223,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
       ? { result: 0, players: 0 }
       : {
           result: (own ? rate(own.fit, was) - rate(priors, was) - boxPoints : 0) + seed + tail,
-          players: boxPoints + minutes + formerPoints,
+          players: boxPoints + minutes + formerPoints + court,
         };
     const residual = shownNow - prevShown - (raw.result + raw.players);
     if (Math.abs(residual) > 1e-6) throw new Error(`ledger ${season.id} ${abbr} ${day}: parts miss the move by ${residual}`);
@@ -260,7 +271,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
     }).sort((a, b) => Math.abs(b.points) - Math.abs(a.points));
     if (g || change !== 0) {
       rows.push({
-        day, before: prevShown, after: shownNow, change, game, raw, players, seed,
+        day, before: prevShown, after: shownNow, change, game, raw, players, seed, court,
         box: held ? [] : boxed,
         former: held ? [] : former,
       });
@@ -335,7 +346,7 @@ export function minuteRows(changes: readonly RotationChange[]): Map<number, { po
 export type WalkKey = "result" | "players";
 
 /** One cause the walk steps through, at its true effect in rating points, with the few words that explain it. */
-export type WalkItem = { kind: "team" | "player" | "seed"; name: string; points: number; phrase: string };
+export type WalkItem = { kind: "team" | "player" | "seed" | "court"; name: string; points: number; phrase: string };
 
 /** A line of the walk at its whole-point share: one item, or every item under a point folded into one closing line. */
 export type WalkLine =
@@ -379,13 +390,13 @@ function favoredSide(p: number | undefined, home: boolean): boolean | null {
 }
 
 /**
- * A player's whole day in a few plain words, from its two parts: how he played (his value change from his game, his
- * box score and his on-court rating) and his counted minutes (the change in the minutes the rating counts him for, at
- * his value). A part is named when it is a tenth of a point or more and at least a quarter of the larger one, so the
- * words follow what moved the row; with both, "and" joins them when they push the rating the same way, "but" when they
- * pull against each other. The minutes part says "longer" or "shorter than expected" when his minutes in the game
- * explain it, beyond 2 minutes off what was counted, and "counted for more" or "fewer minutes" when his teammates' did.
- * A player out for weeks says so.
+ * A player's whole day in a few plain words, from its two parts: how he played (his value change from his game and
+ * his box score) and his counted minutes (the change in the minutes the rating counts him for, at his value). A part
+ * is named when it is a tenth of a point or more and at least a quarter of the larger one, so the words follow what
+ * moved the row; with both, "and" joins them when they push the rating the same way, "but" when they pull against
+ * each other. The minutes part says "longer" or "shorter than expected" when his minutes in the game explain it,
+ * beyond 2 minutes off what was counted, and "counted for more" or "fewer minutes" when his teammates' did. A player
+ * out for weeks says so.
  */
 function playerPhrase(value: number, move: PlayerMove | undefined): string {
   const until = move?.injury?.returnDate ? ` until ${shortDay(move.injury.returnDate)}` : "";
@@ -419,13 +430,14 @@ function playerPhrase(value: number, move: PlayerMove | undefined): string {
   return "About as expected";
 }
 
-/** "9 players under a point each", "The preseason estimate under a point". */
+/** "9 players under a point each", "The preseason estimate under a point", "2 players and the on-court update under a point each". */
 function groupPhrase(items: WalkItem[], all: number): string {
   if (!items.length) return `${all} effect${all === 1 ? "" : "s"} under a tenth of a point${all > 1 ? " each" : ""}`;
   const counts = new Map<WalkItem["kind"], number>();
   for (const x of items) counts.set(x.kind, (counts.get(x.kind) ?? 0) + 1);
   const parts = [...counts].map(([kind, n]) => {
     if (kind === "seed") return "the preseason estimate";
+    if (kind === "court") return "the on-court update";
     return `${n} player${n === 1 ? "" : "s"}`;
   });
   const text = `${parts.join(" and ")} under a point${items.length > 1 ? " each" : ""}`;
@@ -453,7 +465,8 @@ function partLines(items: WalkItem[], whole: number): WalkLine[] {
 /**
  * A row as the walk draws it, in two parts that never show a player twice: the team's own result with the seed's
  * fading, and each player's whole effect (his value change from his game, his change in expected minutes, and
- * what the day's other games did to his value through his past games with a former team). The whole points are split again from
+ * what the day's other games did to his value through his past games with a former team) with, on a day it moves, the
+ * on-court update as one line for the whole rotation. The whole points are split again from
  * those raw parts by the largest-remainder rule, so they still add up to the change.
  */
 export function walk(season: SeasonView, row: LedgerRow): Walk {
@@ -474,7 +487,7 @@ export function walk(season: SeasonView, row: LedgerRow): Walk {
       ...(row.game ? [{ kind: "team" as const, name: LABELS.result, points: row.raw.result - row.seed, phrase: resultPhrase(season, row.game) }] : []),
       { kind: "seed", name: "Preseason estimate", points: row.seed, phrase: "Fading a little, as it does each game" },
     ],
-    players,
+    players: [...players, ...(row.court ? [{ kind: "court" as const, name: "Scoreline with each player on the floor", points: row.court, phrase: "Brought up to date, as it is about once a week" }] : [])],
   };
 
   const parts = (Object.keys(LABELS) as WalkKey[])

@@ -156,7 +156,8 @@ function withLongAbsences(data: SeasonData, rotation: SeasonRotations, away: Lon
 
 /**
  * compute()'s inputs for each of `seasons`, by season id; `draft` names the top-three picks. With `onCourt`, version
- * 5's settings, each player's rating is his box rating withOnCourt() his on-court residual; without it, his box rating.
+ * 5's settings, each player's rating is his box rating withOnCourt() his on-court residual, and the box ratings alone
+ * come beside it for the history ledger; without it, his box rating.
  * With `roster`, each game's lineups and extra term are roster-based; without it, version 4's.
  */
 export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<DraftFile> = {}, onCourt?: OnCourt, roster?: RosterRule): Map<string, ModelInputs> {
@@ -192,6 +193,7 @@ export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<Dra
       players: {
         box,
         ratings: ratings.get(data.season)!,
+        ...(onCourt ? { boxRatings: boxBy.get(data.season)! } : {}),
         lineups: priced.get(data.season)!.lineups,
         rotation: archive ? withLongAbsences(data, rotations.get(data.season)!, longAbsences(data, box, archive)) : rotations.get(data.season)!,
         rookies: rookies.get(data.season),
