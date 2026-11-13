@@ -6,9 +6,11 @@ import { fileURLToPath } from "node:url";
 import { dayKey, EARLY, PARAMS, seasonRule, type SeasonData } from "../../src/lib/elo.ts";
 import type { DraftFile } from "../../src/lib/draft.ts";
 import { modelInputs } from "../../src/lib/inputs.ts";
-import { modelRows, price } from "../evaluate.ts";
-import { changedByLaterResults, isCandidate, type Season } from "../past-seasons.ts";
+import { fitSigma, fitWiden, logLoss, modelRows, price } from "../evaluate.ts";
+import { V5 } from "../../src/lib/v5.ts";
+import { changedByLaterResults, isCandidate, type Candidate, type Season } from "../past-seasons.ts";
 import version4 from "./v4.ts";
+import { describe, priced, version5, type Search } from "./v5.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -59,24 +61,28 @@ const read = (path: string): unknown => {
     return undefined;
   }
 };
-/** 2023-24's games, box scores and pre-tip reports of October and November 2023, kept small for speed. */
+/** 2023-24's games, box scores, play-by-play and pre-tip reports of October and November 2023, kept small for speed. */
 const ID = "2023-24";
 const full = read(`src/data/games/${ID}.json`) as SeasonData;
 const games = full.games.filter((g) => dayKey(g.t) < "2023-12-01");
 const ids = new Set(games.map((g) => g.id));
-const rawBox = read(`src/data/box/${ID}.json`);
-const box = typeof rawBox === "object" && rawBox !== null && "games" in rawBox && typeof rawBox.games === "object" && rawBox.games !== null
-  ? { season: ID, games: Object.fromEntries(Object.entries(rawBox.games).filter(([id]) => ids.has(id))) }
+/** A raw `{ season, games }` file cut to the games above. */
+const cut = (raw: unknown) => typeof raw === "object" && raw !== null && "games" in raw && typeof raw.games === "object" && raw.games !== null
+  ? { season: ID, games: Object.fromEntries(Object.entries(raw.games).filter(([id]) => ids.has(id))) }
   : undefined;
 const small: Season = {
-  data: { ...full, games }, box, preseason: read(`src/data/preseason/${ID}.json`), injuries: read(`src/data/injuries/${ID}.json`),
-  nbaReports: read(`scripts/nba-reports-at-tip/${ID}.json`),
+  data: { ...full, games }, box: cut(read(`src/data/box/${ID}.json`)), preseason: read(`src/data/preseason/${ID}.json`), injuries: read(`src/data/injuries/${ID}.json`),
+  nbaReports: read(`scripts/nba-reports-at-tip/${ID}.json`), stints: cut(read(`scripts/stints/${ID}.json`)),
 };
 
-for (const [f, candidate] of candidates) {
-  test(`scripts/candidates/${f}: no call reads its own day's results or later`, () => {
-    assert.deepEqual(changedByLaterResults({ candidate, earlier: [], season: small, day: "2023-11-15" }), []);
-  });
+/** Version 5 with the site's settings on file: with no earlier season, the file's own candidate has no on-court rating to check. */
+const fixed: Candidate = { name: "Version 5 with V5's settings", choose: (earlier) => priced(earlier, V5) };
+for (const [f, candidate] of [...candidates, ["v5.ts with V5's settings", fixed] as const]) {
+  for (const day of ["2023-11-01", "2023-11-08", "2023-11-15", "2023-11-22"]) {
+    test(`scripts/candidates/${f}: no call reads the results of ${day} or later`, () => {
+      assert.deepEqual(changedByLaterResults({ candidate, earlier: [], season: small, day }), []);
+    });
+  }
 }
 
 test("version 4's calls are the chances scripts/evaluate.ts prices, game by game", () => {
@@ -87,4 +93,41 @@ test("version 4's calls are the chances scripts/evaluate.ts prices, game by game
   assert.ok(want.length > 100 && want.some((r) => r.k < EARLY.games));
   assert.equal(calls.size, want.length);
   for (const r of want) assert.equal(calls.get(r.id)?.p, r.p, r.id);
+});
+
+test("version 4's chances for three real games do not move with version 5's on-court settings in modelInputs", () => {
+  // Without the pre-tip reports, whose archive is rebuilt now and then: the rest of these files is final.
+  const calls = version4.choose([]).price({ ...small, nbaReports: undefined });
+  assert.equal(calls.get("401584689")?.p, 0.6072995577180842, "opening night, 2023-10-24");
+  assert.equal(calls.get("401584749")?.p, 0.6166602765263318, "2023-11-01");
+  assert.equal(calls.get("401584901")?.p, 0.609380487145311, "2023-11-30");
+});
+
+/** Two rules far apart and three weights, the largest far past the search's, so the scores differ visibly. */
+const SMALL_SEARCH: Search = { rules: [{ ridge: 3000, halfLife: 730, boxPrior: 0.5 }, { ridge: 50, halfLife: 30, boxPrior: 0 }], weights: [0, 0.3, 0.6] };
+
+test("version 5 scores each combination of its search as a real fit with those settings scores it, and chooses the lowest", () => {
+  const draft = read("src/data/draft.json") as DraftFile;
+  const candidate = version5(SMALL_SEARCH);
+  const scores = candidate.scores([small]);
+  assert.equal(scores.length, 6);
+  for (const { settings, loss } of scores) {
+    const inputs = modelInputs([small], draft, settings.onCourt.weight ? settings.onCourt : undefined).get(ID)!;
+    const rows = modelRows(small.data, seasonRule(inputs), inputs);
+    const sigma = Number(fitSigma(rows).toFixed(3)), widen = Number(fitWiden(rows, sigma).toFixed(2));
+    assert.ok(Math.abs(loss - logLoss(price(rows, sigma, widen))) < 1e-6, describe(settings));
+    assert.deepEqual([settings.sigma, settings.widen], [sigma, widen], describe(settings));
+  }
+  const losses = scores.map((s) => s.loss);
+  assert.ok(Math.max(...losses) - Math.min(...losses) > 1e-3, "the combinations score apart");
+  assert.equal(candidate.choose([small]).settings, describe(scores[losses.indexOf(Math.min(...losses))].settings));
+});
+
+test("version 5's search starts again when it is handed other seasons than the ones it has fitted", () => {
+  const bare: Season = { ...small, stints: undefined };
+  const candidate = version5(SMALL_SEARCH);
+  const first = candidate.scores([small]);
+  const again = candidate.scores([bare]);
+  assert.deepEqual(again, version5(SMALL_SEARCH).scores([bare]));
+  assert.notDeepEqual(again, first);
 });

@@ -32,7 +32,7 @@ A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don'
 A change to the model is a candidate: one file in `scripts/candidates/` whose default export is a `Candidate` (`scripts/past-seasons.ts`; `scripts/candidates/v4.ts` is the example). `docs/adr/0002` is the rule it is judged by.
 
 - **One candidate, printed only:** `npm run backtest:v5 -- <file name without .ts>`.
-- **Every candidate, and the results part of `docs/model-v5.md` rewritten:** `npm run backtest:v5`. Version 4 alone takes about a minute.
+- **Every candidate, and the results part of `docs/model-v5.md` rewritten:** `npm run backtest:v5`. Version 4 alone takes about a minute, and version 5 (`v5`) about 15 more.
 
 ## Play-by-play record
 
