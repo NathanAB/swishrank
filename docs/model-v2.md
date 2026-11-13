@@ -297,7 +297,7 @@ As in version 1, a rating is 1000 plus the fitted rating times 295.7 / SIGMA Elo
 
 ### Table 11. 2026-27, logged only
 
-The confirmation scores the whole season once, after its last game. Until then the season's games so far are logged here and judge nothing.
+Logged only, as a running record. Since 2026-11-13 no result on these games keeps or switches the site's model (`docs/adr/0002-versions-are-judged-on-past-seasons.md`).
 
 | Season | Games | Version 1 log loss | Version 2 log loss |
 | --- | --- | --- | --- |

@@ -1,7 +1,8 @@
 // npm run backtest:v3: runs docs/model-v3.md's pre-registered plan, as amended before any confirmation game. It
 // scores version 3 and each of its changes against version 2 as the site ran it on the tuning and exploration
-// seasons, checks the tuning windows, logs the 2026-27 confirmation games so far and, once the season has its end in
-// src/data/seasons.json, gives the confirmation's verdict. It prints every table and rewrites the Results part of
+// seasons, checks the tuning windows and logs the 2026-27 confirmation games so far. It gives no verdict on them.
+// Since 2026-11-13 they are a running record, and no result there keeps or switches the site's model
+// (docs/adr/0002-versions-are-judged-on-past-seasons.md). It prints every table and rewrites the Results part of
 // docs/model-v3.md. It exits non-zero when the pre-registration's text has changed, or when version 3's settings,
 // src/lib/elo.ts's PARAMS and EARLY as src/lib/v3.ts reads them, differ from what the plan fits.
 import { createHash } from "node:crypto";
@@ -35,8 +36,6 @@ const read = (path: string): unknown => {
     return undefined;
   }
 };
-const listed = read("seasons.json") as { id: string; end?: string }[];
-const finished = listed.some((s) => s.id === CONFIRMATION && s.end);
 
 const seasons = ALL.map((id) => {
   const data = loadSeason(id);
@@ -177,13 +176,10 @@ section(
   ),
 );
 
-const confirm = compare(v3, v2, confirmation);
 const pieces: [string, Scored[]][] = [["Version 3", v3], ["Home edge alone", homeOnly], ["Report lineups alone", reportOnly], ["Rookie hold alone", rookieOnly]];
 section(
   `Table 6. Confirmation, 2026-27 from ${FIRST_DAY}`,
-  finished
-    ? `The season is over. Version 3's pooled log loss is ${confirm.d < 0 ? "below" : "not below"} version 2's, so ${confirm.d < 0 ? "version 3 goes on the site, unless version 2's own confirmation returned it to version 1" : "the site keeps version 2"}.`
-    : "Logged only: the confirmation judges once, after the season's last game. Each piece alone is reported, never used to judge.",
+  "Logged only, as a running record. Since 2026-11-13 no result on these games keeps or switches the site's model (`docs/adr/0002-versions-are-judged-on-past-seasons.md`). Each piece alone is logged beside version 3.",
   confirmationGames.length
     ? table(
         ["Model", "Games", "Version 2 log loss", "Log loss", "Minus version 2 [95%]", "Two-week windows worse, reported"],

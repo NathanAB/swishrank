@@ -162,7 +162,7 @@ Days with a saved report: 5, 4 of them fetched before the day's first tip-off. A
 
 ### Table 6. Confirmation, 2026-27 from 2026-11-01
 
-Logged only: the confirmation judges once, after the season's last game. Each piece alone is reported, never used to judge.
+Logged only, as a running record. Since 2026-11-13 no result on these games keeps or switches the site's model (`docs/adr/0002-versions-are-judged-on-past-seasons.md`). Each piece alone is logged beside version 3.
 
 No confirmation game has been played.
 

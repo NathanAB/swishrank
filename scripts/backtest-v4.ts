@@ -1,6 +1,7 @@
 // npm run backtest:v4: runs docs/model-v4.md's pre-registered plan. It scores version 4, and each of its parts, against
-// version 3 as the site ran it on the tuning and exploration seasons, logs 2026-27 and the 2027-28 confirmation
-// games so far and, once 2027-28 has its end in src/data/seasons.json, gives the confirmation's verdict. It prints
+// version 3 as the site ran it on the tuning and exploration seasons, and logs 2026-27 and the 2027-28 confirmation
+// games so far. It gives no verdict on them. Since 2026-11-13 they are a running record, and no result there keeps
+// or switches the site's model (docs/adr/0002-versions-are-judged-on-past-seasons.md). It prints
 // every table and rewrites the Results part of docs/model-v4.md. It exits non-zero when the pre-registration's text
 // has changed, or when src/lib/elo.ts's SIGMA and early widening differ from what the plan fits. Version 3 is
 // src/lib/v3.ts's frozen settings with its own lineups and box ratings, so its numbers hold while the site runs version 4.
@@ -36,9 +37,8 @@ const read = (path: string): unknown => {
     return undefined;
   }
 };
-const listed = read("seasons.json") as { id: string; end?: string }[];
+const listed = read("seasons.json") as { id: string }[];
 const ALL = listed.map((s) => s.id).sort();
-const finished = listed.some((s) => s.id === CONFIRMATION && s.end);
 const draft = read("draft.json") as DraftFile;
 
 const files = ALL.map((id) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`), injuries: read(`injuries/${id}.json`) }));
@@ -170,12 +170,9 @@ section(
     : "No game with a saved NBA report has been played.",
 );
 
-const confirm = compare(v4, v3, confirmation);
 section(
   `Table 5. Confirmation, ${CONFIRMATION}`,
-  finished
-    ? `The season is over. Version 4's pooled log loss is ${confirm.d < 0 ? "below" : "not below"} version 3's, so ${confirm.d < 0 ? "version 4 goes on the site, unless version 3's own confirmation returned the site to version 2" : "the site keeps version 3"}.`
-    : "Logged only: the confirmation judges once, after the season's last game. Each part is reported, never used to judge.",
+  "Logged only, as a running record. Since 2026-11-13 no result on these games keeps or switches the site's model (`docs/adr/0002-versions-are-judged-on-past-seasons.md`). Each part is logged beside version 4.",
   only(v4, confirmation).length
     ? table(["Model", "Games", "Version 3 log loss", "Log loss", "Minus version 3 [95%]"], pieces.map(([name, s]) => { const d = compare(s, v3, confirmation); return [name, d.n, f4(d.b), f4(d.a), ci(d)]; }))
     : "No confirmation game has been played.",

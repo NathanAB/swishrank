@@ -147,7 +147,7 @@ The live fetch began saving the NBA's report before each tip-off during 2026-27,
 
 ### Table 5. Confirmation, 2027-28
 
-Logged only: the confirmation judges once, after the season's last game. Each part is reported, never used to judge.
+Logged only, as a running record. Since 2026-11-13 no result on these games keeps or switches the site's model (`docs/adr/0002-versions-are-judged-on-past-seasons.md`). Each part is logged beside version 4.
 
 No confirmation game has been played.
 
