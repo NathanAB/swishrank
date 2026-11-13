@@ -21,7 +21,8 @@
     "backtest:projections": "node scripts/backtest-projections.ts",
     "project": "node scripts/project.ts",
     "odds": "node scripts/odds-history.ts",
-    "stints": "node scripts/stints.ts"
+    "stints": "node scripts/stints.ts",
+    "roster-check": "node scripts/roster-check.ts"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",
