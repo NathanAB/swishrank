@@ -4,6 +4,7 @@
 // season is over. The odds stop at the regular season's last day: once the play-in starts they hold there.
 import { addDays, dayKey, fitModel, shownLineups, type SeasonData } from "./elo.ts";
 import { parseArchive } from "./injuries.ts";
+import { longAbsences } from "./inputs.ts";
 import { daySeed, historyDay, oddsDay, parseHistory, RUNS, teamOdds, type OddsDay, type SeasonOdds } from "./odds.ts";
 import { parseBox, usualRotations, type SeasonBox } from "./players.ts";
 import { DRIFT, setupAt, simulate } from "./project.ts";
@@ -52,7 +53,7 @@ export function currentOdds(): SeasonOdds | null {
     model: m,
     fits: inputs ? fitModel(m.data, inputs) : [],
     usual: shownLineups(m.data, usualRotations(walked).get(season.id)),
-    archive: injuries === undefined ? undefined : parseArchive(injuries, season.id),
+    away: injuries === undefined ? undefined : longAbsences(m.data, boxOf(season.id), parseArchive(injuries, season.id)),
     minutes: minutesTable(boxOf(season.id), previous),
     end,
   };
