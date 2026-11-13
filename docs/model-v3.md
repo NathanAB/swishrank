@@ -6,7 +6,9 @@ Version 3 changes three things in the model in `docs/model-v2.md`:
 - A game's chance drops the players that morning's injury report lists as out.
 - A rookie's value is held near his box rating with 40 games instead of 320, so his results move him sooner.
 
-This file holds the plan version 3 is confirmed by, written before any confirmation game is played, then the results. Where this plan says "as in version 2", the definition in `docs/model-v2.md`'s pre-registration applies unchanged. The site runs version 2 until this plan's confirmation says otherwise or the owner switches it.
+This file holds the plan version 3 is confirmed by, written before any confirmation game is played, then the results. Where this plan says "as in version 2", the definition in `docs/model-v2.md`'s pre-registration applies unchanged. The site ran version 2 until the owner switched it to version 3 on 2026-10-31, as The switch below records.
+
+On 2026-11-13 the owner retired this plan's confirmation as a gate (`docs/adr/0002-versions-are-judged-on-past-seasons.md`). A version is now accepted on past seasons its settings never saw, because one future season's games cannot tell a 0.002 gain in log loss from luck. The Confirmation section below stays as written, because the hash under Results covers its text, but its rule no longer decides anything. `npm run backtest:v3` keeps logging the confirmation games in tables 4 to 6 as a running record, and no result there keeps or switches the site's model.
 
 ## Pre-registration
 

@@ -8,6 +8,8 @@ Version 2 adds three things to the model in `docs/model.md`:
 
 This file holds the plan version 2 is chosen and confirmed by, written before the confirmation season is scored, then the results. Where this plan says "as in version 1", the definition in `docs/model.md`'s pre-registration applies unchanged.
 
+On 2026-11-13 the owner retired this plan's confirmation as a gate (`docs/adr/0002-versions-are-judged-on-past-seasons.md`). A version is now accepted on past seasons its settings never saw, because one future season's games cannot tell a 0.002 gain in log loss from luck. The Confirmation section below and the two deviations under Settings and their evidence stay as written, but their rule no longer decides anything, and no 2026-27 result returns the site to version 1. `npm run backtest:v2` keeps logging 2026-27's games in tables 4 and 11 as a running record.
+
 ## Pre-registration
 
 Written on 2026-10-28, after an exploration on the tuning and exploration seasons. No version 2 candidate has been scored on a 2026-27 game. The backtest prints the SHA-256 of this section, from the line after its heading to the line before the next `## ` heading, as in version 1. The hash at writing is recorded under Results.
@@ -339,6 +341,7 @@ Declared on 2026-10-31, when the owner asked for the two-week window rule to be 
 - The window constraint no longer judges the confirmation. On the tuning seasons, a model exactly as good as version 1, made by swapping version 1's and version 2's chances at random within each (season, week) block, is worse in at least one of the 17 judged windows in 206 of 400 tries, 52%: with many windows one is worse by chance, and each window's interval, from 13 to 16 blocks, runs narrow. The rule would return the site to version 1 about half the time between two equally good models. `node scripts/window-rule.ts v2` runs the check.
 - The confirmation is now: version 2 stays on the site when its pooled 2026-27 log loss is below version 1's; otherwise the site returns to version 1, frozen as `V1` in `scripts/evaluate.ts`. The two-week windows are still reported. This replaces the last point of the deviation above.
 - The change comes after part of 2026-27 was seen, with version 2 ahead of version 1 there, and it makes the confirmation easier to pass. Its reason, the rule's false-fail rate, comes from the tuning seasons alone. Version 3's plan, `docs/model-v3.md`, judges the same way.
+- On 2026-11-13 this confirmation stopped being a gate, as the note above the pre-registration records. No 2026-27 result returns the site to version 1.
 
 ## How the injury report will be judged
 
