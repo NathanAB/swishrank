@@ -8,6 +8,7 @@ import { fixture } from "./fixtures.ts";
 import { modelInputs, type OnCourt, type SeasonFiles } from "./inputs.ts";
 import { onCourtRatings } from "./on-court.ts";
 import { boxRatings, lineups, parseBox, type BoxLine, type Lineup } from "./players.ts";
+import type { RosterRule } from "./roster-lineups.ts";
 import { newcomers } from "./rookies.ts";
 import { parseStints, type Stint } from "./stints.ts";
 import { topThreeStart, V4 } from "./v4.ts";
@@ -210,4 +211,37 @@ test("without on-court settings, a real season's ratings are its box ratings, it
   assert.ok(own.after.size > 15 && own.athletes.length > 300);
   assert.deepEqual(modelInputs([file], draft).get(ID)!.players!.ratings, own);
   assert.notDeepEqual(modelInputs([file], draft, RULE).get(ID)!.players!.ratings, own, "the on-court settings do move it");
+});
+
+test("with a roster rule, a game still to come gets a roster lineup, and its report's statuses move it and the game's chance", () => {
+  const games = (year: string, ids: string[], played: number): Game[] => ids.map((id, i) => ({
+    id, t: `${year}-11-0${i + 1}T23:00Z`, home: "A", away: "B", hs: i < played ? 100 : null, as: i < played ? 90 : null, final: i < played, neutral: false, note: null,
+  }));
+  const five = (base: number, minutes = 48) => [0, 1, 2, 3, 4].map((k) => line(base + k, minutes, 10));
+  // Last season: in its second game, A's 5 is listed Out and sits, and 1 to 4 play 60 each with 48 of their 240
+  // usual minutes absent: Out, missed 0 is 0 of 1, unlisted 1 of 1, and the minutes multiplier at 26+ and 20-35% is
+  // 60/48 = 1.25, at 26+ and under 8% (B) 1.
+  const last: SeasonData = { season: "2025-26", teams: { A: team("A"), B: team("B") }, games: games("2025", ["s1", "s2"], 2) };
+  const lastBox = { season: "2025-26", games: { s1: { A: five(1), B: five(11) }, s2: { A: [1, 2, 3, 4].map((a) => line(a, 60, 10)), B: five(11) } } };
+  const lastReports = { season: "2025-26", games: { s1: { published: "x", home: {}, away: {} }, s2: { published: "x", home: { 5: "Out" }, away: {} } } };
+  const now: SeasonData = { season, teams: last.teams, games: games("2026", ["n1", "n2"], 1) };
+  const nowBox = { season, games: { n1: { A: five(101), B: five(111) } } };
+  const priced = (status: string, roster: RosterRule | null = { fill: -0.3 }) => {
+    const nbaReports = { season, games: { n1: { published: "x", home: {}, away: {} }, n2: { published: "x", home: { 102: status }, away: {} } } };
+    const files: SeasonFiles[] = [
+      { data: last, box: lastBox, preseason: { season: "2025-26", games: 82, totals: { A: 41, B: 41 }, source: "test" }, nbaReports: lastReports },
+      { data: now, box: nowBox, preseason: { season, games: 82, totals: { A: 41, B: 41 }, source: "test" }, nbaReports },
+    ];
+    const inputs = modelInputs(files, {}, undefined, roster ?? undefined).get(season)!;
+    const minutes = Object.fromEntries(inputs.players!.lineups.get("n2")!.home.map((p) => [p.athlete, Math.round(p.share * 48 * 1000) / 1000]));
+    return { minutes, gap: compute(now, inputs).gaps.n2 };
+  };
+  // Out: 102 at 0; 101, 103, 104 and 105 at 1 x 1.25 x 48 each, equal, 60 each.
+  const out = priced("Out");
+  assert.deepEqual(out.minutes, { 101: 60, 103: 60, 104: 60, 105: 60 });
+  // Available, never observed: 0.5, and no one absent, so 1: 102 at 24 and the rest at 48, 216 scaled to 240.
+  const available = priced("Available");
+  assert.deepEqual(available.minutes, { 101: 53.333, 102: 26.667, 103: 53.333, 104: 53.333, 105: 53.333 });
+  assert.notEqual(available.gap, out.gap);
+  assert.deepEqual(priced("Available", null).minutes, { 101: 48, 102: 48, 103: 48, 104: 48, 105: 48 }, "without the rule, version 4's: game 1's five at their 48");
 });

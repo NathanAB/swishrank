@@ -5,13 +5,15 @@
 // those seasons wins. Every other setting is version 4's.
 import { readFileSync } from "node:fs";
 import type { DraftFile } from "../../src/lib/draft.ts";
-import { EARLY, fitModel, PARAMS, seasonRule } from "../../src/lib/elo.ts";
+import { EARLY, PARAMS, seasonRule } from "../../src/lib/elo.ts";
 import { modelInputs, withOnCourt, type OnCourt } from "../../src/lib/inputs.ts";
 import { onCourtWalk, type OnCourtRule, type OnCourtWalk } from "../../src/lib/on-court.ts";
+import type { RosterRule } from "../../src/lib/roster-lineups.ts";
 import { parseStints } from "../../src/lib/stints.ts";
 import { V5 } from "../../src/lib/v5.ts";
 import { fitSigma, fitWiden, logLoss, modelRows, price, type Row } from "../evaluate.ts";
-import { callsOf, type Candidate, type Chosen, type Season } from "../past-seasons.ts";
+import type { Candidate, Chosen, Season } from "../past-seasons.ts";
+import { pricedWith, withRoster } from "../roster-candidates.ts";
 
 const draft = JSON.parse(readFileSync(new URL("../../src/data/draft.json", import.meta.url), "utf8")) as DraftFile;
 
@@ -91,25 +93,30 @@ function scores(search: Search, searched: Searched, n: number): Score[] {
   });
 }
 
-/** Version 5 with `settings`, pricing the season after `earlier`. */
-export const priced = (earlier: readonly Season[], settings: Settings): Chosen => ({
-  settings: describe(settings),
-  price: (season) => {
-    const inputs = modelInputs([...earlier, season], draft, settings.onCourt.weight ? settings.onCourt : undefined).get(season.data.season)!;
-    return callsOf(season.data, fitModel(season.data, inputs), settings.sigma, settings.widen);
-  },
-});
+/** Version 5 with `settings`, pricing the season after `earlier`, with roster-based lineups under `roster` when given. */
+export const priced = (earlier: readonly Season[], settings: Settings, roster?: RosterRule): Chosen =>
+  pricedWith(earlier, { settings: roster ? withRoster(describe(settings), roster) : describe(settings), onCourt: settings.onCourt.weight ? settings.onCourt : undefined, roster, sigma: settings.sigma, widen: settings.widen });
 
 /**
  * Version 5 choosing its settings by `search`: of its combinations, the one with the lowest log loss on the earlier
- * seasons, and the earlier in the search's order of two that tie. `scores` is what it chooses from. With no earlier
- * season there is nothing to choose from, and it is version 4: no on-court rating, and the site's SIGMA and widening.
+ * seasons, and the earlier in the search's order of two that tie. `scores` is what it chooses from, and `settings` what
+ * it chose, kept by list of seasons so another candidate reusing the choice does not score the search again. With no
+ * earlier season there is nothing to choose from, and it is version 4: no on-court rating, and the site's SIGMA and
+ * widening.
  */
-export function version5(search: Search): Candidate & { scores(earlier: readonly Season[]): Score[] } {
+export function version5(search: Search): Candidate & { scores(earlier: readonly Season[]): Score[]; settings(earlier: readonly Season[]): Settings } {
   const fitted = searcher(search);
   const scored = (earlier: readonly Season[]) => scores(search, fitted(earlier), earlier.length);
   const best = (list: readonly Score[]) => list.reduce((found, s) => (s.loss < found.loss ? s : found)).settings;
-  return { name: "Version 5", scores: scored, choose: (earlier) => priced(earlier, earlier.length ? best(scored(earlier)) : { onCourt: { ...search.rules[0], weight: 0 }, sigma: PARAMS.sigma, widen: EARLY.widen }) };
+  const chosen: { earlier: readonly Season[]; settings: Settings }[] = [];
+  const settings = (earlier: readonly Season[]): Settings => {
+    const hit = chosen.find((c) => c.earlier.length === earlier.length && c.earlier.every((s, i) => s === earlier[i]));
+    if (hit) return hit.settings;
+    const found = earlier.length ? best(scored(earlier)) : { onCourt: { ...search.rules[0], weight: 0 }, sigma: PARAMS.sigma, widen: EARLY.widen };
+    chosen.push({ earlier: [...earlier], settings: found });
+    return found;
+  };
+  return { name: "Version 5", scores: scored, settings, choose: (earlier) => priced(earlier, settings(earlier)) };
 }
 
 /** The settings src/lib/v5.ts holds for the site, which `npm run backtest:v5` checks against the ones chosen from every finished season. */

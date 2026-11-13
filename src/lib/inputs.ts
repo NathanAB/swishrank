@@ -5,7 +5,8 @@
 // shown rotation also leaves out the players ESPN's report lists as out for weeks. A box rating reads every earlier
 // season, a home edge the seasons before, and a team without a total is seeded from its rating at the end of the
 // season before, so the seasons are walked together, oldest first. Version 5 adds each player's on-court rating
-// (src/lib/on-court.ts) to his box rating when modelInputs() is given its settings.
+// (src/lib/on-court.ts) to his box rating when modelInputs() is given its settings, and prices each game from its
+// teams' rosters (src/lib/roster-lineups.ts rosterAvailability()) when given a roster rule.
 import { addDays, dayKey, finalDays, fitModel, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
 import type { DraftFile } from "./draft.ts";
 import { trailingHomeEdges } from "./home.ts";
@@ -16,6 +17,7 @@ import { boxRatings, lineups, parseBox, usualRotations, type Athlete, type BoxRa
 import { parsePreseason } from "./preseason.ts";
 import { OUT_STATUSES, reportLineups, reportNext } from "./report-lineup.ts";
 import { newcomers } from "./rookies.ts";
+import { rosterAvailability, type RosterRule } from "./roster-lineups.ts";
 import { parseStints } from "./stints.ts";
 import { availability, SITE_RULE, topThreeStart, V4 } from "./v4.ts";
 
@@ -151,8 +153,9 @@ function withLongAbsences(data: SeasonData, rotation: SeasonRotations, away: Lon
 /**
  * compute()'s inputs for each of `seasons`, by season id; `draft` names the top-three picks. With `onCourt`, version
  * 5's settings, each player's rating is his box rating withOnCourt() his on-court residual; without it, his box rating.
+ * With `roster`, each game's lineups and extra term are roster-based; without it, version 4's.
  */
-export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<DraftFile> = {}, onCourt?: OnCourt): Map<string, ModelInputs> {
+export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<DraftFile> = {}, onCourt?: OnCourt, roster?: RosterRule): Map<string, ModelInputs> {
   const walked = [...seasons]
     .sort((x, y) => x.data.season.localeCompare(y.data.season))
     .map((s) => ({ ...s, box: s.box === undefined ? { season: s.data.season, games: {} } : parseBox(s.box, s.data.season) }));
@@ -169,7 +172,8 @@ export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<Dra
   const espn = new Map(walked.flatMap((s) => (s.injuries === undefined ? [] : [[s.data.season, parseArchive(s.injuries, s.data.season)] as const])));
   const nba = new Map(walked.flatMap((s) => (s.nbaReports === undefined ? [] : [[s.data.season, parseNbaArchive(s.nbaReports, s.data.season)] as const])));
   const dataOf = (season: string) => walked.find((s) => s.data.season === season)!.data;
-  const priced = availability(walked, nba, (season) => espnLineups(dataOf(season), lineupsBySeason.get(season)!, espn.get(season)), SITE_RULE);
+  const v4 = availability(walked, nba, (season) => espnLineups(dataOf(season), lineupsBySeason.get(season)!, espn.get(season)), SITE_RULE);
+  const priced = roster ? rosterAvailability(walked, nba, roster, v4) : v4;
   const out = new Map<string, ModelInputs>();
   let before: { data: SeasonData; inputs: ModelInputs } | null = null;
   for (const { data, box, preseason } of walked) {

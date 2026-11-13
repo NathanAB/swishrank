@@ -21,7 +21,7 @@ import { months } from "./results.ts";
 import { conferenceSlug, gameSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
 import { CONFERENCE_ORDER } from "./teams.ts";
 import { coloursOf, lineColor } from "./tint.ts";
-import { SITE_ON_COURT } from "./v5.ts";
+import { SITE_ON_COURT, SITE_ROSTER } from "./v5.ts";
 
 export type SeasonView = SeasonRef & {
   /** "2026–27" */
@@ -123,6 +123,7 @@ const allInputs = () =>
     })),
     draft as unknown as DraftFile,
     SITE_ON_COURT,
+    SITE_ROSTER,
   ));
 
 /** A season's model inputs, as compute() read them. */
