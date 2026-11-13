@@ -1,10 +1,9 @@
 ---
 // A team's projections on its page in the season in progress: three figures down the left, its projected record, its
 // chance of the playoffs and its chance of the title (or of the first draft pick, for a team likelier to win the
-// lottery than the title), each chance with its move this week; and beside them where it finishes, its chance of each
-// seed in its conference, coloured by what the seed means as the odds page's season results are, with the league's
-// cut lines named under them. On a phone the figures run across the top and the seeds sit under them. Pointing at,
-// focusing or tapping a seed reads out its chance.
+// lottery than the title), each chance with its move this week; and beside them whatever the page slots in, the
+// team's rating chart on its own page. On a tablet or a phone the figures run across the top and the slot sits under
+// them.
 import Panel from "./Panel.astro";
 import type { Abbr } from "../lib/elo.ts";
 import { record } from "../lib/format.ts";
@@ -31,10 +30,6 @@ const figures = [
   { label: "Make the playoffs", value: oddsPct(o.playoffs), note: move("playoffs") },
   pick ? { label: "No. 1 draft pick", value: oddsPct(o.firstPick), note: null } : { label: "Win the title", value: oddsPct(o.title), note: move("title") },
 ];
-const ordinal = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th");
-const most = Math.max(...o.seed, 0.1);
-const colourOf = (i: number) => (i < 6 ? "var(--result-top6)" : i < 10 ? "var(--result-playin)" : "var(--result-lottery)");
-const seeds = o.seed.map((p, i) => ({ seed: i + 1, p, height: (p / most) * 100, colour: colourOf(i), text: `${ordinal(i + 1)} seed: ${oddsPct(p)}` }));
 ---
 
 <Panel title="Projections">
@@ -48,47 +43,12 @@ const seeds = o.seed.map((p, i) => ({ seed: i + 1, p, height: (p / most) * 100, 
         </div>
       ))}
     </dl>
-    <div class="finish" data-seeds>
-      <p class="sub">Where they finish</p>
-      <div class="cols" role="list" aria-label={`The ${whose} chance of each seed in their conference`}>
-        {seeds.map((s) => (
-          <div class="col" role="listitem" tabindex="0" aria-label={s.text} data-text={s.text}>
-            <span class="track"><i style={`height: ${s.height}%; background: ${s.colour}`}></i></span>
-            <span class="seed num">{s.seed}</span>
-          </div>
-        ))}
-      </div>
-      <div class="cuts" aria-hidden="true"><span style="grid-column: 1 / 7">Top 6</span><span style="grid-column: 7 / 11">Play-in</span><span style="grid-column: 11 / 16">Lottery</span></div>
-      <div class="tip" data-seed-tip hidden></div>
-    </div>
+    <div class="beside"><slot /></div>
   </div>
 </Panel>
 
-<script>
-  import { placeTip, type Pointer } from "../scripts/tip.ts";
-
-  for (const root of document.querySelectorAll<HTMLElement>("[data-seeds]")) {
-    const tip = root.querySelector<HTMLElement>("[data-seed-tip]")!;
-    // Above the seed's column, wherever on it the pointer is.
-    const show = (col: HTMLElement, at: Pointer) => {
-      tip.textContent = col.dataset.text ?? "";
-      tip.hidden = false;
-      const clientY = col.querySelector(".track")!.getBoundingClientRect().top;
-      placeTip({ tip, area: root, at: { clientX: at.clientX, clientY, pointerType: at.pointerType }, side: "above" });
-    };
-    for (const col of root.querySelectorAll<HTMLElement>("[data-text]")) {
-      col.addEventListener("pointerenter", (e) => show(col, e));
-      col.addEventListener("pointerdown", (e) => show(col, e));
-      col.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") tip.hidden = true; });
-      col.addEventListener("focus", () => { const r = col.getBoundingClientRect(); show(col, { clientX: r.left + r.width / 2, clientY: r.top }); });
-      col.addEventListener("blur", () => (tip.hidden = true));
-    }
-    document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Node && root.contains(e.target))) tip.hidden = true; });
-  }
-</script>
-
 <style>
-  /* The figures in a column a row each, ruled apart, beside the seeds; the two stand the same height. */
+  /* The figures in a column a row each, ruled apart, beside the slot; the two stand the same height. */
   .projections { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 40px; align-items: stretch; margin-top: 10px; }
   .figs { display: grid; grid-template-rows: repeat(3, 1fr); }
   .fig { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 12px; align-content: center; padding: 10px 0; border-top: 1px solid var(--rule); min-width: 0; }
@@ -100,29 +60,16 @@ const seeds = o.seed.map((p, i) => ({ seed: i + 1, p, height: (p / most) * 100, 
   .note { align-self: end; padding-bottom: 5px; color: var(--muted); font-size: var(--fs-small); line-height: 16px; }
   .note.up { color: var(--rise); }
   .note.down { color: var(--drop); }
-  .finish { position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; min-width: 0; }
-  .sub { font-size: 13px; line-height: 18px; font-weight: 600; }
-  /* Fifteen columns, each bar at most 24px wide, rounded at its top and square on the baseline. */
-  .cols { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); min-height: 120px; border-bottom: 1px solid var(--control); }
-  .col { display: grid; grid-template-rows: 1fr; position: relative; cursor: default; border-radius: 3px; }
-  .col:hover, .col:focus-visible { background: color-mix(in oklab, var(--text) 6%, transparent); }
-  .track { display: flex; align-items: flex-end; justify-content: center; height: 100%; padding-top: 4px; }
-  .track i { width: min(24px, calc(100% - 4px)); min-height: 1px; border-radius: 4px 4px 0 0; }
-  .seed { position: absolute; left: 0; right: 0; bottom: -20px; text-align: center; color: var(--muted); font-size: 11px; line-height: 14px; }
-  .cuts { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); margin-top: 22px; color: var(--muted); font-size: 11px; line-height: 14px; }
-  .cuts span { text-align: center; padding-top: 5px; margin: 0 3px; border-top: 1px solid var(--control); }
-  .tip { white-space: nowrap; }
+  .beside { min-width: 0; }
 
-  /* On a tablet or a phone the figures run across, three abreast, and the seeds stand under them. */
+  /* On a tablet or a phone the figures run across, three abreast, and the slot stands under them. */
   @media (max-width: 900px) {
     .projections { grid-template-columns: minmax(0, 1fr); gap: 20px; }
     .figs { grid-template-rows: none; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
     .fig, .fig:first-child, .fig:last-child { grid-template-columns: minmax(0, 1fr); align-content: start; padding: 0; border: 0; }
     .note { padding-bottom: 0; }
-    .cols { min-height: 120px; height: 120px; }
   }
   @media (max-width: 640px) {
     .value { font-size: 26px; line-height: 30px; }
-    .cols { min-height: 104px; height: 104px; }
   }
 </style>
