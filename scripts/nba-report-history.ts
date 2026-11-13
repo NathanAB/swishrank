@@ -3,8 +3,8 @@
 //
 //   node scripts/nba-report-history.ts 2019-20 2020-21 ...   [--cache <dir>] [--lead <minutes> --out <dir>]
 //
-// With --lead, a game takes the latest report published at least that many minutes before its tip, as the live fetch
-// saves it, and the files go to --out: scripts/nba-reports-at-tip/ holds --lead 30, for backtests after version 4's.
+// With --lead, a game takes the latest report whose printed time is at least that many minutes before its tip, as the
+// live fetch saves it, and the files go to --out: scripts/nba-reports-at-tip/ holds --lead 30, for backtests after version 4's.
 //
 // A game takes the latest report published on the hour at least 90 minutes before its tip, Eastern time, no later
 // than 5 PM and no earlier than 11 AM; the league published three a day before 2021-22 (1, 5 and 8 PM), so a game
@@ -13,8 +13,8 @@
 // pdftotext -layout text, named <day>_<hour>.txt for the day and hour wanted. Needs curl and pdftotext (poppler-utils).
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { addDays, finalDays } from "../src/lib/elo.ts";
-import { gameSides, historyReport, nameMatcher, parseReportText, rosters, teamNames, type GameReport, type NbaArchive, type NbaReport } from "../src/lib/nba-report.ts";
+import { addDays, dayKey, finalDays } from "../src/lib/elo.ts";
+import { gameSides, historyReport, inTime, nameMatcher, parseReportText, rosters, teamNames, type GameReport, type NbaArchive, type NbaReport } from "../src/lib/nba-report.ts";
 import { loadBox, loadSeason } from "./evaluate.ts";
 
 const args = process.argv.slice(2);
@@ -75,10 +75,19 @@ for (const id of seasons) {
   let covered = 0, finals = 0, unmatched = 0;
   for (const { games: today } of finalDays(data)) for (const g of today) {
     finals++;
-    const [day, hour] = historyReport(g.t, LEAD);
-    const key = `${day}_${hour}`;
-    if (!reports.has(key)) { const text = reportText(day, hour); reports.set(key, text === null ? null : parseReportText(text, teams)); }
-    const report = reports.get(key);
+    const read = (day: string, hour: number) => {
+      const key = `${day}_${hour}`;
+      if (!reports.has(key)) { const text = reportText(day, hour); reports.set(key, text === null ? null : parseReportText(text, teams)); }
+      return reports.get(key);
+    };
+    let [day, hour] = historyReport(g.t, LEAD);
+    let report = read(day, hour);
+    // The file named for an hour can print a later time than its name, so step back until the printed time is in time.
+    while (LEAD !== undefined && report?.published && !inTime(report.published, g.t, LEAD)) {
+      if (hour === 20 && day !== dayKey(g.t)) { report = null; break; }
+      [day, hour] = hour > 11 && day === dayKey(g.t) ? [day, hour - 1] : [addDays(dayKey(g.t), -1), 20];
+      report = read(day, hour);
+    }
     const sides = report?.published ? gameSides(g, report, match) : null;
     if (!report?.published || !sides) continue;
     games[g.id] = { published: report.published, ...sides };

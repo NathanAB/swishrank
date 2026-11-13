@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { SeasonData } from "./elo.ts";
-import { gameSides, historyReport, nameMatcher, normName, parseNbaArchive, parseReportText, teamNames, withNbaReport } from "./nba-report.ts";
+import { gameSides, historyReport, inTime, nameMatcher, normName, parseNbaArchive, parseReportText, teamNames, withNbaReport } from "./nba-report.ts";
 
 const team = (name: string) => ({ name, short: name.split(" ").at(-1)!, color: "000000", alternateColor: "ffffff" });
 const data: SeasonData = {
@@ -116,4 +116,17 @@ test("historyReport: a tip too early for the day's first report reads the night 
   assert.deepEqual(historyReport("2024-01-10T17:00Z", 30), ["2024-01-10", 11]);
   // 11:00 AM Eastern: 10:30 is before the first report of the day.
   assert.deepEqual(historyReport("2024-01-10T16:00Z", 30), ["2024-01-09", 20]);
+});
+
+test("inTime: a report counts only when its printed time is at least the lead before the tip", () => {
+  // A 7:30 PM Eastern tip on 2024-01-10 (EST), 30 minutes' lead: 7:00 PM is the latest in time.
+  assert.equal(inTime("2024-01-10T19:30", "2024-01-11T00:30Z", 30), false);
+  assert.equal(inTime("2024-01-10T19:01", "2024-01-11T00:30Z", 30), false);
+  assert.equal(inTime("2024-01-10T19:00", "2024-01-11T00:30Z", 30), true);
+  assert.equal(inTime("2024-01-10T18:30", "2024-01-11T00:30Z", 30), true);
+  // The night before's report is in time for a noon tip.
+  assert.equal(inTime("2024-01-09T20:30", "2024-01-10T17:00Z", 30), true);
+  // Daylight time: 23:30Z on 2024-03-20 is 7:30 PM Eastern.
+  assert.equal(inTime("2024-03-20T19:00", "2024-03-20T23:30Z", 30), true);
+  assert.equal(inTime("2024-03-20T19:15", "2024-03-20T23:30Z", 30), false);
 });
