@@ -4,6 +4,7 @@
 // 1000, and nothing re-centres them, so the league's average floats. docs/model.md and docs/model-v2.md hold the
 // backtests behind every setting.
 import type { Athlete, BoxRatings, Lineup, SeasonBox, SeasonRotations, Sides } from "./players.ts";
+import { SITE } from "./site.ts";
 
 export const START = 1000;
 /**
@@ -64,18 +65,18 @@ export type FitRule = { n0: number; margin: MarginRule; home: HomeRule; seed?: S
 export type Params = FitRule & { sigma: number };
 
 /**
- * The site's model, version 4 since 2026-11-02 (docs/model-v4.md): version 3's fit rule (docs/model-v3.md), version
- * 2's settings with a rookie's value held with 40 games, and SIGMA fitted again; src/lib/v4.ts holds the rest. The
- * home edge here, 0.622, is only the fallback: each season's own edge, from the three seasons before it, comes in its
- * ModelInputs. Since 2026-11-01, by the owner's choice outside version 3's plan, a team's rating moves only on its own
- * game days (`idle`), and since 2026-11-05 a past opponent's later results no longer reach it (`opponents`);
- * docs/model-v3.md, The switch, has why. Version 3 is frozen as `V3` in src/lib/v3.ts, version 2
- * as `V2` in scripts/evaluate.ts.
+ * The site's model: version 3's fit rule (docs/model-v3.md), version 2's settings with a rookie's value held with 40
+ * games, which versions 4 and 5 keep, and the SIGMA of the version src/lib/site.ts SITE points at, whose own file
+ * holds the rest. The home edge here, 0.622, is only the fallback: each season's own edge, from the three seasons
+ * before it, comes in its ModelInputs. Since 2026-11-01, by the owner's choice outside version 3's plan, a team's
+ * rating moves only on its own game days (`idle`), and since 2026-11-05 a past opponent's later results no longer
+ * reach it (`opponents`); docs/model-v3.md, The switch, has why. Version 4 is frozen as `V4` in src/lib/v4.ts, version
+ * 3 as `V3` in src/lib/v3.ts, version 2 as `V2` in scripts/evaluate.ts.
  */
 export const PARAMS = {
   n0: 96, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 },
   seed: { scale: 5, fade: 120, carry: 0.7 }, b2b: 0.4, players: { a: 0.08, np: 320, halfLife: 365, rookieNp: 40 },
-  idle: "freeze", opponents: "fixed", sigma: 2.986,
+  idle: "freeze", opponents: "fixed", sigma: SITE.sigma,
 } satisfies Params;
 
 /** Games a team plays before its rating stops being provisional: docs/model-v2.md, table 9. */
@@ -500,9 +501,9 @@ export const ELO_PER_SIGMA = (400 / Math.LN10) * 1.702;
 
 /**
  * A season's first games say little, and the model's chances for them run high. While either side has played
- * fewer than `games` games, a gap counts `widen` times less, fitted on the tuning seasons: docs/model-v4.md.
+ * fewer than `games` games, a gap counts `widen` times less: the widening of the version src/lib/site.ts SITE points at.
  */
-export const EARLY = { games: 5, widen: 1.14 };
+export const EARLY = { games: 5, widen: SITE.widen };
 
 /** The model's win chance for a rating gap in Elo points, when the less experienced side has `played` games. */
 export const winProb = (gap: number, played = Infinity) => phi(gap / (ELO_PER_SIGMA * (played < EARLY.games ? EARLY.widen : 1)));
@@ -529,8 +530,8 @@ export type Season = {
   r: Record<Abbr, number>;
   /**
    * Each game still to play's expected home margin by id, in Elo points, as its chance reads it: the two sides' team
-   * parts and the player parts of the lineups that game is priced with, home court, the back-to-back and version 4's
-   * fill term for the minutes its report takes out.
+   * parts and the player parts of the lineups that game is priced with, home court, the back-to-back and the extra
+   * term for the minutes its lineups leave out (src/lib/inputs.ts).
    */
   gaps: Record<string, number>;
   /** The home edge the latest fit measured, in Elo points. */

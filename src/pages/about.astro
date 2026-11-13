@@ -2,7 +2,7 @@
 // How the ratings work, for a fan who has never heard of Elo: a three-line summary, five steps that each pair a
 // sentence or two with a drawing of real games the reader can play with (components/explain/), then the fine
 // print. Every figure is worked out from the season's games by lib/, so the page cannot disagree with the ratings,
-// and docs/model.md and docs/model-v2.md hold the backtests behind each setting.
+// and docs/model.md to docs/model-v5.md hold the backtests behind each setting.
 import DayOff from "../components/explain/DayOff.astro";
 import GapAnswer from "../components/explain/GapAnswer.astro";
 import GapCurve from "../components/explain/GapCurve.astro";
@@ -20,7 +20,6 @@ import { href } from "../lib/routes.ts";
 import { ABOUT_TITLE } from "../lib/meta.ts";
 import { examples, offDay, upsetRatio } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
-import { SITE_ON_COURT } from "../lib/v5.ts";
 
 const season = allSeasons().find((s) => s.model.results.length > 0) ?? null;
 const model = season?.model ?? null;
@@ -109,7 +108,7 @@ const game = opener && {
     </Panel></li>
 
     <li><Panel title="Each game's chance, worked out">
-      <p class="say">Take the home team's rating, subtract the visitor's and add home court. The curve in step 2 turns that gap into each team's chance. The injury report then moves it, by up to a few points, for whoever is sitting out that night. A team playing the second night of a back-to-back gives up another {int(tired)} points.</p>
+      <p class="say">Take the home team's rating, subtract the visitor's and add home court. The curve in step 2 turns that gap into each team's chance. The game's lineup then moves it, by up to a few points, for who is likely to play that night and for how long. A team playing the second night of a back-to-back gives up another {int(tired)} points.</p>
       <Fragment slot="side">{season && <Matchup season={season} />}</Fragment>
     </Panel></li>
   </ol>
@@ -120,15 +119,17 @@ const game = opener && {
       <dt>Scale</dt>
       <dd>Borrowed from chess's Elo ratings. Unlike Elo, which nudges a rating after each game, a team's rating here is refit to all of its games each time it plays.</dd>
       <dt>Players</dt>
-      <dd>Each player has a value, measured from his box scores over past seasons{SITE_ON_COURT && ", the scoreline while he is on the floor, adjusted for the teammates and opponents out there with him,"} and his team's results this season. A rookie has no past seasons, so his team's results move him sooner, and a top-three draft pick starts from the level such picks have played at. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
+      <dd>Each player has one value, built from three things. His box scores say what he did himself. The scoreline while he is on the floor, adjusted for the teammates and opponents out there with him, says how his team did with him. Both go back over past seasons. His team's results this season then move his value. A rookie has no past seasons, so his team's results move him sooner, and a top-three draft pick starts from the level such picks have played at. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
       <dt>Chances</dt>
       <dd>They follow how often past favorites won at each gap, within one percentage point of Elo's formula, 1 / (1 + 10^(−gap / 400)).</dd>
       <dt>Later games</dt>
       <dd>Each one moves a rating less, because it's one result among many.</dd>
       <dt>Early games</dt>
       <dd>Until both teams have played {EARLY.games}, the chances stay closer to 50%, because a few games say little about a team.</dd>
+      <dt>Lineups</dt>
+      <dd>A game's chances count each team's recent players: everyone who played in one of its last 10 games and is still with the team. Each counts for his usual minutes times his chance of playing. That chance is how often players like him have played in past seasons: players with the same status on the NBA's injury report, the latest before tip-off, who had missed as many games in a row. A player listed as out counts for almost nothing. A questionable player counts for part of his minutes, and so does a regular who sat the last game without being listed. When much of the rotation is out, the bench counts for more minutes. The minutes a team is expected to miss count a little lower, because backups play them worse than the regulars. A team the report doesn't cover yet is counted at the rates of teams with no report. Seasons before 2020–21 have no earlier injury reports to learn from, so their games count the players of each team's last game, less any the report lists as out.</dd>
       <dt>Injuries</dt>
-      <dd>A game's chances read the NBA's injury report, the latest before tip-off. Players it lists as out or doubtful sit. A questionable player counts for half his minutes. A regular who missed only his team's last game and isn't on the report counts as back. The minutes of those who sit count a little lower, because backups play them worse than the regulars. A team the report doesn't cover yet loses the players that morning's ESPN report lists as out. A team's rating leaves out players who are out for weeks. The rest of the rotation takes their minutes, also counted a little lower, until the team's last 10 games show who plays them.</dd>
+      <dd>A team's rating leaves out players who are out for weeks. The rest of the rotation takes their minutes, counted a little lower, until the team's last 10 games show who plays them.</dd>
       <dt>Home court</dt>
       <dd>Its worth is measured each season from the three seasons before.</dd>
       <dt>Back-to-backs</dt>

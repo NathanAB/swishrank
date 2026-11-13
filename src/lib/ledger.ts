@@ -9,7 +9,7 @@ import { parseArchive, type Injury } from "./injuries.ts";
 import { playerName } from "./names.ts";
 import type { Lineup } from "./players.ts";
 import { seasonInputs, team, type SeasonView } from "./season.ts";
-import { SITE_ON_COURT } from "./v5.ts";
+import { SITE } from "./site.ts";
 
 const INJURY_FILES = import.meta.glob<unknown>("../data/injuries/*.json", { eager: true, import: "default" });
 
@@ -46,7 +46,7 @@ export type LedgerGame = {
   beat: boolean;
 };
 
-/** One player's value change from his box score in the team's own game, times his share of the minutes. */
+/** One player's value change from the team's own game, his box score and his on-court rating, times his share of the minutes. */
 export type BoxPlayer = { athlete: number; name: string; points: number };
 
 export type LedgerRow = {
@@ -59,11 +59,11 @@ export type LedgerRow = {
   /**
    * The move in rating points, in the walk's two parts, which add up to it exactly. `result` is what the team's
    * own game did before its players' box scores counted, the team part's shift when they did, and the seed's
-   * fading; `players` is each player's value change from his box score, what his change in counted minutes did,
+   * fading; `players` is each player's value change from his game, what his change in counted minutes did,
    * and what the day's other games did to his value (`former`).
    */
   raw: Record<WalkKey, number>;
-  /** Each player of the rotation the team took into the day, and his value change from his box score. */
+  /** Each player of the rotation the team took into the day, and his value change from his game (BoxPlayer). */
   box: BoxPlayer[];
   /** Players whose counted minutes changed, largest effect first. */
   players: PlayerMove[];
@@ -129,7 +129,7 @@ function cacheKey(seasonId: string): string {
   const root = process.cwd();
   const hash = createHash("sha256");
   const lib = filesUnder(join(root, "src", "lib")).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
-  const dirs = [...["games", "box", "preseason", "injuries", "nba-reports"].map((dir) => join(root, "src", "data", dir)), ...(SITE_ON_COURT ? [join(root, "scripts", "stints")] : [])];
+  const dirs = [...["games", "box", "preseason", "injuries", "nba-reports"].map((dir) => join(root, "src", "data", dir)), ...(SITE.onCourt ? [join(root, "scripts", "stints")] : [])];
   const data = dirs.flatMap(filesUnder).filter((f) => (/(\d{4}-\d{2})\.json$/.exec(f)?.[1] ?? "9999") <= seasonId);
   for (const f of [...lib, join(root, "src", "data", "seasons.json"), join(root, "src", "data", "draft.json"), ...data]) hash.update(f.slice(root.length)).update("\0").update(readFileSync(f)).update("\0");
   cacheKeys.set(seasonId, (key = hash.digest("hex")));
@@ -379,12 +379,13 @@ function favoredSide(p: number | undefined, home: boolean): boolean | null {
 }
 
 /**
- * A player's whole day in a few plain words, from its two parts: how he played (his value change from his box score)
- * and his counted minutes (the change in the minutes the rating counts him for, at his value). A part is named when it
- * is a tenth of a point or more and at least a quarter of the larger one, so the words follow what moved the row;
- * with both, "and" joins them when they push the rating the same way, "but" when they pull against each other. The
- * minutes part says "longer" or "shorter than expected" when his minutes in the game explain it, beyond 2 minutes off
- * what was counted, and "counted for more" or "fewer minutes" when his teammates' did. A player out for weeks says so.
+ * A player's whole day in a few plain words, from its two parts: how he played (his value change from his game, his
+ * box score and his on-court rating) and his counted minutes (the change in the minutes the rating counts him for, at
+ * his value). A part is named when it is a tenth of a point or more and at least a quarter of the larger one, so the
+ * words follow what moved the row; with both, "and" joins them when they push the rating the same way, "but" when they
+ * pull against each other. The minutes part says "longer" or "shorter than expected" when his minutes in the game
+ * explain it, beyond 2 minutes off what was counted, and "counted for more" or "fewer minutes" when his teammates' did.
+ * A player out for weeks says so.
  */
 function playerPhrase(value: number, move: PlayerMove | undefined): string {
   const until = move?.injury?.returnDate ? ` until ${shortDay(move.injury.returnDate)}` : "";
@@ -451,7 +452,7 @@ function partLines(items: WalkItem[], whole: number): WalkLine[] {
 
 /**
  * A row as the walk draws it, in two parts that never show a player twice: the team's own result with the seed's
- * fading, and each player's whole effect (his value change from his box score, his change in expected minutes, and
+ * fading, and each player's whole effect (his value change from his game, his change in expected minutes, and
  * what the day's other games did to his value through his past games with a former team). The whole points are split again from
  * those raw parts by the largest-remainder rule, so they still add up to the change.
  */

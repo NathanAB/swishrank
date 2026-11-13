@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { DraftFile } from "../src/lib/draft.ts";
 import { compute, type SeasonData } from "../src/lib/elo.ts";
-import { modelInputs } from "../src/lib/inputs.ts";
+import { siteInputs } from "../src/lib/inputs.ts";
 import { daySeed, HISTORY_RUNS, oddsDay, toHistoryFile } from "../src/lib/odds.ts";
 import { DRIFT, setupAt, simulate } from "../src/lib/project.ts";
 import { regularSeasonEnd } from "../src/lib/teams.ts";
@@ -22,7 +22,7 @@ for (const id of asked) if (!finished.includes(id)) throw new Error(`${id} is no
 const targets = asked.length ? asked : finished.filter((id) => !existsSync(new URL(`../src/data/odds/${id}.json`, import.meta.url)));
 
 const files = ids.map((id) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`), injuries: read(`injuries/${id}.json`), nbaReports: read(`nba-reports/${id}.json`) }));
-const inputs = modelInputs(files, read("draft.json") as DraftFile);
+const inputs = siteInputs(files, read("draft.json") as DraftFile);
 mkdirSync(new URL("../src/data/odds/", import.meta.url), { recursive: true });
 for (const id of targets) {
   const t0 = Date.now();

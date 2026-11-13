@@ -6,7 +6,10 @@
 // season, a home edge the seasons before, and a team without a total is seeded from its rating at the end of the
 // season before, so the seasons are walked together, oldest first. Version 5 adds each player's on-court rating
 // (src/lib/on-court.ts) to his box rating when modelInputs() is given its settings, and prices each game from its
-// teams' rosters (src/lib/roster-lineups.ts rosterAvailability()) when given a roster rule.
+// teams' rosters (src/lib/roster-lineups.ts rosterAvailability()) when given a roster rule. modelInputs() with neither
+// is version 4's inputs; siteInputs() is the site's, at the settings of the version src/lib/site.ts SITE points at.
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { addDays, dayKey, finalDays, fitModel, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
 import type { DraftFile } from "./draft.ts";
 import { trailingHomeEdges } from "./home.ts";
@@ -18,6 +21,7 @@ import { parsePreseason } from "./preseason.ts";
 import { OUT_STATUSES, reportLineups, reportNext } from "./report-lineup.ts";
 import { newcomers } from "./rookies.ts";
 import { rosterAvailability, type RosterRule } from "./roster-lineups.ts";
+import { SITE } from "./site.ts";
 import { parseStints } from "./stints.ts";
 import { availability, SITE_RULE, topThreeStart, V4 } from "./v4.ts";
 
@@ -198,4 +202,27 @@ export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<Dra
     before = { data, inputs };
   }
   return out;
+}
+
+/**
+ * A season's play-by-play record as read from scripts/stints/ under the working directory, or undefined when it has
+ * none on file. The build and `npm run` both start at the repository root; anywhere else there is no such folder, and
+ * it throws rather than hand back seasons with no record.
+ */
+const stintsOnFile = (id: string): unknown => {
+  const dir = join(process.cwd(), "scripts", "stints");
+  if (!existsSync(dir)) throw new Error(`siteInputs: no scripts/stints/ under ${process.cwd()}, so the on-court rating has no play-by-play record to read. Run from the repository root.`);
+  const path = join(dir, `${id}.json`);
+  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined;
+};
+
+/**
+ * The site's inputs: modelInputs() at the on-court and roster settings of the version src/lib/site.ts SITE points at.
+ * When SITE reads the on-court rating, a season given without `stints` gets its record from scripts/stints/, or none
+ * when it has none on file, so a caller cannot price at the site's SIGMA with another version's ratings by leaving the
+ * play-by-play record out. It throws when the working directory has no scripts/stints/.
+ */
+export function siteInputs(seasons: readonly SeasonFiles[], draft: Readonly<DraftFile>): Map<string, ModelInputs> {
+  const files = SITE.onCourt ? seasons.map((s) => ({ ...s, stints: s.stints ?? stintsOnFile(s.data.season) })) : seasons;
+  return modelInputs(files, draft, SITE.onCourt, SITE.roster);
 }
