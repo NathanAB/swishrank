@@ -3,7 +3,7 @@
 // outside scripts/candidates/ so the loaders do not take it for a candidate.
 import { readFileSync } from "node:fs";
 import type { DraftFile } from "../src/lib/draft.ts";
-import { EARLY, fitModel, PARAMS, seasonRule } from "../src/lib/elo.ts";
+import { fitModel, seasonRule } from "../src/lib/elo.ts";
 import { modelInputs, type OnCourt } from "../src/lib/inputs.ts";
 import type { RosterRule } from "../src/lib/roster-lineups.ts";
 import { V4 } from "../src/lib/v4.ts";
@@ -29,14 +29,14 @@ export const pricedWith = (earlier: readonly Season[], run: { settings: string; 
 
 /** Version 4's ratings, SIGMA and early widening with roster-based lineups under `roster`, pricing the season after `earlier`. */
 export const version4With = (earlier: readonly Season[], roster: RosterRule): Chosen =>
-  pricedWith(earlier, { settings: withRoster(`the site's: SIGMA ${PARAMS.sigma}, early widening ${EARLY.widen}`, roster), roster, sigma: PARAMS.sigma, widen: EARLY.widen });
+  pricedWith(earlier, { settings: withRoster(`version 4's: SIGMA ${V4.sigma}, early widening ${V4.widen}`, roster), roster, sigma: V4.sigma, widen: V4.widen });
 
 /** Whether `earlier[i]` is priced from roster lineups: some season before it has an NBA report archive. */
 const rosterPriced = (earlier: readonly Season[], i: number) => earlier.slice(0, i).some((s) => s.nbaReports !== undefined);
 
 /**
  * The fill with the lowest log loss over the roster-priced seasons of `earlier`, each priced with version 4's ratings,
- * the site's SIGMA and early widening; V4.fill when none is roster-priced. A season's rows read nothing after it, so
+ * version 4's SIGMA and early widening; V4.fill when none is roster-priced. A season's rows read nothing after it, so
  * it keeps them by season and fill across calls, and starts again when handed a list that departs from the kept one.
  */
 function fillChooser(): (earlier: readonly Season[]) => number {
@@ -54,7 +54,7 @@ function fillChooser(): (earlier: readonly Season[]) => number {
     }
     const rows = kept.rows.slice(0, earlier.length);
     if (!rows.some((r) => r.length)) return V4.fill;
-    const losses = FILLS.map((_, f) => logLoss(price(rows.flatMap((r) => r[f] ?? []), PARAMS.sigma, EARLY.widen)));
+    const losses = FILLS.map((_, f) => logLoss(price(rows.flatMap((r) => r[f] ?? []), V4.sigma, V4.widen)));
     return FILLS[losses.indexOf(Math.min(...losses))];
   };
 }

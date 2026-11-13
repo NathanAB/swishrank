@@ -3,11 +3,11 @@
 // games so far. It gives no verdict on them. Since 2026-11-13 they are a running record, and no result there keeps
 // or switches the site's model (docs/adr/0002-versions-are-judged-on-past-seasons.md). It prints
 // every table and rewrites the Results part of docs/model-v4.md. It exits non-zero when the pre-registration's text
-// has changed, or when src/lib/elo.ts's SIGMA and early widening differ from what the plan fits. Version 3 is
-// src/lib/v3.ts's frozen settings with its own lineups and box ratings, so its numbers hold while the site runs version 4.
+// has changed, or when src/lib/v4.ts V4's SIGMA and early widening differ from what the plan fits. Version 3 is
+// src/lib/v3.ts's frozen settings with its own lineups and box ratings, so its numbers hold whichever version the site runs.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { EARLY, ELO_PER_SIGMA, PARAMS, seasonRule, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
+import { ELO_PER_SIGMA, PARAMS, seasonRule, type SeasonData, type SeasonInputs } from "../src/lib/elo.ts";
 import { parseArchive } from "../src/lib/injuries.ts";
 import { modelInputs } from "../src/lib/inputs.ts";
 import { parseNbaArchive, type NbaArchive } from "../src/lib/nba-report.ts";
@@ -181,7 +181,7 @@ section(
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const want = { sigma: r3(sigma), widen: r2(widen) };
-const have = { sigma: r3(PARAMS.sigma), widen: r2(EARLY.widen) };
+const have = { sigma: r3(V4.sigma), widen: r2(V4.widen) };
 const match = JSON.stringify(want) === JSON.stringify(have);
 out.push(`### Check\n\nsrc/lib/v4.ts V4 ${match ? "matches" : "DOES NOT match"} the plan's fit, \`${JSON.stringify(want)}\`.`);
 if (!match) process.exitCode = 1;
