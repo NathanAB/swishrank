@@ -3,14 +3,18 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dayKey, EARLY, PARAMS, seasonRule, type SeasonData } from "../../src/lib/elo.ts";
+import { dayKey, EARLY, fitModel, PARAMS, seasonRule, type SeasonData } from "../../src/lib/elo.ts";
 import type { DraftFile } from "../../src/lib/draft.ts";
 import { modelInputs } from "../../src/lib/inputs.ts";
 import { fitSigma, fitWiden, logLoss, modelRows, price } from "../evaluate.ts";
+import { V4 } from "../../src/lib/v4.ts";
 import { V5 } from "../../src/lib/v5.ts";
-import { changedByLaterResults, isCandidate, type Candidate, type Season } from "../past-seasons.ts";
+import { callsOf, changedByLaterResults, isCandidate, type Candidate, type Season } from "../past-seasons.ts";
+import { chooseFill, FILLS } from "../roster-candidates.ts";
 import version4 from "./v4.ts";
+import version4Roster from "./v4-roster.ts";
 import { describe, priced, version5, type Search } from "./v5.ts";
+import { version5Roster } from "./v5-roster.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -61,19 +65,25 @@ const read = (path: string): unknown => {
     return undefined;
   }
 };
-/** 2023-24's games, box scores, play-by-play and pre-tip reports of October and November 2023, kept small for speed. */
+/** Season `id`'s games, box scores, play-by-play and pre-tip reports before `end`, kept small for speed. */
+function shortened(id: string, end: string): Season {
+  const full = read(`src/data/games/${id}.json`) as SeasonData;
+  const games = full.games.filter((g) => dayKey(g.t) < end);
+  const ids = new Set(games.map((g) => g.id));
+  /** A raw `{ season, games }` file cut to the games above. */
+  const cut = (raw: unknown) => typeof raw === "object" && raw !== null && "games" in raw && typeof raw.games === "object" && raw.games !== null
+    ? { season: id, games: Object.fromEntries(Object.entries(raw.games).filter(([g]) => ids.has(g))) }
+    : undefined;
+  return {
+    data: { ...full, games }, box: cut(read(`src/data/box/${id}.json`)), preseason: read(`src/data/preseason/${id}.json`), injuries: read(`src/data/injuries/${id}.json`),
+    nbaReports: read(`scripts/nba-reports-at-tip/${id}.json`), stints: cut(read(`scripts/stints/${id}.json`)),
+  };
+}
+/** 2023-24 in October and November 2023. */
 const ID = "2023-24";
-const full = read(`src/data/games/${ID}.json`) as SeasonData;
-const games = full.games.filter((g) => dayKey(g.t) < "2023-12-01");
-const ids = new Set(games.map((g) => g.id));
-/** A raw `{ season, games }` file cut to the games above. */
-const cut = (raw: unknown) => typeof raw === "object" && raw !== null && "games" in raw && typeof raw.games === "object" && raw.games !== null
-  ? { season: ID, games: Object.fromEntries(Object.entries(raw.games).filter(([id]) => ids.has(id))) }
-  : undefined;
-const small: Season = {
-  data: { ...full, games }, box: cut(read(`src/data/box/${ID}.json`)), preseason: read(`src/data/preseason/${ID}.json`), injuries: read(`src/data/injuries/${ID}.json`),
-  nbaReports: read(`scripts/nba-reports-at-tip/${ID}.json`), stints: cut(read(`scripts/stints/${ID}.json`)),
-};
+const small = shortened(ID, "2023-12-01");
+/** 2022-23 to mid-November 2022: an earlier season with NBA reports, for roster lineups to learn their rates from. */
+const early = shortened("2022-23", "2022-11-15");
 
 /** Version 5 with the site's settings on file: with no earlier season, the file's own candidate has no on-court rating to check. */
 const fixed: Candidate = { name: "Version 5 with V5's settings", choose: (earlier) => priced(earlier, V5) };
@@ -130,4 +140,54 @@ test("version 5's search starts again when it is handed other seasons than the o
   const again = candidate.scores([bare]);
   assert.deepEqual(again, version5(SMALL_SEARCH).scores([bare]));
   assert.notDeepEqual(again, first);
+});
+
+/** Version 5 with V5's settings and roster lineups at V5's fill. */
+const fixedRoster: Candidate = { name: "Version 5 with V5's settings and roster lineups", choose: (earlier) => priced(earlier, V5, V5.roster) };
+for (const [f, candidate] of [["v4-roster.ts", version4Roster], ["v5.ts with V5's settings and roster lineups", fixedRoster]] as const) {
+  for (const day of ["2023-11-01", "2023-11-08", "2023-11-15", "2023-11-22"]) {
+    test(`scripts/candidates/${f}, rates learned from 2022-23: no call reads the results of ${day} or later`, () => {
+      assert.deepEqual(changedByLaterResults({ candidate, earlier: [early], season: small, day }), []);
+    });
+  }
+}
+
+test("the walk-forward check above prices 2023-24 from roster lineups, not version 4's", () => {
+  const roster = version4Roster.choose([early]).price(small), plain = version4.choose([early]).price(small);
+  const differ = [...roster].filter(([id, c]) => JSON.stringify(c.lineup) !== JSON.stringify(plain.get(id)?.lineup));
+  assert.ok(differ.length > 100, `${differ.length} games' lineups differ`);
+});
+
+test("the fill is version 4's with no roster-priced earlier season, and otherwise the one with the lowest log loss on the roster-priced seasons", () => {
+  assert.equal(chooseFill([]), -0.3);
+  assert.equal(chooseFill([early]), -0.3);
+  const draft = read("src/data/draft.json") as DraftFile;
+  const losses = FILLS.map((fill) => {
+    const inputs = modelInputs([early, small], draft, undefined, { fill }).get(ID)!;
+    return logLoss(price(modelRows(small.data, seasonRule(inputs), inputs), PARAMS.sigma, EARLY.widen));
+  });
+  assert.ok(Math.max(...losses) - Math.min(...losses) > 1e-4, "the fills score apart");
+  const best = FILLS[losses.indexOf(Math.min(...losses))];
+  assert.notEqual(best, V4.fill, "the winner is not the fill chosen with nothing to choose from");
+  assert.equal(chooseFill([early, small]), best);
+});
+
+/** One rule and two weights: version 5's search in seconds. */
+const ONE_RULE: Search = { rules: [{ ridge: 3000, halfLife: 730, boxPrior: 0.5 }], weights: [0, 0.3] };
+
+test("version 5 with roster lineups prices with version 5's own choice for the earlier seasons, at the fill chosen from them", () => {
+  const draft = read("src/data/draft.json") as DraftFile;
+  const v5 = version5(ONE_RULE);
+  const settings = v5.settings([early]);
+  const chosen = version5Roster(v5).choose([early]);
+  assert.equal(chosen.settings, `${describe(settings)}; roster lineups at fill -0.3`);
+  const inputs = modelInputs([early, small], draft, settings.onCourt.weight ? settings.onCourt : undefined, { fill: -0.3 }).get(ID)!;
+  const want = callsOf(small.data, fitModel(small.data, inputs), settings.sigma, settings.widen);
+  const calls = chosen.price(small);
+  assert.ok(want.size > 100);
+  assert.equal(calls.size, want.size);
+  for (const [id, c] of want) {
+    assert.equal(calls.get(id)?.p, c.p, id);
+    assert.deepEqual(calls.get(id)?.lineup, c.lineup, id);
+  }
 });
