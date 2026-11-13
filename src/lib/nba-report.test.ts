@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { SeasonData } from "./elo.ts";
-import { gameSides, nameMatcher, normName, parseNbaArchive, parseReportText, teamNames, withNbaReport } from "./nba-report.ts";
+import { gameSides, historyReport, nameMatcher, normName, parseNbaArchive, parseReportText, teamNames, withNbaReport } from "./nba-report.ts";
 
 const team = (name: string) => ({ name, short: name.split(" ").at(-1)!, color: "000000", alternateColor: "ffffff" });
 const data: SeasonData = {
@@ -96,4 +96,24 @@ test("a report reaches only games still to come, and a later one replaces it unt
   assert.equal(after.archive.games["2"].away!["30"], "Out");
   assert.deepEqual(parseNbaArchive(JSON.parse(JSON.stringify(after.archive)), "2019-20"), after.archive);
   assert.throws(() => parseNbaArchive({ season: "2019-20", games: { 1: { published: "x", home: { 5: "Gone" }, away: null } } }, "2019-20"), /game 1 is malformed/);
+});
+
+test("historyReport: version 4's plan stops at 5 PM, a lead reads the last report before the tip", () => {
+  // 7:30 PM Eastern on 2024-01-10 (EST, UTC-5).
+  assert.deepEqual(historyReport("2024-01-11T00:30Z"), ["2024-01-10", 17]);
+  assert.deepEqual(historyReport("2024-01-11T00:30Z", 30), ["2024-01-10", 19]);
+  // 10:00 PM Eastern: the plan's rule still reads 5 PM, five hours before the tip.
+  assert.deepEqual(historyReport("2024-01-11T03:00Z"), ["2024-01-10", 17]);
+  assert.deepEqual(historyReport("2024-01-11T03:00Z", 30), ["2024-01-10", 21]);
+  // 3:30 PM Eastern: 90 minutes before is 2 PM, 30 minutes before is 3 PM.
+  assert.deepEqual(historyReport("2024-01-10T20:30Z"), ["2024-01-10", 14]);
+  assert.deepEqual(historyReport("2024-01-10T20:30Z", 30), ["2024-01-10", 15]);
+});
+
+test("historyReport: a tip too early for the day's first report reads the night before's", () => {
+  // Noon Eastern: the plan has none that day; with a 30-minute lead the 11 AM report is in time.
+  assert.deepEqual(historyReport("2024-01-10T17:00Z"), ["2024-01-09", 20]);
+  assert.deepEqual(historyReport("2024-01-10T17:00Z", 30), ["2024-01-10", 11]);
+  // 11:00 AM Eastern: 10:30 is before the first report of the day.
+  assert.deepEqual(historyReport("2024-01-10T16:00Z", 30), ["2024-01-09", 20]);
 });

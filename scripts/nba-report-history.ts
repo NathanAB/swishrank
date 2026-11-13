@@ -1,7 +1,10 @@
 // Builds src/data/nba-reports/<season>.json for seasons before the live fetch began (docs/model-v4.md): for each
 // final game, the NBA's injury report from about two hours before its tip-off, as the league's archive keeps it.
 //
-//   node scripts/nba-report-history.ts 2019-20 2020-21 ...   [--cache <dir>]
+//   node scripts/nba-report-history.ts 2019-20 2020-21 ...   [--cache <dir>] [--lead <minutes> --out <dir>]
+//
+// With --lead, a game takes the latest report published at least that many minutes before its tip, as the live fetch
+// saves it, and the files go to --out: scripts/nba-reports-at-tip/ holds --lead 30, for backtests after version 4's.
 //
 // A game takes the latest report published on the hour at least 90 minutes before its tip, Eastern time, no later
 // than 5 PM and no earlier than 11 AM; the league published three a day before 2021-22 (1, 5 and 8 PM), so a game
@@ -10,31 +13,37 @@
 // pdftotext -layout text, named <day>_<hour>.txt for the day and hour wanted. Needs curl and pdftotext (poppler-utils).
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { addDays, dayKey, finalDays, TZ } from "../src/lib/elo.ts";
-import { gameSides, nameMatcher, parseReportText, rosters, teamNames, type GameReport, type NbaArchive, type NbaReport } from "../src/lib/nba-report.ts";
+import { addDays, finalDays } from "../src/lib/elo.ts";
+import { gameSides, historyReport, nameMatcher, parseReportText, rosters, teamNames, type GameReport, type NbaArchive, type NbaReport } from "../src/lib/nba-report.ts";
 import { loadBox, loadSeason } from "./evaluate.ts";
 
 const args = process.argv.slice(2);
-const at = args.indexOf("--cache");
-const CACHE = at >= 0 ? args[at + 1] : new URL("../.cache/nba-reports/", import.meta.url).pathname;
-const seasons = args.filter((a, i) => a !== "--cache" && i !== at + 1);
+const FLAGS = ["--cache", "--lead", "--out"];
+const flag = (name: string) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
+const CACHE = flag("--cache") ?? new URL("../.cache/nba-reports/", import.meta.url).pathname;
+const LEAD = flag("--lead") === undefined ? undefined : Number(flag("--lead"));
+const seasons = args.filter((a, i) => !FLAGS.includes(a) && !FLAGS.includes(args[i - 1]));
 const names = JSON.parse(readFileSync(new URL("../src/data/players.json", import.meta.url), "utf8")) as Record<string, string>;
-const OUT = new URL("../src/data/nba-reports/", import.meta.url);
+const OUT = flag("--out") === undefined ? new URL("../src/data/nba-reports/", import.meta.url) : new URL(`file://${flag("--out")!.replace(/\/?$/, "/")}`);
 mkdirSync(CACHE, { recursive: true });
 mkdirSync(OUT, { recursive: true });
 
-const clock = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-const easternHour = (iso: string) => { const [h, m] = clock.format(new Date(iso)).split(":").map(Number); return h + m / 60; };
-
-/** The report a game wants: its day and hour, Eastern time. */
-function wanted(t: string): [string, number] {
-  const day = dayKey(t), hour = easternHour(t);
-  if (hour < 12.5) return [addDays(day, -1), 20];
-  return [day, Math.max(11, Math.min(17, Math.floor(hour - 1.5)))];
-}
-
 const fileNames = (h: number) => { const ap = h >= 12 ? "PM" : "AM", d = String(h > 12 ? h - 12 : h).padStart(2, "0"); return [`${d}${ap}`, `${d}_00${ap}`]; };
 const URL_FOR = (day: string, name: string) => `https://ak-static.cms.nba.com/referee/injury/Injury-Report_${day}_${name}.pdf`;
+
+const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+/** Downloads `url` to `to`: true when the league has it. One request at a time with a pause, since its server blocks a burst. */
+function download(url: string, to: string): boolean {
+  pause(300);
+  try {
+    execFileSync("curl", ["-sf", "--max-time", "30", "--retry", "2", "-A", "Mozilla/5.0", "-o", to, url]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+// A report the archive has. When the server blocks requests it refuses this one too, which tells a block from a missing report.
+const KNOWN = URL_FOR("2022-12-03", "08PM");
 
 /** The text of the latest report at or before `hour` on `day`, down to 11 AM, else the night before's 8 or 7 PM; null when none. */
 function reportText(day: string, hour: number): string | null {
@@ -45,13 +54,14 @@ function reportText(day: string, hour: number): string | null {
   for (let h = hour; h >= 11; h--) tries.push([day, h]);
   if (hour !== 20) tries.push([addDays(day, -1), 20], [addDays(day, -1), 19]);
   for (const [d, h] of tries) for (const name of fileNames(h)) {
-    try {
-      execFileSync("curl", ["-sf", "--max-time", "30", "--retry", "2", "-o", pdf, URL_FOR(d, name)]);
-      execFileSync("pdftotext", ["-layout", pdf, cached]);
-      rmSync(pdf);
-      return readFileSync(cached, "utf8");
-    } catch { /* not published at that time */ }
+    if (!download(URL_FOR(d, name), pdf)) continue;
+    execFileSync("pdftotext", ["-layout", pdf, cached]);
+    rmSync(pdf);
+    return readFileSync(cached, "utf8");
   }
+  rmSync(pdf, { force: true });
+  if (!download(KNOWN, `${pdf}.known`)) throw new Error(`${day} ${hour}:00: the league's server is refusing requests; run again later, the cache keeps what was read`);
+  rmSync(`${pdf}.known`);
   return null;
 }
 
@@ -65,7 +75,7 @@ for (const id of seasons) {
   let covered = 0, finals = 0, unmatched = 0;
   for (const { games: today } of finalDays(data)) for (const g of today) {
     finals++;
-    const [day, hour] = wanted(g.t);
+    const [day, hour] = historyReport(g.t, LEAD);
     const key = `${day}_${hour}`;
     if (!reports.has(key)) { const text = reportText(day, hour); reports.set(key, text === null ? null : parseReportText(text, teams)); }
     const report = reports.get(key);

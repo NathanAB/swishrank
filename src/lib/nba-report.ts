@@ -3,7 +3,7 @@
 // athlete id, and keeps, for each game, the latest report saved before its tip-off, in
 // src/data/nba-reports/<season>.json. Only names, teams and statuses are kept: the report's reasons are the
 // league's prose, and the repository is public.
-import { dayKey, type Abbr, type Game, type SeasonData } from "./elo.ts";
+import { TZ, addDays, dayKey, type Abbr, type Game, type SeasonData } from "./elo.ts";
 import type { Athlete } from "./players.ts";
 
 export const NBA_STATUSES = ["Out", "Doubtful", "Questionable", "Probable", "Available"] as const;
@@ -173,4 +173,20 @@ export function withNbaReport(archive: NbaArchive, data: SeasonData, report: Nba
     changed++;
   }
   return { archive: { season: archive.season, games: Object.fromEntries(Object.entries(games).sort(([x], [y]) => x.localeCompare(y))) }, changed };
+}
+
+const clock = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const easternHour = (iso: string) => { const [h, m] = clock.format(new Date(iso)).split(":").map(Number); return h + m / 60; };
+
+/**
+ * The archived report a past game is read with, as its Eastern day and hour: the league publishes on the hour, and
+ * none before 11 AM. Without `lead`, version 4's plan (docs/model-v4.md): the latest at least 90 minutes before the
+ * tip, no later than 5 PM, and for a tip before 12:30 PM the night before's 8 PM report. With `lead` minutes, the
+ * latest at least that long before the tip, as the live fetch saves it, or the night before's when that is before 11 AM.
+ */
+export function historyReport(t: string, lead?: number): [day: string, hour: number] {
+  const day = dayKey(t), hour = easternHour(t);
+  if (lead === undefined) return hour < 12.5 ? [addDays(day, -1), 20] : [day, Math.max(11, Math.min(17, Math.floor(hour - 1.5)))];
+  const latest = Math.floor(hour - lead / 60);
+  return latest < 11 ? [addDays(day, -1), 20] : [day, latest];
 }
