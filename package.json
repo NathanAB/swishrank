@@ -20,7 +20,8 @@
     "ratings": "node scripts/rating-scores.ts",
     "backtest:projections": "node scripts/backtest-projections.ts",
     "project": "node scripts/project.ts",
-    "odds": "node scripts/odds-history.ts"
+    "odds": "node scripts/odds-history.ts",
+    "stints": "node scripts/stints.ts"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",

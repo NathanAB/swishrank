@@ -137,9 +137,30 @@ export const lostFinals = (before: readonly Game[], after: readonly Game[]): str
   return before.filter((g) => g.final && !final.has(g.id)).map((g) => g.id);
 };
 
-type SummaryAthlete = { athlete?: { id?: string; displayName?: string }; didNotPlay?: boolean; stats?: string[] };
-/** The parts of ESPN's game summary (site.api.espn.com .../summary?event=<id>) the box scores and names read. */
-export type EspnSummary = { boxscore?: { players?: { team: { abbreviation: string }; statistics?: { labels?: string[]; athletes?: SummaryAthlete[] }[] }[] } };
+/** ESPN's game summary of one event: its box score and play-by-play. */
+export const summaryUrl = (id: string) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
+
+type SummaryAthlete = { athlete?: { id?: string; displayName?: string }; starter?: boolean; didNotPlay?: boolean; stats?: string[] };
+type SummaryPlay = {
+  period?: { number?: number };
+  clock?: { displayValue?: string };
+  type?: { text?: string };
+  text?: string;
+  participants?: { athlete?: { id?: string } }[];
+  team?: { id?: string };
+  shootingPlay?: boolean;
+  scoringPlay?: boolean;
+  pointsAttempted?: number;
+  scoreValue?: number;
+  homeScore?: number;
+  awayScore?: number;
+};
+/** The parts of ESPN's game summary (summaryUrl) the box scores, names and play-by-play record read. */
+export type EspnSummary = {
+  header?: { competitions?: { competitors?: { homeAway?: string; score?: string; team?: { id?: string } }[] }[] };
+  boxscore?: { players?: { team: { id?: string; abbreviation: string }; statistics?: { labels?: string[]; athletes?: SummaryAthlete[] }[] }[] };
+  plays?: SummaryPlay[];
+};
 
 // ESPN writes a blank stat as "--" or leaves it out; it counts as 0, as a whole number with a "+" does as itself.
 const whole = (s: string | undefined) => {

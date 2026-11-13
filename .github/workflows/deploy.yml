@@ -65,7 +65,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/games src/data/box src/data/injuries src/data/schedule src/data/players.json src/data/draft.json
+          git add src/data/games src/data/box src/data/injuries src/data/schedule src/data/players.json src/data/draft.json scripts/stints
           git diff --cached --quiet && exit 0
           git commit -m "Update scores"
           # A run that waited in the queue may be behind a push made since, which would reject its own, and the NBA

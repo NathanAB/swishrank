@@ -22,6 +22,7 @@ npm run backtest:v3  # version 3 against version 2, and docs/model-v3.md's confi
 npm run backtest:v4  # version 4 against version 3, and docs/model-v4.md's confirmation log
 npm run backtest:projections  # the odds' drift, chosen and scored on past seasons, for docs/projections.md
 npm run odds -- 2026-27  # a finished season's title race, for src/data/odds/
+npm run stints -- 2025-26  # rebuild a season's play-by-play record in scripts/stints/ from ESPN; every season without an id
 npm run dev     # http://localhost:4321/
 ```
 
@@ -35,6 +36,7 @@ npm run dev     # http://localhost:4321/
 - `src/lib/v4.ts`, `src/lib/nba-report.ts` and `src/lib/draft.ts` hold version 4, the site's model, which `src/lib/inputs.ts` feeds to `src/lib/elo.ts` and `scripts/backtest-v4.ts` scores against version 3. `.github/workflows/nba-report.yml`, started by the Worker in `cron/` every half hour while a game is still to tip off, runs `scripts/fetch-nba-report.ts`, saving the NBA's injury report onto the games still to come in `src/data/nba-reports/<season>.json`, and starts the deploy when it saves one; `scripts/nba-report-history.ts` built the seasons before 2026-27 from the league's archive.
 - `src/data/seasons.json` lists the seasons. The one without an `end` date is the current season and lives at the site root; older seasons live under their id, such as `/2025-26/`.
 - `scripts/fetch-season.mjs` turns ESPN's scoreboard into `src/data/games/<season>.json`.
+- `src/lib/stints.ts` rebuilds each game's stints from the play-by-play in ESPN's game summary: who was on the floor, for how long, and each side's points and three-point shots. `scripts/stints/<season>.json` holds them for every final game since 2015-16, for the on-court rating of version 5. No page loads these files. `scripts/fetch-season.mjs` adds each new final game's stints from the summary it reads for the box score, and `scripts/stints.ts` rebuilds a season and prints how well it agrees with the box scores.
 - `src/pages/` holds the routes, and `src/components/` the table, chart and game lists they share.
 - `src/lib/project.ts` plays out the rest of a season; `src/lib/season-odds.ts` runs it for the pages, with the schedule past the games file's two weeks from `src/data/schedule/` and each finished season's title race from `src/data/odds/`.
 - `src/lib/heatmap.ts` lays out each team page's players: compute()'s `players` split of every shown rating, as a treemap from `src/lib/treemap.ts`.
