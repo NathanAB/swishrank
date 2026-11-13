@@ -388,7 +388,7 @@ function playerPhrase(value: number, move: PlayerMove | undefined): string {
   const until = move?.injury?.returnDate ? ` until ${shortDay(move.injury.returnDate)}` : "";
   if (move?.status === "out") return `Still out${until}`;
   if (move?.backups && move.status === "joined") {
-    if (move.played == null) return `Expected back${until}`;
+    if (move.played == null) return move.injury?.returnDate ? `Expected back ${shortDay(move.injury.returnDate)}` : "Expected back";
     return value >= 0.1 ? "Back from injury, and played well" : value <= -0.1 ? "Back from injury, but played poorly" : "Back from injury";
   }
   // On a day off only the injury report or a player leaving moves the rotation.

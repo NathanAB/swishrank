@@ -133,3 +133,11 @@ test("minutes that change hands are credited to whoever caused the trade, a sitt
   assert.equal(fading.get(9)!.points, 0, "nothing on the absent player while he stays out");
   assert.equal(fading.get(1)!.points, 2, "the fading gap goes to the teammate now counted for his minutes");
 });
+
+test("a player the rating counts again before he plays reads as expected back on his return date, not \"until\" it", () => {
+  const season = allSeasons().find((s) => s.id === "2026-27")!;
+  const phrases = ledger(season, "POR").flatMap((row) => walk(season, row).parts.flatMap((p) => p.lines.flatMap((l) => (l.kind === "group" ? l.items : [l]))))
+    .map((x) => x.phrase).filter((p) => p.startsWith("Expected back"));
+  assert.ok(phrases.length > 0, "Portland has an Expected back row");
+  for (const p of phrases) assert.match(p, /^Expected back( [A-Z][a-z]{2} \d{1,2})?$/);
+});
