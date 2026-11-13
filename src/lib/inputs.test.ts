@@ -1,11 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, EARLY, ELO_PER_SIGMA, expected, fitModel, fitSeason, PARAMS, phi, played, playerPart, secondNights, shownLineups, START, b2bTerm, type Game, type SeasonData } from "./elo.ts";
+import { readFileSync } from "node:fs";
+import { compute, dayKey, EARLY, ELO_PER_SIGMA, expected, fitModel, fitSeason, PARAMS, phi, played, playerPart, secondNights, shownLineups, START, b2bTerm, type Game, type SeasonData } from "./elo.ts";
+import type { DraftFile } from "./draft.ts";
 import { outcome } from "./facts.ts";
 import { fixture } from "./fixtures.ts";
-import { modelInputs } from "./inputs.ts";
-import { lineups, type BoxLine, type Lineup } from "./players.ts";
-import { V4 } from "./v4.ts";
+import { modelInputs, type OnCourt, type SeasonFiles } from "./inputs.ts";
+import { onCourtRatings } from "./on-court.ts";
+import { boxRatings, lineups, parseBox, type BoxLine, type Lineup } from "./players.ts";
+import { newcomers } from "./rookies.ts";
+import { parseStints, type Stint } from "./stints.ts";
+import { topThreeStart, V4 } from "./v4.ts";
 
 const season = "2026-27";
 const near = (actual: number, want: number, what: string) => assert.ok(Math.abs(actual - want) < 1e-9, `${what}: ${actual}, wanted ${want}`);
@@ -147,4 +152,62 @@ test("a season added before opening night, with no teams or some of them, and a 
   const noBox = modelInputs([{ data, box: undefined, preseason }]).get(season)!;
   const teamsAlone = compute(data, { centres: noBox.centres });
   compute(data, noBox).results.forEach((r, i) => near(r.p, teamsAlone.results[i].p, `game ${r.game.id} without box scores`));
+});
+
+// Version 5: stints for game 2 (D at C) and game 3 (C at A), none for B's players, then two seasons of A against B
+// with box scores and no play-by-play.
+const fives = (base: number, last = 4) => [base, base + 1, base + 2, base + 3, base + last];
+const stints = {
+  season,
+  games: {
+    2: [[fives(30), fives(40), 500, 15, 10, 5, 2, 4, 1]],
+    3: [[fives(10), fives(30), 600, 20, 10, 5, 2, 5, 2], [fives(10, 5), fives(30, 5), 400, 8, 12, 3, 1, 4, 2]],
+  } satisfies Record<string, Stint[]>,
+};
+const later = (id: string): SeasonFiles => ({
+  data: { season: id, teams: { A: team("A"), B: team("B") }, games: [{ ...game("1", 21, "B", "A", 100, 104), t: `${id.slice(0, 4)}-10-21T23:00Z` }] },
+  box: { season: id, games: { 1: { A: roster(10, 20), B: roster(20, 20) } } },
+  preseason: undefined,
+});
+const files: SeasonFiles[] = [{ data, box, preseason, stints }, later("2027-28"), later("2028-29")];
+const RULE: OnCourt = { ridge: 100, halfLife: 365, boxPrior: 0.5, weight: 0.12 };
+
+test("with on-court settings, a rating is the box rating plus weight / a times the on-court residual, and a player with no play-by-play keeps his box rating exactly", () => {
+  const v4 = modelInputs(files).get("2027-28")!.players!.ratings;
+  const v5 = modelInputs(files, {}, RULE).get("2027-28")!.players!.ratings;
+  const boxBy = new Map(["2026-27", "2027-28", "2028-29"].map((id) => [id, modelInputs(files).get(id)!.players!.ratings]));
+  const residual = onCourtRatings(files.map((f) => ({ data: f.data, stints: f.stints === undefined ? undefined : parseStints(f.stints, f.data.season) })), boxBy, RULE).get("2027-28")!;
+  assert.deepEqual(v5.athletes, [10, 11, 12, 20, 21, 22]);
+  for (const j of [3, 4, 5]) assert.equal(v5.start[j], v4.start[j], `player ${v5.athletes[j]} has no stint`);
+  for (const j of [0, 1, 2]) {
+    assert.ok(Math.abs(residual.start[j]) > 0.01, `player ${v5.athletes[j]}'s residual, ${residual.start[j]}`);
+    near((v5.start[j] - v4.start[j]) / residual.start[j], 1.5, `player ${v5.athletes[j]}: weight / a = 0.12 / 0.08`);
+  }
+});
+
+test("seasons without a play-by-play record still get on-court ratings, carried on from the record before them", () => {
+  const v4 = modelInputs(files), v5 = modelInputs(files, {}, RULE);
+  for (const id of ["2027-28", "2028-29"]) {
+    const box = v4.get(id)!.players!.ratings, mixed = v5.get(id)!.players!.ratings;
+    assert.deepEqual([...mixed.after.keys()], [...box.after.keys()], id);
+    assert.ok(Math.abs(mixed.start[0] - box.start[0]) > 0.01, `${id}: player 10 starts at ${mixed.start[0]}, his box rating ${box.start[0]}`);
+  }
+});
+
+test("without on-court settings, a real season's ratings are its box ratings, its play-by-play on file or not", () => {
+  const ID = "2023-24";
+  const read = (path: string): unknown => JSON.parse(readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"));
+  const full = read(`src/data/games/${ID}.json`) as SeasonData;
+  const real: SeasonData = { ...full, games: full.games.filter((g) => dayKey(g.t) < "2023-11-15") };
+  const ids = new Set(real.games.map((g) => g.id));
+  const cut = (raw: unknown) => ({ season: ID, games: Object.fromEntries(Object.entries(parseStints(raw, ID).games).filter(([id]) => ids.has(id))) });
+  const rawBox = parseBox(read(`src/data/box/${ID}.json`), ID);
+  const realBox = { season: ID, games: Object.fromEntries(Object.entries(rawBox.games).filter(([id]) => ids.has(id))) };
+  const draft = read("src/data/draft.json") as DraftFile;
+  const walked = [{ data: real, box: realBox }];
+  const own = boxRatings(walked, PARAMS.players.halfLife, topThreeStart(walked, newcomers(walked), draft)).get(ID)!;
+  const file = { data: real, box: realBox, preseason: undefined, stints: cut(read(`scripts/stints/${ID}.json`)) };
+  assert.ok(own.after.size > 15 && own.athletes.length > 300);
+  assert.deepEqual(modelInputs([file], draft).get(ID)!.players!.ratings, own);
+  assert.notDeepEqual(modelInputs([file], draft, RULE).get(ID)!.players!.ratings, own, "the on-court settings do move it");
 });

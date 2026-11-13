@@ -2,7 +2,9 @@
 // version 4 on each finished season from FIRST_SCORED on, every setting chosen from the seasons before the one scored,
 // prints the tables and rewrites the Results part of docs/model-v5.md. With file names as arguments, as in
 // `node scripts/backtest-v5.ts on-court`, it scores only those candidates and leaves the doc as it is. Version 4 runs
-// as a candidate too, against itself, and the run exits non-zero when any of its differences is not exactly 0.
+// as a candidate too, against itself, and the run exits non-zero when any of its differences is not exactly 0. Each
+// other candidate also chooses its settings from every finished season, the ones a season after them would run with;
+// a candidate file that exports `frozen`, the settings src/lib holds for the site, fails the run when they differ.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { SeasonData } from "../src/lib/elo.ts";
 import { BOOTSTRAP, type Diff } from "./evaluate.ts";
@@ -34,6 +36,7 @@ const seasons: Season[] = listed.map(({ id }) => ({
   stints: read(new URL(`stints/${id}.json`, import.meta.url)),
 }));
 const scored = listed.filter((s) => s.id >= FIRST_SCORED && s.end).map((s) => s.id).sort();
+const isFinished = (id: string) => listed.some((s) => s.id === id && s.end);
 
 function pricedOnce(candidate: Candidate): Candidate {
   const chosen = new Map<number, Chosen>();
@@ -58,11 +61,12 @@ function pricedOnce(candidate: Candidate): Candidate {
   };
 }
 
-async function load(file: string): Promise<Candidate> {
+async function load(file: string): Promise<{ candidate: Candidate; frozen?: string }> {
   const mod: unknown = await import(new URL(`${file}.ts`, CANDIDATES).href);
   const candidate = typeof mod === "object" && mod !== null && "default" in mod ? mod.default : undefined;
   if (!isCandidate(candidate)) throw new Error(`scripts/candidates/${file}.ts has no default export shaped like a Candidate`);
-  return candidate;
+  const frozen = typeof mod === "object" && mod !== null && "frozen" in mod && typeof mod.frozen === "string" ? mod.frozen : undefined;
+  return { candidate, frozen };
 }
 
 const onFile = readdirSync(CANDIDATES)
@@ -72,7 +76,8 @@ const onFile = readdirSync(CANDIDATES)
 const asked = process.argv.slice(2);
 for (const a of asked) if (!onFile.includes(a)) throw new Error(`scripts/candidates/${a}.ts is not on file`);
 const files = asked.length ? onFile.filter((f) => asked.includes(f)) : onFile;
-const baseline = pricedOnce(await load(BASELINE_FILE));
+const baseline = pricedOnce((await load(BASELINE_FILE)).candidate);
+const finished = seasons.filter((s) => isFinished(s.data.season)).sort((x, y) => x.data.season.localeCompare(y.data.season));
 
 const vegas: Record<string, number> = Object.assign({}, ...scored.map((id) => loadVegas(id).chances));
 const polymarket: Record<string, number> = Object.assign({}, ...scored.map((id) => loadPolymarket(id).chances));
@@ -112,7 +117,7 @@ const differences = (board: Board): number[] =>
   [...board.seasons, board.pooled].flatMap((l) => [l.logLoss.d, l.logLoss.lo, l.logLoss.hi, ...(l.lineups.teamGames ? [l.lineups.misplaced.d] : [])]);
 
 for (const file of files) {
-  const candidate = await load(file);
+  const { candidate, frozen } = await load(file);
   const board = scoreboard({ seasons, scored, candidate, baseline });
   const name = candidate.name;
   section(
@@ -150,6 +155,15 @@ for (const file of files) {
       [...board.seasons.map((s) => lineupRow(s.season, s)), lineupRow("Pooled", board.pooled)],
     ),
   );
+  if (file !== BASELINE_FILE) {
+    const settings = candidate.choose(finished).settings;
+    const differs = frozen !== undefined && frozen !== settings;
+    out.push(`### ${name}: settings from every finished season\n\nChosen from ${span(finished.map((s) => s.data.season))}, the settings the season after them would run with: ${settings}.${frozen === undefined ? "" : differs ? ` They are NOT the settings on file for the site: ${frozen}.` : " They are the settings on file for the site."}`);
+    if (differs) {
+      console.error(`backtest:v5: ${name}'s settings on file for the site are not the ones it chooses from every finished season`);
+      process.exitCode = 1;
+    }
+  }
   if (file === BASELINE_FILE) {
     const off = differences(board).filter((d) => d !== 0);
     out.push(`### Check\n\nVersion 4 against itself: ${off.length ? `${off.length} differences are NOT exactly 0` : "every difference is exactly 0"}.`);

@@ -2,6 +2,10 @@
 // "end" is current and lives at the site root. Each season's games come from src/data/games/<id>.json, and the
 // model also reads its box scores and preseason win totals from src/data/box/ and src/data/preseason/, ESPN's and
 // the NBA's injury reports from src/data/injuries/ and src/data/nba-reports/, and the draft from src/data/draft.json.
+// With version 5's on-court rating switched on (src/lib/v5.ts SITE_ON_COURT), it reads each season's play-by-play
+// record from scripts/stints/ too, from disk at build time, so no page bundles it.
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import draft from "../data/draft.json" with { type: "json" };
 import list from "../data/seasons.json" with { type: "json" };
 import type { DraftFile } from "./draft.ts";
@@ -17,6 +21,7 @@ import { months } from "./results.ts";
 import { conferenceSlug, gameSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
 import { CONFERENCE_ORDER } from "./teams.ts";
 import { coloursOf, lineColor } from "./tint.ts";
+import { SITE_ON_COURT } from "./v5.ts";
 
 export type SeasonView = SeasonRef & {
   /** "2026–27" */
@@ -99,16 +104,25 @@ const seasonData = (id: string) => {
   return parseSeasonData(raw, id);
 };
 
+/** A season's play-by-play record as read from scripts/stints/, or undefined when it has none on file. */
+const stintsFile = (id: string): unknown => {
+  const path = join(process.cwd(), "scripts", "stints", `${id}.json`);
+  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined;
+};
+
 // A season without box scores rates its teams alone, one without preseason totals seeds them from the season before,
-// and one without injury reports prices its games with the previous game's lineups.
+// one without injury reports prices its games with the previous game's lineups, and one without a play-by-play record
+// adds nothing to its players' on-court ratings.
 let inputs: Map<string, ModelInputs> | undefined;
 const allInputs = () =>
   (inputs ??= modelInputs(
     ENTRIES.all.map(({ id }) => ({
       data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id),
       injuries: file(INJURY_FILES, "injuries", id), nbaReports: file(NBA_REPORT_FILES, "nba-reports", id),
+      stints: SITE_ON_COURT ? stintsFile(id) : undefined,
     })),
     draft as unknown as DraftFile,
+    SITE_ON_COURT,
   ));
 
 /** A season's model inputs, as compute() read them. */

@@ -9,6 +9,7 @@ import { parseArchive, type Injury } from "./injuries.ts";
 import { playerName } from "./names.ts";
 import type { Lineup } from "./players.ts";
 import { seasonInputs, team, type SeasonView } from "./season.ts";
+import { SITE_ON_COURT } from "./v5.ts";
 
 const INJURY_FILES = import.meta.glob<unknown>("../data/injuries/*.json", { eager: true, import: "default" });
 
@@ -119,7 +120,8 @@ const filesUnder = (dir: string): string[] =>
 const cacheKeys = new Map<string, string>();
 /**
  * What a finished season's rows are worked out from: the model's code in src/lib, and the season list and every data
- * file of the season and the seasons before it. Player names are left out and looked up again when rows are read.
+ * file of the season and the seasons before it, their play-by-play records included once the site reads them. Player
+ * names are left out and looked up again when rows are read.
  */
 function cacheKey(seasonId: string): string {
   let key = cacheKeys.get(seasonId);
@@ -127,8 +129,8 @@ function cacheKey(seasonId: string): string {
   const root = process.cwd();
   const hash = createHash("sha256");
   const lib = filesUnder(join(root, "src", "lib")).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
-  const data = ["games", "box", "preseason", "injuries", "nba-reports"].flatMap((dir) => filesUnder(join(root, "src", "data", dir)))
-    .filter((f) => (/(\d{4}-\d{2})\.json$/.exec(f)?.[1] ?? "9999") <= seasonId);
+  const dirs = [...["games", "box", "preseason", "injuries", "nba-reports"].map((dir) => join(root, "src", "data", dir)), ...(SITE_ON_COURT ? [join(root, "scripts", "stints")] : [])];
+  const data = dirs.flatMap(filesUnder).filter((f) => (/(\d{4}-\d{2})\.json$/.exec(f)?.[1] ?? "9999") <= seasonId);
   for (const f of [...lib, join(root, "src", "data", "seasons.json"), join(root, "src", "data", "draft.json"), ...data]) hash.update(f.slice(root.length)).update("\0").update(readFileSync(f)).update("\0");
   cacheKeys.set(seasonId, (key = hash.digest("hex")));
   return key;
