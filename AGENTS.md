@@ -34,6 +34,10 @@ A change to the model is a candidate: one file in `scripts/candidates/` whose de
 - **One candidate, printed only:** `npm run backtest:v5 -- <file name without .ts>`.
 - **Every candidate, and the results part of `docs/model-v5.md` rewritten:** `npm run backtest:v5`. Version 4 alone takes about a minute.
 
+## Play-by-play record
+
+`scripts/stints/<season>.json` is written by code, never by hand. After a change to the rebuild in `src/lib/stints.ts`, run `npm run stints -- --cache <dir>` and commit the files it rewrites with the change. It takes 2 to 14 minutes from ESPN, and under 2 minutes once `<dir>` holds the summaries. The format is in `src/lib/stints.ts` (`Stint`).
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
