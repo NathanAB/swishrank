@@ -20,6 +20,7 @@ import { href } from "../lib/routes.ts";
 import { ABOUT_TITLE } from "../lib/meta.ts";
 import { examples, offDay, upsetRatio } from "../lib/method.ts";
 import { allSeasons, team } from "../lib/season.ts";
+import { SITE_ON_COURT } from "../lib/v5.ts";
 
 const season = allSeasons().find((s) => s.model.results.length > 0) ?? null;
 const model = season?.model ?? null;
@@ -119,7 +120,7 @@ const game = opener && {
       <dt>Scale</dt>
       <dd>Borrowed from chess's Elo ratings. Unlike Elo, which nudges a rating after each game, a team's rating here is refit to all of its games each time it plays.</dd>
       <dt>Players</dt>
-      <dd>Each player has a value, measured from his box scores over past seasons and his team's results this season. A rookie has no past seasons, so his team's results move him sooner, and a top-three draft pick starts from the level such picks have played at. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
+      <dd>Each player has a value, measured from his box scores over past seasons{SITE_ON_COURT && ", the scoreline while he is on the floor, adjusted for the teammates and opponents out there with him,"} and his team's results this season. A rookie has no past seasons, so his team's results move him sooner, and a top-three draft pick starts from the level such picks have played at. A team's rating counts its usual rotation, each player at his minutes over its last 10 games.</dd>
       <dt>Chances</dt>
       <dd>They follow how often past favorites won at each gap, within one percentage point of Elo's formula, 1 / (1 + 10^(−gap / 400)).</dd>
       <dt>Later games</dt>
