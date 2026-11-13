@@ -73,6 +73,33 @@ export function callsOf(data: SeasonData, days: readonly FitDay[], sigma: number
   return out;
 }
 
+/**
+ * `candidate` choosing and pricing once for each list of earlier seasons, by its length, and each season it prices: a
+ * run that scores it on several boards, or asks for its settings again, reuses what it has.
+ */
+export function pricedOnce(candidate: Candidate): Candidate {
+  const chosen = new Map<number, Chosen>();
+  const calls = new Map<Season, Map<number, Calls>>();
+  return {
+    name: candidate.name,
+    choose: (earlier) => {
+      const n = earlier.length;
+      const inner = chosen.get(n) ?? candidate.choose(earlier);
+      chosen.set(n, inner);
+      return {
+        settings: inner.settings,
+        price: (season) => {
+          const bySeason = calls.get(season) ?? new Map<number, Calls>();
+          calls.set(season, bySeason);
+          const priced = bySeason.get(n) ?? inner.price(season);
+          bySeason.set(n, priced);
+          return priced;
+        },
+      };
+    },
+  };
+}
+
 /** A final game with both versions' chances: `day` counts from the season's first game day, `y` is 1 for a home win. */
 export type ScoredGame = { id: string; season: string; day: number; y: 0 | 1; candidate: number; baseline: number };
 
