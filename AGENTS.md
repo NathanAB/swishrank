@@ -13,7 +13,7 @@ Manage the background server with `astro dev stop`, `astro dev status`, and `ast
 A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don't run it to check a change; the deploy runs it on every push to `main`.
 
 - **One page in the dev server:** start `astro dev --background`, then fetch or open the page.
-- **One page in a real build, about 15 seconds:** build a scratch copy that holds only the pages you changed. This catches data that loads in the dev server and not in a bundle.
+- **One page in a real build, about a minute:** build a scratch copy that holds only the pages you changed. This catches data that loads in the dev server and not in a bundle.
 
   ```
   git worktree add --detach <scratch> HEAD
@@ -25,14 +25,14 @@ A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don'
 
   Keep any of those directories that holds a page you changed. Read `dist/<page>/index.html`, then run `git worktree remove --force <scratch>`.
 - **Tests:** `node --test <file>` for the file you changed, and `npm test` (about three minutes) once before the pull request. The deploy waits on `npm test`, so a test on real data must stay green as the season in progress gains games: bound a finished season, or assert a count that only grows.
-- **Deploys:** each push to `main` starts a deploy of about 20 minutes, and deploys queue. Land related changes in one pull request.
+- **Deploys:** each push to `main` starts a deploy of about 9 minutes, and each score refresh one of 2 to 4, nearly all of it `npm run build`. Deploys queue. Land related changes in one pull request.
 
 ## Scoring a model change
 
 A change to the model is a candidate: one file in `scripts/candidates/` whose default export is a `Candidate` (`scripts/past-seasons.ts`; `scripts/candidates/v4.ts` is the example). `docs/adr/0002` is the rule it is judged by.
 
 - **One candidate, printed only:** `npm run backtest:v5 -- <file name without .ts>`.
-- **Every candidate, and the results part of `docs/model-v5.md` rewritten:** `npm run backtest:v5`. Version 4 alone takes about a minute, and the candidates that run version 5's search (`v5`, `v5-roster`) 8 to 15 more.
+- **Every candidate, and the results part of `docs/model-v5.md` rewritten:** `npm run backtest:v5`. Version 4 alone takes about a minute, and the candidates that run version 5's search (`v5`, `v5-roster`, `v5-daily`) about 12 more. `v5-daily` is the site's: `V5` in `src/lib/v5.ts` must match what it chooses.
 - **A candidate against a second baseline:** export `against`, a list of candidate file names, from its file (`scripts/candidates/v5-roster.ts` is the example).
 - **After a change to roster-based lineups (`src/lib/roster-lineups.ts`):** `npm run roster-check`, about 30 seconds. It prints the learned rates and the lineup measures to hold beside the port's column in `docs/model-v5.md` (The lineups' port against the prototype).
 

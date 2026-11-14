@@ -2,7 +2,8 @@
 // well as his box rating (src/lib/on-court.ts). Its new settings are chosen on the seasons before the one scored: the
 // on-court rating's ridge, half-life and box prior from SEARCH.rules and its weight from SEARCH.weights, each
 // combination with SIGMA and the early widening fitted by maximum likelihood, and the one with the lowest log loss on
-// those seasons wins. Every other setting is version 4's.
+// those seasons wins. Every other setting is version 4's. The search refits the on-court rating after every 7th game
+// day, as it did when version 5 was scored; scripts/candidates/v5-daily.ts is the site's, refitted after every game day.
 import { readFileSync } from "node:fs";
 import type { DraftFile } from "../../src/lib/draft.ts";
 import { seasonRule } from "../../src/lib/elo.ts";
@@ -11,7 +12,6 @@ import { onCourtWalk, type OnCourtRule, type OnCourtWalk } from "../../src/lib/o
 import type { RosterRule } from "../../src/lib/roster-lineups.ts";
 import { parseStints } from "../../src/lib/stints.ts";
 import { V4 } from "../../src/lib/v4.ts";
-import { V5 } from "../../src/lib/v5.ts";
 import { fitSigma, fitWiden, logLoss, modelRows, price, type Row } from "../evaluate.ts";
 import type { Candidate, Chosen, Season } from "../past-seasons.ts";
 import { pricedWith, withRoster } from "../roster-candidates.ts";
@@ -28,7 +28,7 @@ export type Search = { rules: readonly OnCourtRule[]; weights: readonly number[]
  * every season; which point of it a season is scored with comes from the seasons before that one alone.
  */
 export const SEARCH: Search = {
-  rules: [1500, 3000, 6000].flatMap((ridge) => [365, 730, 1460].flatMap((halfLife) => [0, 0.5, 1].map((boxPrior) => ({ ridge, halfLife, boxPrior })))),
+  rules: [1500, 3000, 6000].flatMap((ridge) => [365, 730, 1460].flatMap((halfLife) => [0, 0.5, 1].map((boxPrior) => ({ ridge, halfLife, boxPrior, refitEvery: 7 })))),
   weights: Array.from({ length: 16 }, (_, i) => i / 50),
 };
 
@@ -40,7 +40,7 @@ const PROBE = 0.1;
 
 export const describe = ({ onCourt, sigma, widen }: Settings) =>
   onCourt.weight
-    ? `on-court rating with ridge ${onCourt.ridge}, half-life ${onCourt.halfLife} days and box prior ${onCourt.boxPrior}, at weight ${onCourt.weight.toFixed(2)}; SIGMA ${sigma}, early widening ${widen}`
+    ? `on-court rating with ridge ${onCourt.ridge}, half-life ${onCourt.halfLife} days and box prior ${onCourt.boxPrior}, refitted every ${onCourt.refitEvery === 1 ? "game day" : `${onCourt.refitEvery} game days`}, at weight ${onCourt.weight.toFixed(2)}; SIGMA ${sigma}, early widening ${widen}`
     : `no on-court rating; SIGMA ${sigma}, early widening ${widen}`;
 
 /** Seasons a search has fitted, oldest first: version 4's rows for each, and each rule's walk with its rows at PROBE. */
@@ -119,8 +119,5 @@ export function version5(search: Search): Candidate & { scores(earlier: readonly
   };
   return { name: "Version 5", scores: scored, settings, choose: (earlier) => priced(earlier, settings(earlier)) };
 }
-
-/** The settings src/lib/v5.ts holds for the site, which `npm run backtest:v5` checks against the ones chosen from every finished season. */
-export const frozen = describe(V5);
 
 export default version5(SEARCH);
