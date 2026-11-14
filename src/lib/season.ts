@@ -2,13 +2,15 @@
 // "end" is current and lives at the site root. Each season's games come from src/data/games/<id>.json, and the
 // model also reads its box scores and preseason win totals from src/data/box/ and src/data/preseason/, ESPN's and
 // the NBA's injury reports from src/data/injuries/ and src/data/nba-reports/, and the draft from src/data/draft.json.
+// Its inputs are the site's (src/lib/inputs.ts siteInputs()), which also read each season's play-by-play record from
+// scripts/stints/ when the site's version reads the on-court rating, from disk at build time, so no page bundles it.
 import draft from "../data/draft.json" with { type: "json" };
 import list from "../data/seasons.json" with { type: "json" };
 import type { DraftFile } from "./draft.ts";
 import { compute, dayKey, type Abbr, type Game, type ModelInputs, type Season, type SeasonData, type Team } from "./elo.ts";
 import { seasonLabel } from "./format.ts";
 import { injuryRecordOf, listingsOf, type InjuryRecord } from "./injury-record.ts";
-import { modelInputs } from "./inputs.ts";
+import { siteInputs } from "./inputs.ts";
 import { parseNbaArchive } from "./nba-report.ts";
 import { playerName } from "./names.ts";
 import type { ChartData, TeamLook } from "./player-chart.ts";
@@ -100,10 +102,11 @@ const seasonData = (id: string) => {
 };
 
 // A season without box scores rates its teams alone, one without preseason totals seeds them from the season before,
-// and one without injury reports prices its games with the previous game's lineups.
+// one without injury reports prices its games with the previous game's lineups, and one without a play-by-play record
+// on file adds nothing to its players' on-court ratings.
 let inputs: Map<string, ModelInputs> | undefined;
 const allInputs = () =>
-  (inputs ??= modelInputs(
+  (inputs ??= siteInputs(
     ENTRIES.all.map(({ id }) => ({
       data: seasonData(id), box: file(BOX_FILES, "box", id), preseason: file(PRESEASON_FILES, "preseason", id),
       injuries: file(INJURY_FILES, "injuries", id), nbaReports: file(NBA_REPORT_FILES, "nba-reports", id),

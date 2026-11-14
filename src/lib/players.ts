@@ -46,7 +46,10 @@ export const REPLACEMENT = 8.49;
 /** Minutes of replacement-level play every box rating starts from. */
 export const PSEUDO_MINUTES = 400;
 
-/** Each of a season's players' box rating, in `athletes` order: before its first game day, then after each game day. */
+/**
+ * Each of a season's players' box rating, in `athletes` order: before its first game day, then after each game day.
+ * `athletes` lists them by first appearance in the season's final games, day by day.
+ */
 export type BoxRatings = { athletes: Athlete[]; start: Float64Array; after: Map<string, Float64Array> };
 
 const epochDay = (day: string) => Date.parse(day) / 86_400_000;
@@ -64,7 +67,9 @@ export function boxRatings(seasons: readonly SeasonPlayers[], halfLife: number, 
   const out = new Map<string, BoxRatings>();
   for (const { data, box } of seasons) {
     const days = finalDays(data);
-    const athletes = [...new Set(Object.keys(box.games).flatMap((id) => linesOf(box, id).flatMap((lines) => lines.map((l) => l[0]))))];
+    const playersOf = (id: string) => linesOf(box, id).flatMap((lines) => lines.map((l) => l[0]));
+    // By first appearance, day by day: a fit sums over the players in this order, so a later game must not reorder them.
+    const athletes = [...new Set([...days.flatMap(({ games }) => games.flatMap((g) => playersOf(g.id))), ...Object.keys(box.games).flatMap(playersOf)])];
     const startOf = (a: Athlete) => level?.(a, data.season) ?? REPLACEMENT;
     const snapshot = (now: number) => {
       const rel = new Float64Array(G.length);

@@ -1,6 +1,7 @@
 // npm run backtest:v2: runs docs/model-v2.md's pre-registered plan. It scores the 18 candidates on the tuning
 // seasons against version 1 as shipped, chooses version 2 by the plan's rules, prints every table and rewrites
-// the Results part of docs/model-v2.md. 2026-27 is logged only; the confirmation runs after its last game. It
+// the Results part of docs/model-v2.md. 2026-27 is logged only. Since 2026-11-13 its games are a running record, and
+// no result there keeps or switches the site's model (docs/adr/0002-versions-are-judged-on-past-seasons.md). It
 // exits non-zero when version 2 as frozen in scripts/evaluate.ts differs from the choice (version 1 when no
 // candidate is eligible), or when the pre-registration's text has changed.
 import { createHash } from "node:crypto";
@@ -254,7 +255,7 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
   const confirmedGames = only(s, confirmation).length;
   section(
     "Table 11. 2026-27, logged only",
-    "The confirmation scores the whole season once, after its last game. Until then the season's games so far are logged here and judge nothing.",
+    "Logged only, as a running record. Since 2026-11-13 no result on these games keeps or switches the site's model (`docs/adr/0002-versions-are-judged-on-past-seasons.md`).",
     table(
       ["Season", "Games", "Version 1 log loss", `${V2} log loss`],
       [["2026-27", confirmedGames, confirmedGames ? f4(logLoss(only(baseline.scored, confirmation))) : "", confirmedGames ? f4(logLoss(only(s, confirmation))) : ""]],

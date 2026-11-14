@@ -4,6 +4,7 @@
 // 1000, and nothing re-centres them, so the league's average floats. docs/model.md and docs/model-v2.md hold the
 // backtests behind every setting.
 import type { Athlete, BoxRatings, Lineup, SeasonBox, SeasonRotations, Sides } from "./players.ts";
+import { SITE } from "./site.ts";
 
 export const START = 1000;
 /**
@@ -46,6 +47,8 @@ export type SeedRule = { scale: number; fade: number; carry: number };
 /**
  * Version 2's players: each one's value is pulled toward `a` times his box rating with `np` games. Version 3 pulls a
  * player new to the box scores, the season's `rookies`, with `rookieNp` games instead, so his results move him sooner.
+ * Version 5 pulls him toward `a` times his box rating plus `weight` times his on-court residual (src/lib/inputs.ts
+ * withOnCourt), which SeasonInputs' `ratings` carry in place of the box ratings.
  */
 export type PlayerRule = { a: number; np: number; halfLife: number; rookieNp?: number };
 /**
@@ -62,18 +65,18 @@ export type FitRule = { n0: number; margin: MarginRule; home: HomeRule; seed?: S
 export type Params = FitRule & { sigma: number };
 
 /**
- * The site's model, version 4 since 2026-11-02 (docs/model-v4.md): version 3's fit rule (docs/model-v3.md), version
- * 2's settings with a rookie's value held with 40 games, and SIGMA fitted again; src/lib/v4.ts holds the rest. The
- * home edge here, 0.622, is only the fallback: each season's own edge, from the three seasons before it, comes in its
- * ModelInputs. Since 2026-11-01, by the owner's choice outside version 3's plan, a team's rating moves only on its own
- * game days (`idle`), and since 2026-11-05 a past opponent's later results no longer reach it (`opponents`);
- * docs/model-v3.md, The switch, has why. Version 3 is frozen as `V3` in src/lib/v3.ts, version 2
- * as `V2` in scripts/evaluate.ts.
+ * The site's model: version 3's fit rule (docs/model-v3.md), version 2's settings with a rookie's value held with 40
+ * games, which versions 4 and 5 keep, and the SIGMA of the version src/lib/site.ts SITE points at, whose own file
+ * holds the rest. The home edge here, 0.622, is only the fallback: each season's own edge, from the three seasons
+ * before it, comes in its ModelInputs. Since 2026-11-01, by the owner's choice outside version 3's plan, a team's
+ * rating moves only on its own game days (`idle`), and since 2026-11-05 a past opponent's later results no longer
+ * reach it (`opponents`); docs/model-v3.md, The switch, has why. Version 4 is frozen as `V4` in src/lib/v4.ts, version
+ * 3 as `V3` in src/lib/v3.ts, version 2 as `V2` in scripts/evaluate.ts.
  */
 export const PARAMS = {
   n0: 96, margin: { kind: "power", q: 0.5 }, home: { kind: "fixed", value: 0.622 },
   seed: { scale: 5, fade: 120, carry: 0.7 }, b2b: 0.4, players: { a: 0.08, np: 320, halfLife: 365, rookieNp: 40 },
-  idle: "freeze", opponents: "fixed", sigma: 2.986,
+  idle: "freeze", opponents: "fixed", sigma: SITE.sigma,
 } satisfies Params;
 
 /** Games a team plays before its rating stops being provisional: docs/model-v2.md, table 9. */
@@ -95,11 +98,12 @@ export type FitDay = { day: string; games: Pregame[]; before: Fit; after: Fit };
 /**
  * What a season's fit reads beyond its games: each team's prior centre, its players' lines, ratings and lineups, and,
  * for version 4 (docs/model-v4.md), a term by game id added to the back-to-back term: in the expected margin, and
- * taken out of the margin in the fit.
+ * taken out of the margin in the fit. When `ratings` carry version 5's on-court part, `boxRatings` are the box ratings
+ * alone, in the same `athletes` order: only fitSeasonSteps() reads them, to tell the on-court update apart.
  */
 export type SeasonInputs = {
   centres?: Record<Abbr, number>;
-  players?: { box: SeasonBox; ratings: BoxRatings; lineups: ReadonlyMap<string, Sides<Lineup>>; rookies?: ReadonlySet<Athlete> };
+  players?: { box: SeasonBox; ratings: BoxRatings; boxRatings?: BoxRatings; lineups: ReadonlyMap<string, Sides<Lineup>>; rookies?: ReadonlySet<Athlete> };
   extra?: ReadonlyMap<string, number>;
 };
 
@@ -280,14 +284,18 @@ function dayFree(games: readonly FinalGame[], box: SeasonBox | undefined): Free 
 /**
  * One day of fitSeasonSteps(): the fit once the seed's pull fades to the day's strength; for `first`'s game, the fit
  * after it before and after its players' box ratings come up to the day; the fit after the day's other games, their
- * players' box ratings brought up too; and `after`, the day's fit, which also ages the box ratings of everyone who
- * did not play.
+ * players' box ratings brought up too; `unrefit`, the day's fit as it would be without any on-court update since each
+ * player last played, which also ages the box ratings of everyone who did not play; and `after`, the day's fit. Every
+ * step before `after` holds each player's on-court part where his last game left it, the part his value was last
+ * fitted to, so the on-court update is `after` less `unrefit` alone: on `first`'s next game day for a refit while it
+ * rests, on a player's next game for one while he sits. Without the on-court part, `unrefit` is `after`.
  */
-export type FitSteps = FitDay & { priors: Fit; own?: { result: Fit; fit: Fit }; others: Fit };
+export type FitSteps = FitDay & { priors: Fit; own?: { result: Fit; fit: Fit }; others: Fit; unrefit: Fit };
 
 /**
  * fitSeason() with `first`'s game added before the rest of its day, keeping the fits FitSteps names. Their
  * differences add up exactly to the day's move. src/lib/ledger.ts reads it to split a team's move into its parts.
+ * The day's last fit is `after`, as fitSeason() fits it, so each day starts where fitSeason()'s does.
  */
 export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonInputs, first: Abbr): FitSteps[] {
   const abbrs = Object.keys(data.teams);
@@ -299,16 +307,23 @@ export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonIn
   const pregame = pregameOf(rule, second, inputs);
   const solver = players ? playerSolver(abbrs, rule, inputs.centres, players) : teamSolver(abbrs, rule, inputs.centres);
   const ratings = players?.ratings;
+  const boxes = players?.boxRatings;
   const index = new Map(ratings?.athletes.map((a, j) => [a, j]) ?? []);
-  let previous = ratings?.start;
+  /** The rating columns of the players with a line in a game, the ones its day's fit may move. */
+  const columns = (p: Pregame) => Object.values(players?.box.games[p.game.id] ?? {}).flatMap((lines) => (lines ?? []).flatMap((l) => index.get(l[0]) ?? []));
+  // Each player's on-court part as of his last game, and the box ratings of the day before.
+  const held = ratings && boxes && ratings.start.map((x, j) => x - boxes.start[j]);
+  let previous = boxes ? boxes.start : ratings?.start;
   let fit = solver.start;
   const out: FitSteps[] = [];
   for (const { day, games } of days) {
     const pre = games.map(pregame);
-    const today = ratings?.after.get(day);
-    const mix = previous && Float64Array.from(previous);
+    const box = boxes?.after.get(day);
+    const withHeld = (b: Float64Array) => (held ? b.map((x, j) => x + held[j]) : b);
+    const today = box ? withHeld(box) : ratings?.after.get(day);
+    const mix = previous && Float64Array.from(withHeld(previous));
     const bringUp = (p: Pregame) => {
-      if (mix && today) for (const lines of Object.values(players!.box.games[p.game.id] ?? {})) for (const l of lines ?? []) { const j = index.get(l[0]); if (j !== undefined) mix[j] = today[j]; }
+      if (mix && today) for (const j of columns(p)) mix[j] = today[j];
     };
     const before = fit;
     const free = rule.idle === "freeze" ? dayFree(games, players?.box) : undefined;
@@ -324,9 +339,11 @@ export function fitSeasonSteps(data: SeasonData, rule: FitRule, inputs: SeasonIn
     }
     for (const p of pre) if (p !== mine) { solver.add(p); bringUp(p); }
     const others = solver.fit(day, strength(day), mix, free);
+    const unrefit = box ? solver.fit(day, strength(day), today, free) : undefined;
     fit = solver.fit(day, strength(day), undefined, free);
-    out.push({ day, games: pre, before, after: fit, priors, own, others });
-    previous = today;
+    out.push({ day, games: pre, before, after: fit, priors, own, others, unrefit: unrefit ?? fit });
+    if (held && box && ratings) { const rating = ratings.after.get(day)!; for (const p of pre) for (const j of columns(p)) held[j] = rating[j] - box[j]; }
+    previous = box ?? today;
   }
   return out;
 }
@@ -498,9 +515,9 @@ export const ELO_PER_SIGMA = (400 / Math.LN10) * 1.702;
 
 /**
  * A season's first games say little, and the model's chances for them run high. While either side has played
- * fewer than `games` games, a gap counts `widen` times less, fitted on the tuning seasons: docs/model-v4.md.
+ * fewer than `games` games, a gap counts `widen` times less: the widening of the version src/lib/site.ts SITE points at.
  */
-export const EARLY = { games: 5, widen: 1.14 };
+export const EARLY = { games: 5, widen: SITE.widen };
 
 /** The model's win chance for a rating gap in Elo points, when the less experienced side has `played` games. */
 export const winProb = (gap: number, played = Infinity) => phi(gap / (ELO_PER_SIGMA * (played < EARLY.games ? EARLY.widen : 1)));
@@ -527,8 +544,8 @@ export type Season = {
   r: Record<Abbr, number>;
   /**
    * Each game still to play's expected home margin by id, in Elo points, as its chance reads it: the two sides' team
-   * parts and the player parts of the lineups that game is priced with, home court, the back-to-back and version 4's
-   * fill term for the minutes its report takes out.
+   * parts and the player parts of the lineups that game is priced with, home court, the back-to-back and the extra
+   * term for the minutes its lineups leave out (src/lib/inputs.ts).
    */
   gaps: Record<string, number>;
   /** The home edge the latest fit measured, in Elo points. */

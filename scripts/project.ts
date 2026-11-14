@@ -15,7 +15,7 @@
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { addDays, compute, dayKey, ELO_PER_SIGMA, fitModel, PARAMS, phi, playerPart, shownLineups, START, type Abbr, type Fit, type Season, type SeasonData } from "../src/lib/elo.ts";
 import type { DraftFile } from "../src/lib/draft.ts";
-import { modelInputs, LONG_ABSENCE } from "../src/lib/inputs.ts";
+import { LONG_ABSENCE, modelInputs, siteInputs } from "../src/lib/inputs.ts";
 import { parseArchive } from "../src/lib/injuries.ts";
 import { scaled, type Lineup } from "../src/lib/players.ts";
 import { DIVISIONS, divisionOf, DRIFT, generator, meanWins, setupAt, shownOutlook, simulate, stakes, winsAt, type Drift, type Fixture, type Outlook, type Projection } from "../src/lib/project.ts";
@@ -37,7 +37,7 @@ const ids = list.map((s) => s.id).sort();
 const current = list.find((s) => !s.end)!.id;
 const last = ids[ids.indexOf(current) - 1];
 const files = ids.map((id) => ({ data: read(`games/${id}.json`) as SeasonData, box: read(`box/${id}.json`), preseason: read(`preseason/${id}.json`), injuries: read(`injuries/${id}.json`), nbaReports: read(`nba-reports/${id}.json`) }));
-const inputs = modelInputs(files, read("draft.json") as DraftFile);
+const inputs = siteInputs(files, read("draft.json") as DraftFile);
 const dataOf = (id: string) => files.find((f) => f.data.season === id)!.data;
 const model = compute(dataOf(current), inputs.get(current));
 const lastModel = compute(dataOf(last), inputs.get(last));
@@ -119,6 +119,7 @@ const extra = standIn(model, 20261101);
 
 const SCALE = ELO_PER_SIGMA / PARAMS.sigma;
 const fits = fitModel(model.data, inputs.get(current)!);
+// Only its shown rotation is read, which neither the on-court rating nor roster lineups change, so no switches.
 const plain = modelInputs(files.map((f) => (f.data.season === current ? { ...f, injuries: undefined } : f))).get(current)!;
 const usualLineups = shownLineups(model.data, plain.players!.rotation);
 const archive = parseArchive(read(`injuries/${current}.json`), current);

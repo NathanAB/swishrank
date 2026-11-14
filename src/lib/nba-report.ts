@@ -3,7 +3,7 @@
 // athlete id, and keeps, for each game, the latest report saved before its tip-off, in
 // src/data/nba-reports/<season>.json. Only names, teams and statuses are kept: the report's reasons are the
 // league's prose, and the repository is public.
-import { dayKey, type Abbr, type Game, type SeasonData } from "./elo.ts";
+import { TZ, addDays, dayKey, type Abbr, type Game, type SeasonData } from "./elo.ts";
 import type { Athlete } from "./players.ts";
 
 export const NBA_STATUSES = ["Out", "Doubtful", "Questionable", "Probable", "Available"] as const;
@@ -173,4 +173,31 @@ export function withNbaReport(archive: NbaArchive, data: SeasonData, report: Nba
     changed++;
   }
   return { archive: { season: archive.season, games: Object.fromEntries(Object.entries(games).sort(([x], [y]) => x.localeCompare(y))) }, changed };
+}
+
+const clock = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const easternHour = (iso: string) => { const [h, m] = clock.format(new Date(iso)).split(":").map(Number); return h + m / 60; };
+
+/**
+ * The archived report a past game is read with, as its Eastern day and hour: the league publishes on the hour, and
+ * none before 11 AM. Without `lead`, version 4's plan (docs/model-v4.md): the latest at least 90 minutes before the
+ * tip, no later than 5 PM, and for a tip before 12:30 PM the night before's 8 PM report. With `lead` minutes, the
+ * latest file named for an hour at least that long before the tip, or the night before's when that is before 11 AM; the
+ * caller steps back while the report's printed time fails inTime().
+ */
+const stamp = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+/**
+ * Whether a report that prints `published` as its time, Eastern as "YYYY-MM-DDTHH:MM", came out at least `lead` minutes
+ * before the tip `t`. The league's file named for an hour has printed half past it, so the name alone does not say.
+ */
+export function inTime(published: string, t: string, lead: number): boolean {
+  const p = Object.fromEntries(stamp.formatToParts(new Date(Date.parse(t) - lead * 60_000)).map((x) => [x.type, x.value]));
+  return published <= `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+
+export function historyReport(t: string, lead?: number): [day: string, hour: number] {
+  const day = dayKey(t), hour = easternHour(t);
+  if (lead === undefined) return hour < 12.5 ? [addDays(day, -1), 20] : [day, Math.max(11, Math.min(17, Math.floor(hour - 1.5)))];
+  const latest = Math.floor(hour - lead / 60);
+  return latest < 11 ? [addDays(day, -1), 20] : [day, latest];
 }

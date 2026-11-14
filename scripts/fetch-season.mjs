@@ -1,5 +1,7 @@
 // Fetch a season's NBA games from ESPN's public scoreboard into src/data/games/<season>.json, the box score of
-// every final game src/data/box/<season>.json lacks from ESPN's game summary, and the day's injury report into
+// every final game src/data/box/<season>.json lacks from ESPN's game summary, with the play-by-play record of every
+// final game scripts/stints/<season>.json lacks, or holds with points that miss the final score, from the same summary
+// (src/lib/stints.ts), and the day's injury report into
 // src/data/injuries/<season>.json. For a season in progress, the rest of its regular-season schedule past the games
 // file's two weeks goes into src/data/schedule/<season>.json for the odds. Then src/data/players.json gets the name of every player in the box scores
 // and injury reports: from each summary the box step reads, and from ESPN's athlete page for any still missing; and
@@ -13,21 +15,22 @@
 
 import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
 import { dayKey } from "../src/lib/elo.ts";
-import { boxLines, fetchEvents, fetchJson, lostFinals, parse, playerNames } from "../src/lib/espn.ts";
+import { fetchEvents, fetchJson, lostFinals, parse, summaryUrl } from "../src/lib/espn.ts";
 import { parseDraft } from "../src/lib/draft.ts";
 import { parseArchive, parseFeed, withReport } from "../src/lib/injuries.ts";
+import { formatStints, fromSummary, needsSummary, parseStints } from "../src/lib/stints.ts";
 import { stage } from "../src/lib/teams.ts";
 
 const SEASONS = JSON.parse(await readFile(new URL("../src/data/seasons.json", import.meta.url), "utf8"));
 const OUT_DIR = new URL("../src/data/games/", import.meta.url);
 const BOX_DIR = new URL("../src/data/box/", import.meta.url);
+const STINTS_DIR = new URL("stints/", import.meta.url);
 const INJURY_DIR = new URL("../src/data/injuries/", import.meta.url);
 const SCHEDULE_DIR = new URL("../src/data/schedule/", import.meta.url);
 const NAMES_FILE = new URL("../src/data/players.json", import.meta.url);
 const DRAFT_FILE = new URL("../src/data/draft.json", import.meta.url);
 const INJURIES = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries";
 const ATHLETE = (id) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${id}`;
-const SUMMARY = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
 const URL_FOR = (ymd) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${ymd}`;
 // Two weeks of games ahead, so a team's page can always show its next five.
 const FIXTURE_DAYS = 14;
@@ -67,26 +70,45 @@ async function fetchSeason(season) {
 
 // A box score ESPN cannot give yet leaves its game out of the file, to be tried again on the next run: the model
 // predicts from each team's latest game with lines, so a gap costs a little, where a failed run would hold back scores.
+// The play-by-play record comes from the same summary and fails on its own, never taking the box score with it: a
+// game without a usable one, or whose record misses the final score, is asked for again on the next run, and a
+// record on file is replaced only by one that rebuilds.
 async function fetchBox(id, finals) {
   const file = new URL(`${id}.json`, BOX_DIR);
   const box = await readFile(file, "utf8").then((text) => JSON.parse(text), () => ({ season: id, games: {} }));
-  const missing = finals.filter((g) => !box.games[g.id]);
-  let added = 0;
+  const stintsFile = new URL(`${id}.json`, STINTS_DIR);
+  const record = await readFile(stintsFile, "utf8").then((text) => parseStints(JSON.parse(text), id), (err) => {
+    if (err.code === "ENOENT") return { season: id, games: {} };
+    throw err;
+  });
+  const missing = needsSummary(finals, box, record);
+  let added = 0, recorded = 0;
   for (let i = 0; i < missing.length; i += 8) {
     await Promise.all(missing.slice(i, i + 8).map(async (g) => {
+      let saved;
       try {
-        const summary = await fetchJson(SUMMARY(g.id));
-        Object.assign(names, playerNames(summary));
-        const lines = boxLines(summary);
-        if (Object.keys(lines).length) { box.games[g.id] = lines; added++; }
+        saved = fromSummary(await fetchJson(summaryUrl(g.id)));
       } catch (err) {
-        console.warn(`${id}: no box score for game ${g.id} this time: ${err.message}`);
+        if (!box.games[g.id]) console.warn(`${id}: no box score for game ${g.id} this time: ${err.message}`);
+        else console.warn(`${id}: no play-by-play record for game ${g.id} this time: ${err.message}`);
+        return;
       }
+      Object.assign(names, saved.names);
+      if (!box.games[g.id]) {
+        if (!saved.box.ok) console.warn(`${id}: no box score for game ${g.id} this time: ${saved.box.reason}`);
+        else if (Object.keys(saved.box.value).length) { box.games[g.id] = saved.box.value; added++; }
+      }
+      if (!saved.stints.ok) return console.warn(`${id}: no play-by-play record for game ${g.id} this time: ${saved.stints.reason}`);
+      if (!record.games[g.id]) recorded++;
+      record.games[g.id] = saved.stints.value;
     }));
   }
   await mkdir(BOX_DIR, { recursive: true });
   await writeFile(file, JSON.stringify({ season: id, games: box.games }) + "\n");
   console.log(`${id}: box scores for ${added} more games, ${finals.length - Object.keys(box.games).length} final games without one`);
+  await mkdir(STINTS_DIR, { recursive: true });
+  await writeFile(stintsFile, formatStints(record, finals.map((g) => g.id)));
+  console.log(`${id}: play-by-play records for ${recorded} more games, ${finals.filter((g) => !record.games[g.id]).length} final games without one`);
 }
 
 // The regular season's games scheduled past the games file, for the odds (src/lib/schedule.ts), through April 30 of

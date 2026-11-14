@@ -4,23 +4,50 @@
 // extra term from the NBA's injury report, the latest saved before its tip-off (src/lib/v4.ts availability()). The
 // shown rotation also leaves out the players ESPN's report lists as out for weeks. A box rating reads every earlier
 // season, a home edge the seasons before, and a team without a total is seeded from its rating at the end of the
-// season before, so the seasons are walked together, oldest first.
+// season before, so the seasons are walked together, oldest first. Version 5 adds each player's on-court rating
+// (src/lib/on-court.ts) to his box rating when modelInputs() is given its settings, and prices each game from its
+// teams' rosters (src/lib/roster-lineups.ts rosterAvailability()) when given a roster rule. modelInputs() with neither
+// is version 4's inputs; siteInputs() is the site's, at the settings of the version src/lib/site.ts SITE points at.
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { addDays, dayKey, finalDays, fitModel, PARAMS, seedCentres, type Abbr, type ModelInputs, type SeasonData } from "./elo.ts";
 import type { DraftFile } from "./draft.ts";
 import { trailingHomeEdges } from "./home.ts";
 import { parseArchive, type InjuryArchive, type Report } from "./injuries.ts";
 import { parseNbaArchive } from "./nba-report.ts";
-import { boxRatings, lineups, parseBox, usualRotations, type Athlete, type Lineup, type Lineups, type SeasonBox, type SeasonRotations, type Sides } from "./players.ts";
+import { onCourtRatings, type OnCourtRule } from "./on-court.ts";
+import { boxRatings, lineups, parseBox, usualRotations, type Athlete, type BoxRatings, type Lineup, type Lineups, type SeasonBox, type SeasonRotations, type Sides } from "./players.ts";
 import { parsePreseason } from "./preseason.ts";
 import { OUT_STATUSES, reportLineups, reportNext } from "./report-lineup.ts";
 import { newcomers } from "./rookies.ts";
+import { rosterAvailability, type RosterRule } from "./roster-lineups.ts";
+import { SITE } from "./site.ts";
+import { parseStints } from "./stints.ts";
 import { availability, SITE_RULE, topThreeStart, V4 } from "./v4.ts";
 
 /**
- * One season's raw files: its games, parsed, and its box scores, preseason totals, ESPN's injury reports and the
- * NBA's (src/data/nba-reports/) as read from JSON, undefined where a file is missing.
+ * One season's raw files: its games, parsed, and its box scores, preseason totals, ESPN's injury reports, the NBA's
+ * (src/data/nba-reports/) and its play-by-play record (scripts/stints/, for src/lib/stints.ts parseStints) as read
+ * from JSON, undefined where a file is missing.
  */
-export type SeasonFiles = { data: SeasonData; box: unknown; preseason: unknown; injuries?: unknown; nbaReports?: unknown };
+export type SeasonFiles = { data: SeasonData; box: unknown; preseason: unknown; injuries?: unknown; nbaReports?: unknown; stints?: unknown };
+
+/** Version 5's on-court settings: the fit's (src/lib/on-court.ts) and the `weight` its residual counts in a player's centre. */
+export type OnCourt = OnCourtRule & { weight: number };
+
+/**
+ * A season's box ratings with its on-court residuals (src/lib/on-court.ts onCourtRatings) added, both in the box
+ * ratings' `athletes` order: box + (weight / PARAMS.players.a) * residual, so the fit's centre for a player, `a` times
+ * his rating, is a * box + weight * residual.
+ */
+export function withOnCourt(box: BoxRatings, residual: BoxRatings, weight: number): BoxRatings {
+  const scale = weight / PARAMS.players.a;
+  const mix = (b: Float64Array, r: Float64Array | undefined) => {
+    if (!r || r.length !== b.length) throw new Error("withOnCourt: the residuals do not match the box ratings");
+    return b.map((x, j) => x + scale * r[j]);
+  };
+  return { athletes: box.athletes, start: mix(box.start, residual.start), after: new Map([...box.after].map(([day, b]) => [day, mix(b, residual.after.get(day))])) };
+}
 
 /** Each team's team part after a season's last game day, or its seed when the season has no final game. */
 const lastTeamParts = (data: SeasonData, inputs: ModelInputs): Record<Abbr, number> => fitModel(data, inputs).at(-1)?.after.r ?? inputs.centres ?? {};
@@ -127,20 +154,31 @@ function withLongAbsences(data: SeasonData, rotation: SeasonRotations, away: Lon
   return out;
 }
 
-/** compute()'s inputs for each of `seasons`, by season id; `draft` names the top-three picks. */
-export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<DraftFile> = {}): Map<string, ModelInputs> {
+/**
+ * compute()'s inputs for each of `seasons`, by season id; `draft` names the top-three picks. With `onCourt`, version
+ * 5's settings, each player's rating is his box rating withOnCourt() his on-court residual, and the box ratings alone
+ * come beside it for the history ledger; without it, his box rating.
+ * With `roster`, each game's lineups and extra term are roster-based; without it, version 4's.
+ */
+export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<DraftFile> = {}, onCourt?: OnCourt, roster?: RosterRule): Map<string, ModelInputs> {
   const walked = [...seasons]
     .sort((x, y) => x.data.season.localeCompare(y.data.season))
     .map((s) => ({ ...s, box: s.box === undefined ? { season: s.data.season, games: {} } : parseBox(s.box, s.data.season) }));
   const rookies = newcomers(walked);
-  const ratings = boxRatings(walked, PARAMS.players.halfLife, topThreeStart(walked, rookies, draft));
+  const boxBy = boxRatings(walked, PARAMS.players.halfLife, topThreeStart(walked, rookies, draft));
+  const mixed = (rule: OnCourt) => {
+    const residuals = onCourtRatings(walked.map((s) => ({ data: s.data, stints: s.stints === undefined ? undefined : parseStints(s.stints, s.data.season) })), boxBy, rule);
+    return new Map([...boxBy].map(([season, box]) => [season, withOnCourt(box, residuals.get(season)!, rule.weight)]));
+  };
+  const ratings = onCourt ? mixed(onCourt) : boxBy;
   const lineupsBySeason = lineups(walked, V4.recent);
   const rotations = usualRotations(walked);
   const homes = trailingHomeEdges(walked.map((s) => s.data), PARAMS);
   const espn = new Map(walked.flatMap((s) => (s.injuries === undefined ? [] : [[s.data.season, parseArchive(s.injuries, s.data.season)] as const])));
   const nba = new Map(walked.flatMap((s) => (s.nbaReports === undefined ? [] : [[s.data.season, parseNbaArchive(s.nbaReports, s.data.season)] as const])));
   const dataOf = (season: string) => walked.find((s) => s.data.season === season)!.data;
-  const priced = availability(walked, nba, (season) => espnLineups(dataOf(season), lineupsBySeason.get(season)!, espn.get(season)), SITE_RULE);
+  const v4 = availability(walked, nba, (season) => espnLineups(dataOf(season), lineupsBySeason.get(season)!, espn.get(season)), SITE_RULE);
+  const priced = roster ? rosterAvailability(walked, nba, roster, v4) : v4;
   const out = new Map<string, ModelInputs>();
   let before: { data: SeasonData; inputs: ModelInputs } | null = null;
   for (const { data, box, preseason } of walked) {
@@ -155,6 +193,7 @@ export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<Dra
       players: {
         box,
         ratings: ratings.get(data.season)!,
+        ...(onCourt ? { boxRatings: boxBy.get(data.season)! } : {}),
         lineups: priced.get(data.season)!.lineups,
         rotation: archive ? withLongAbsences(data, rotations.get(data.season)!, longAbsences(data, box, archive)) : rotations.get(data.season)!,
         rookies: rookies.get(data.season),
@@ -165,4 +204,27 @@ export function modelInputs(seasons: readonly SeasonFiles[], draft: Readonly<Dra
     before = { data, inputs };
   }
   return out;
+}
+
+/**
+ * A season's play-by-play record as read from scripts/stints/ under the working directory, or undefined when it has
+ * none on file. The build and `npm run` both start at the repository root; anywhere else there is no such folder, and
+ * it throws rather than hand back seasons with no record.
+ */
+const stintsOnFile = (id: string): unknown => {
+  const dir = join(process.cwd(), "scripts", "stints");
+  if (!existsSync(dir)) throw new Error(`siteInputs: no scripts/stints/ under ${process.cwd()}, so the on-court rating has no play-by-play record to read. Run from the repository root.`);
+  const path = join(dir, `${id}.json`);
+  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined;
+};
+
+/**
+ * The site's inputs: modelInputs() at the on-court and roster settings of the version src/lib/site.ts SITE points at.
+ * When SITE reads the on-court rating, a season given without `stints` gets its record from scripts/stints/, or none
+ * when it has none on file, so a caller cannot price at the site's SIGMA with another version's ratings by leaving the
+ * play-by-play record out. It throws when the working directory has no scripts/stints/.
+ */
+export function siteInputs(seasons: readonly SeasonFiles[], draft: Readonly<DraftFile>): Map<string, ModelInputs> {
+  const files = SITE.onCourt ? seasons.map((s) => ({ ...s, stints: s.stints ?? stintsOnFile(s.data.season) })) : seasons;
+  return modelInputs(files, draft, SITE.onCourt, SITE.roster);
 }

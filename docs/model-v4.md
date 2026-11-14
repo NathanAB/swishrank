@@ -4,6 +4,8 @@ Version 4 changes how the model in `docs/model-v3.md` reads who will play. A gam
 
 This file holds the plan version 4 is confirmed by, written before its confirmation season begins. Where it says "as in version 3", the definition in `docs/model-v3.md`'s pre-registration applies unchanged. The site ran version 3 until the owner switched it to version 4 on 2026-11-02, before the confirmation season, as The switch below records.
 
+On 2026-11-13 the owner retired this plan's confirmation as a gate (`docs/adr/0002-versions-are-judged-on-past-seasons.md`). A version is now accepted on past seasons its settings never saw, because one future season's games cannot tell a 0.002 gain in log loss from luck. The Confirmation section below stays as written, because the hash under Results covers its text, but its rule no longer decides anything. `npm run backtest:v4` keeps logging 2026-27's games in table 4 and the 2027-28 confirmation games in table 5 as a running record, and no result there keeps or switches the site's model.
+
 ## Pre-registration
 
 Written on 2026-11-01, during 2026-27 and before 2027-28, its confirmation season. It replaces a plan written earlier the same day that changed only a top-three pick's starting level, whose hash is recorded under Results; no confirmation game had been played. `npm run backtest:v4` prints the SHA-256 of this section, from the line after its heading to the line before the next `## ` heading, as in versions 1 to 3. The hash at writing is recorded under Results.
@@ -147,7 +149,7 @@ The live fetch began saving the NBA's report before each tip-off during 2026-27,
 
 ### Table 5. Confirmation, 2027-28
 
-Logged only: the confirmation judges once, after the season's last game. Each part is reported, never used to judge.
+Logged only, as a running record. Since 2026-11-13 no result on these games keeps or switches the site's model (`docs/adr/0002-versions-are-judged-on-past-seasons.md`). Each part is logged beside version 4.
 
 No confirmation game has been played.
 
