@@ -25,7 +25,7 @@ A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don'
 
   Keep any of those directories that holds a page you changed. Read `dist/<page>/index.html`, then run `git worktree remove --force <scratch>`.
 - **Tests:** `node --test <file>` for the file you changed, and `npm test` (about three minutes) once before the pull request. The deploy waits on `npm test`, so a test on real data must stay green as the season in progress gains games: bound a finished season, or assert a count that only grows.
-- **Deploys:** each push to `main` starts a deploy of about 20 minutes, and deploys queue. Land related changes in one pull request.
+- **Deploys:** each push to `main` starts a deploy of about 9 minutes, and each score refresh one of 2 to 4, nearly all of it `npm run build`. Deploys queue. Land related changes in one pull request.
 
 ## Scoring a model change
 
