@@ -13,7 +13,7 @@ Manage the background server with `astro dev stop`, `astro dev status`, and `ast
 A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don't run it to check a change; the deploy runs it on every push to `main`.
 
 - **One page in the dev server:** start `astro dev --background`, then fetch or open the page.
-- **One page in a real build, about 15 seconds:** build a scratch copy that holds only the pages you changed. This catches data that loads in the dev server and not in a bundle.
+- **One page in a real build, about a minute:** build a scratch copy that holds only the pages you changed. This catches data that loads in the dev server and not in a bundle.
 
   ```
   git worktree add --detach <scratch> HEAD
