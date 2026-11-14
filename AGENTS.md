@@ -32,7 +32,7 @@ A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don'
 A change to the model is a candidate: one file in `scripts/candidates/` whose default export is a `Candidate` (`scripts/past-seasons.ts`; `scripts/candidates/v4.ts` is the example). `docs/adr/0002` is the rule it is judged by.
 
 - **One candidate, printed only:** `npm run backtest:v5 -- <file name without .ts>`.
-- **Every candidate, and the results part of `docs/model-v5.md` rewritten:** `npm run backtest:v5`. Version 4 alone takes about a minute, and the candidates that run version 5's search (`v5`, `v5-roster`) 8 to 15 more.
+- **Every candidate, and the results part of `docs/model-v5.md` rewritten:** `npm run backtest:v5`. Version 4 alone takes about a minute, and the candidates that run version 5's search (`v5`, `v5-roster`, `v5-daily`) about 12 more. `v5-daily` is the site's: `V5` in `src/lib/v5.ts` must match what it chooses.
 - **A candidate against a second baseline:** export `against`, a list of candidate file names, from its file (`scripts/candidates/v5-roster.ts` is the example).
 - **After a change to roster-based lineups (`src/lib/roster-lineups.ts`):** `npm run roster-check`, about 30 seconds. It prints the learned rates and the lineup measures to hold beside the port's column in `docs/model-v5.md` (The lineups' port against the prototype).
 

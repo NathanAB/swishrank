@@ -31,11 +31,11 @@ test("a refit is the hand-worked ridge solution, and a box prior moves each play
   const day = "2020-01-01";
   const seasons: OnCourtSeason[] = [{ data: seasonOf("s1", [day]), stints: record("s1", { "s1-0": swapped }) }, { data: seasonOf("s2", []) }];
   const box = (value: (a: Athlete) => number) => new Map([["s1", boxOf(TEN, [day], value)], ["s2", boxOf(TEN, [])]]);
-  const plain = onCourtRatings(seasons, box(() => 0), { ridge: 100, halfLife: 365, boxPrior: 0 }).get("s2")!;
+  const plain = onCourtRatings(seasons, box(() => 0), { ridge: 100, halfLife: 365, boxPrior: 0, refitEvery: 7 }).get("s2")!;
   for (const a of TEN) near(at(plain, a, plain.start), a <= 5 ? 14 / 3 : -14 / 3, `player ${a}`);
   // G1's box rating 4 at boxPrior 0.5 puts its prior at 2 and G2's at 0. With residual e for G1 and -e for G2, the
   // stints read 10 + 10e + h and -10 - 10e + h: e (200 + ridge) = 1400 - 200, e = 4.
-  const prior = onCourtRatings(seasons, box((a) => (a <= 5 ? 4 : 0)), { ridge: 100, halfLife: 365, boxPrior: 0.5 }).get("s2")!;
+  const prior = onCourtRatings(seasons, box((a) => (a <= 5 ? 4 : 0)), { ridge: 100, halfLife: 365, boxPrior: 0.5, refitEvery: 7 }).get("s2")!;
   for (const a of TEN) near(at(prior, a, prior.start), a <= 5 ? 4 : -4, `player ${a} with a box prior`);
 });
 
@@ -43,12 +43,35 @@ test("the same stints halfLife days older count half", () => {
   const second = run("2020-01-05", 7);
   const seasons: OnCourtSeason[] = [{ data: seasonOf("s1", ["2020-01-01"]), stints: record("s1", { "s1-0": swapped }) }, { data: seasonOf("s2", second), stints: record("s2", {}) }];
   const box = new Map([["s1", boxOf(TEN, ["2020-01-01"])], ["s2", boxOf(TEN, second)]]);
-  const s2 = onCourtRatings(seasons, box, { ridge: 100, halfLife: 10, boxPrior: 0 }).get("s2")!;
+  const s2 = onCourtRatings(seasons, box, { ridge: 100, halfLife: 10, boxPrior: 0, refitEvery: 7 }).get("s2")!;
   near(at(s2, 1, s2.start), 14 / 3, "on the stints' own day, at full weight");
   near(at(s2, 1, s2.after.get("2020-01-10")!), 14 / 3, "before s2's first refit");
   // Ten days on, each stint counts 5 possessions: u (100 + ridge) = 700, u = 3.5.
   near(at(s2, 1, s2.after.get("2020-01-11")!), 3.5, "after s2's refit on day 7, ten days on");
   near(at(s2, 6, s2.after.get("2020-01-11")!), -3.5, "player 6, ten days on");
+});
+
+test("refitted every game day, a rating reads a day's stints from that day on, where every 7th waits for the season's end", () => {
+  const days = run("2020-01-01", 3);
+  const seasons: OnCourtSeason[] = [{ data: seasonOf("s1", days), stints: record("s1", { "s1-1": swapped }) }, { data: seasonOf("s2", []) }];
+  const box = new Map([["s1", boxOf(TEN, days)], ["s2", boxOf(TEN, [])]]);
+  const values = (refitEvery: number) => {
+    const out = onCourtRatings(seasons, box, { ridge: 100, halfLife: 1, boxPrior: 0, refitEvery });
+    return [...days.map((d) => at(out.get("s1")!, 1, out.get("s1")!.after.get(d)!)), at(out.get("s2")!, 1, out.get("s2")!.start)];
+  };
+  // The stints are the second day's: u = 14/3 that day, and a day on, at half weight, u (100 + ridge) = 700.
+  const daily = values(1);
+  assert.equal(daily[0], 0, "before the stints");
+  near(daily[1], 14 / 3, "on the stints' day");
+  near(daily[2], 3.5, "a day on");
+  near(daily[3], 3.5, "the next season starts from the last day's refit");
+  const weekly = values(7);
+  assert.deepEqual(weekly.slice(0, 3), [0, 0, 0], "no refit in a season of three days");
+  near(weekly[3], 3.5, "the season's last refit, as the next begins");
+});
+
+test("refitEvery must be a whole number of game days, 1 or more", () => {
+  for (const refitEvery of [0, 1.5, -7, NaN]) assert.throws(() => onCourtWalk({ ...RULE, refitEvery }), /refitEvery/, String(refitEvery));
 });
 
 test("three-point makes above the earlier seasons' rate come out of the score, and a first season keeps its points", () => {
@@ -63,7 +86,7 @@ test("three-point makes above the earlier seasons' rate come out of the score, a
   ];
   const all = [...TEN, ...G3, ...G4];
   const box = new Map([["s1", boxOf(all, ["2020-01-01"])], ["s2", boxOf(all, ["2021-01-01"])], ["s3", boxOf(all, [])]]);
-  const out = onCourtRatings(seasons, box, { ridge: 100, halfLife: 1e9, boxPrior: 0 });
+  const out = onCourtRatings(seasons, box, { ridge: 100, halfLife: 1e9, boxPrior: 0, refitEvery: 7 });
   const second = out.get("s2")!, third = out.get("s3")!;
   near(at(second, 1, second.start), 14 / 3, "s1, with no earlier rate, keeps its points as scored");
   near(at(third, 11, third.start), 8 / 3, "s2 at s1's rate");
@@ -76,11 +99,11 @@ test("a player with no stints, or under half a possession, keeps 0, and a very l
   const seasons: OnCourtSeason[] = [{ data: seasonOf("s1", [day]), stints: record("s1", { "s1-0": [...swapped, tiny] }) }, { data: seasonOf("s2", []) }];
   const athletes = [...TEN, 11, 99];
   const box = new Map([["s1", boxOf(athletes, [day], (a) => (a === 11 || a === 99 ? 6 : a <= 5 ? 4 : 0))], ["s2", boxOf(athletes, [])]]);
-  const s2 = onCourtRatings(seasons, box, { ridge: 100, halfLife: 365, boxPrior: 0.5 }).get("s2")!;
+  const s2 = onCourtRatings(seasons, box, { ridge: 100, halfLife: 365, boxPrior: 0.5, refitEvery: 7 }).get("s2")!;
   assert.equal(at(s2, 99, s2.start), 0, "player 99 has no stint");
   assert.equal(at(s2, 11, s2.start), 0, "player 11 has a tenth of a possession");
   assert.ok(Math.abs(at(s2, 1, s2.start)) > 1, "player 1 has 20 possessions");
-  const held = onCourtRatings(seasons, box, { ridge: 1e12, halfLife: 365, boxPrior: 0.5 }).get("s2")!;
+  const held = onCourtRatings(seasons, box, { ridge: 1e12, halfLife: 365, boxPrior: 0.5, refitEvery: 7 }).get("s2")!;
   for (const a of athletes) assert.ok(Math.abs(at(held, a, held.start)) < 1e-6, `player ${a} at ridge 1e12: ${at(held, a, held.start)}`);
 });
 
@@ -92,7 +115,7 @@ test("a season without a play-by-play record still gets its ratings, and the nex
     { data: seasonOf("s3", ["2020-03-01"]) },
   ];
   const box = new Map([["s1", boxOf(TEN, ["2020-01-01"])], ["s2", boxOf(TEN, second)], ["s3", boxOf(TEN, ["2020-03-01"])]]);
-  const rule = { ridge: 100, halfLife: 10, boxPrior: 0 };
+  const rule = { ridge: 100, halfLife: 10, boxPrior: 0, refitEvery: 7 };
   const out = onCourtRatings(seasons(undefined), box, rule);
   const s2 = out.get("s2")!, s3 = out.get("s3")!;
   assert.deepEqual([...s2.after.keys()], second);
@@ -130,14 +153,14 @@ function synthetic() {
   const box = new Map(seasons.map((s) => [s.data.season, boxOf(athletes, s.data.games.filter((g) => g.final).map((g) => g.t.slice(0, 10)), (a, d) => ((a * 7 + Number(d.slice(8))) % 11 - 5) / 2)]));
   return { seasons, box };
 }
-const RULE: OnCourtRule = { ridge: 50, halfLife: 10, boxPrior: 0.5 };
+const RULE: OnCourtRule = { ridge: 50, halfLife: 10, boxPrior: 0.5, refitEvery: 7 };
+const DAILY: OnCourtRule = { ...RULE, refitEvery: 1 };
 
 test("no rating reads a later game: on or before a day, every value is the same when later games' stints and box ratings change", () => {
   const { seasons, box } = synthetic();
-  const base = onCourtRatings(seasons, box, RULE);
   const dayOf = (g: Game) => g.t.slice(0, 10);
-  // s1's seventh day is a refit, its ninth its last; s2's third and seventh, a refit; s3's first.
-  for (const cut of ["2020-01-07", "2020-01-08", "2020-01-09", "2020-03-03", "2020-03-07", "2020-05-01"]) {
+  // At RULE, s1's seventh day is a refit, its ninth its last; s2's third and seventh, a refit; s3's first.
+  for (const rule of [RULE, DAILY]) for (const cut of ["2020-01-07", "2020-01-08", "2020-01-09", "2020-03-03", "2020-03-07", "2020-05-01"]) {
     const changed = seasons.map(({ data, stints }): OnCourtSeason => ({
       data,
       stints: stints && record(stints.season, Object.fromEntries(Object.entries(stints.games).flatMap(([id, list]) => {
@@ -147,12 +170,13 @@ test("no rating reads a later game: on or before a day, every value is the same 
       }))),
     }));
     const changedBox = new Map([...box].map(([id, r]) => [id, { ...r, after: new Map([...r.after].map(([d, v]) => [d, d > cut ? v.map((x) => x + 1) : v])) }]));
-    const later = onCourtRatings(changed, changedBox, RULE);
+    const base = onCourtRatings(seasons, box, rule), later = onCourtRatings(changed, changedBox, rule);
     seasons.forEach(({ data }, k) => {
       const id = data.season, a = base.get(id)!, b = later.get(id)!;
       const lastBefore = k > 0 ? [...base.get(seasons[k - 1].data.season)!.after.keys()].at(-1)! : "";
-      if (lastBefore <= cut) assert.deepEqual(b.start, a.start, `${id} start, cut ${cut}`);
-      for (const [d, v] of a.after) if (d <= cut) assert.deepEqual(b.after.get(d), v, `${id} ${d}, cut ${cut}`);
+      const at = `refitted every ${rule.refitEvery}, cut ${cut}`;
+      if (lastBefore <= cut) assert.deepEqual(b.start, a.start, `${id} start, ${at}`);
+      for (const [d, v] of a.after) if (d <= cut) assert.deepEqual(b.after.get(d), v, `${id} ${d}, ${at}`);
     });
   }
 });
@@ -251,4 +275,19 @@ test("every refit matches a from-scratch solve of the weighted normal equations"
     assert.ok(want.size >= 11, `${day}: ${want.size} players fitted`);
     for (const a of r.athletes) near(at(r, a, values), want.get(a) ?? 0, `${day} player ${a}`, 1e-7);
   }
+});
+
+test("refitted every game day, every day's rating matches a from-scratch solve of the stints up to that day", () => {
+  const { seasons, box } = synthetic();
+  const out = onCourtRatings(seasons, box, DAILY);
+  let days = 0;
+  seasons.forEach(({ data }, season) => {
+    const r = out.get(data.season)!;
+    for (const [day, values] of r.after) {
+      const want = direct(seasons, box, DAILY, season, day);
+      for (const a of r.athletes) near(at(r, a, values), want.get(a) ?? 0, `${day} player ${a}`, 1e-7);
+      days++;
+    }
+  });
+  assert.equal(days, 24);
 });

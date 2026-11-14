@@ -46,7 +46,7 @@ test("every row's walk adds up, part by part and in all, shows each player once,
 /**
  * How far a game's Result may run against its surprise, in a finished season. Across every finished team-season one
  * runs 2 at most, IND's on 2025-12-18; the whole day's change, a new player's minutes included, ran one 13. Version 5's
- * weekly on-court update moves every player's value at once, and the walk books it on its own players' line, never in
+ * on-court update moves every player's value at once, and the walk books it on its own players' line, never in
  * the Result, which keeps it there.
  */
 const AGAINST = 2;
@@ -121,16 +121,21 @@ test(`no game's Result in a finished season runs more than ${AGAINST} points aga
  */
 const FADING = 4;
 
-test(`the seed's line moves no team-day of 2025-26 by ${FADING} points or more, and the on-court update a point or more only on some`, () => {
+test(`the seed's line moves no team-day of 2025-26 by ${FADING} points or more, and the on-court update moves a team after most of its games and on no day off`, () => {
   const season = allSeasons().find((s) => s.id === "2025-26")!;
-  let rows = 0, moved = 0;
+  let games = 0, moved = 0;
   for (const abbr of season.model.abbrs) for (const row of ledger(season, abbr)) {
-    rows++;
-    // A player who sat out a refit takes his update when he plays again, so small ones come on about half the days.
-    if (Math.abs(row.court) >= 1) moved++;
-    assert.ok(Math.abs(row.seed) < FADING, `${season.id} ${abbr} ${row.day}: the seed's line is ${row.seed}`);
+    const at = `${season.id} ${abbr} ${row.day}`;
+    assert.ok(Math.abs(row.seed) < FADING, `${at}: the seed's line is ${row.seed}`);
+    if (!row.game) {
+      assert.ok(Math.abs(row.court) < 1e-9, `${at}: the on-court update is ${row.court} on a day off`);
+      continue;
+    }
+    games++;
+    if (Math.abs(row.court) >= 0.5) moved++;
   }
-  assert.ok(moved > 0 && moved < rows / 2, `the on-court update moves ${moved} of ${rows} team-days by a point or more`);
+  // Refitted after every 7th game day it moved 859 of the season's 2,644 team-games by half a point or more.
+  assert.ok(games > 2600 && moved > games / 2, `the on-court update moves ${moved} of ${games} team-games by half a point or more`);
 });
 
 test("minutes that change hands are credited to whoever caused the trade, a sitter never gains, and the rows still add up", () => {

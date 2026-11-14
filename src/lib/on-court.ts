@@ -1,6 +1,6 @@
 // The on-court rating (GLOSSARY.md), version 5's addition to each player's value: how his team does on the
 // scoreboard while he is on the floor, adjusted for the teammates and opponents out there with him. It is a ridge
-// regression on every stint so far (src/lib/stints.ts), older stints counting less, refitted every REFIT_EVERY game
+// regression on every stint so far (src/lib/stints.ts), older stints counting less, refitted every `refitEvery` game
 // days and walked forward through the seasons, so a rating never reads a later game. The fit is the version 5
 // prototype's (branch prototype/model-v5, scripts/research/pbp2/apm2.py) with three-point luck taken out.
 import { finalDays, type SeasonData } from "./elo.ts";
@@ -9,11 +9,10 @@ import type { SeasonStints, Stint } from "./stints.ts";
 
 /**
  * `ridge` is how many possessions of evidence pull each player toward his prior, `boxPrior` times his box rating;
- * `halfLife` is the days after which a stint counts half.
+ * `halfLife` is the days after which a stint counts half; `refitEvery` is the game days from one refit to the next,
+ * a whole number, 1 for a refit after every game day.
  */
-export type OnCourtRule = { ridge: number; halfLife: number; boxPrior: number };
-/** Game days between refits. */
-const REFIT_EVERY = 7;
+export type OnCourtRule = { ridge: number; halfLife: number; boxPrior: number; refitEvery: number };
 /** A fixed pace: 100 possessions a side per 48 minutes. */
 export const SECONDS_PER_POSSESSION = 28.8;
 /** A season's games and its play-by-play record, undefined when none is on file. */
@@ -55,7 +54,7 @@ type Open = { box: BoxRatings; day: string; refitted: boolean; pending: Pending[
  * a final game, on its game's day: its row is +1 for each home player and the home column, -1 for each away player,
  * its target 100 times the margin per possession, at SECONDS_PER_POSSESSION, and its weight its possessions times
  * 0.5^(days since / halfLife). Each side's points lose 3 times its threes made beyond the league's rate over the
- * seasons before, so a first season keeps its points as scored. A season refits after every REFIT_EVERY-th game
+ * seasons before, so a first season keeps its points as scored. A season refits after every `refitEvery`-th game
  * day, with that day's stints, and once more after its last game day, when that was not a refit already, as the walk
  * goes on to the next season: that refit is the next season's `start`, and the walk's last season never gets it.
  * A refit solves (A + ridge I) x = b + ridge * prior for the players with more than ACTIVE decayed possessions and
@@ -64,6 +63,8 @@ type Open = { box: BoxRatings; day: string; refitted: boolean; pending: Pending[
  * where his last refit of an earlier season left it, so whether he plays later in the season changes nothing.
  */
 export function onCourtWalk(rule: OnCourtRule): OnCourtWalk {
+  const every = rule.refitEvery;
+  if (!Number.isInteger(every) || every < 1) throw new Error(`onCourtWalk: refitEvery is ${every}, not a whole number of game days`);
   const f = 0.5 ** (1 / rule.halfLife);
   const index = new Map<Athlete, number>();
   // Column 0 is the home term. The normal equations are a packed lower triangle, so a new player appends a row.
@@ -214,7 +215,7 @@ export function onCourtWalk(rule: OnCourtRule): OnCourtWalk {
           threes[0] += stint[5] + stint[7];
           threes[1] += stint[6] + stint[8];
         }
-        if (i % REFIT_EVERY === REFIT_EVERY - 1) {
+        if (i % every === every - 1) {
           refit(day, pending, seen, rate, box);
           pending = [];
           current = onAthletes(latest);
@@ -222,7 +223,7 @@ export function onCourtWalk(rule: OnCourtRule): OnCourtWalk {
         after.set(day, current);
       });
       const last = days.at(-1);
-      if (last) open = { box, day: last.day, refitted: days.length % REFIT_EVERY === 0, pending, seen, rate, threes };
+      if (last) open = { box, day: last.day, refitted: days.length % every === 0, pending, seen, rate, threes };
       return { athletes: box.athletes, start, after };
     },
   };

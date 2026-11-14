@@ -49,7 +49,7 @@ export type LedgerGame = {
 
 /**
  * One player's value change from the team's own game and his box score, times his share of the minutes. His on-court
- * part is held still here; its weekly update is the row's `court`, one number for the team.
+ * part is held still here; its update is the row's `court`, one number for the team.
  */
 export type BoxPlayer = { athlete: number; name: string; points: number };
 
@@ -80,9 +80,9 @@ export type LedgerRow = {
   /** What the seed's daily fading did. */
   seed: number;
   /**
-   * What bringing every player's on-court part up to the day did, at once and for the whole rotation. It moves on a
-   * refit's day when the team plays, or on its first game day after one, about once a week, and on a player's first
-   * game after a refit he sat out; it is 0 on other days, and always on version 4.
+   * What bringing every player's on-court part up to the day did, at once and for the whole rotation. The on-court
+   * rating is refitted after every game day, and a player takes the refits since his last game when he next plays,
+   * so it moves on the team's game days; it is 0 on a day the team does not play, and always on version 4.
    */
   court: number;
 };
@@ -487,7 +487,7 @@ export function walk(season: SeasonView, row: LedgerRow): Walk {
       ...(row.game ? [{ kind: "team" as const, name: LABELS.result, points: row.raw.result - row.seed, phrase: resultPhrase(season, row.game) }] : []),
       { kind: "seed", name: "Preseason estimate", points: row.seed, phrase: "Fading a little, as it does each game" },
     ],
-    players: [...players, ...(row.court ? [{ kind: "court" as const, name: "Scoreline with each player on the floor", points: row.court, phrase: "Brought up to date, as it is about once a week" }] : [])],
+    players: [...players, ...(row.court ? [{ kind: "court" as const, name: "Scoreline with each player on the floor", points: row.court, phrase: "Brought up to date, as it is after each day of games" }] : [])],
   };
 
   const parts = (Object.keys(LABELS) as WalkKey[])

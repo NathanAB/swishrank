@@ -15,6 +15,7 @@ import { chooseFill, FILLS } from "../roster-candidates.ts";
 import version4 from "./v4.ts";
 import version4Roster from "./v4-roster.ts";
 import { describe, priced, version5, type Search } from "./v5.ts";
+import { version5Daily } from "./v5-daily.ts";
 import { version5Roster } from "./v5-roster.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -145,7 +146,7 @@ test("siteInputs throws when the working directory has no scripts/stints/, in pl
 });
 
 /** Two rules far apart and three weights, the largest far past the search's, so the scores differ visibly. */
-const SMALL_SEARCH: Search = { rules: [{ ridge: 3000, halfLife: 730, boxPrior: 0.5 }, { ridge: 50, halfLife: 30, boxPrior: 0 }], weights: [0, 0.3, 0.6] };
+const SMALL_SEARCH: Search = { rules: [{ ridge: 3000, halfLife: 730, boxPrior: 0.5, refitEvery: 7 }, { ridge: 50, halfLife: 30, boxPrior: 0, refitEvery: 7 }], weights: [0, 0.3, 0.6] };
 
 test("version 5 scores each combination of its search as a real fit with those settings scores it, and chooses the lowest", () => {
   const draft = read("src/data/draft.json") as DraftFile;
@@ -204,7 +205,7 @@ test("the fill is version 4's with no roster-priced earlier season, and otherwis
 });
 
 /** One rule and two weights: version 5's search in seconds. */
-const ONE_RULE: Search = { rules: [{ ridge: 3000, halfLife: 730, boxPrior: 0.5 }], weights: [0, 0.3] };
+const ONE_RULE: Search = { rules: [{ ridge: 3000, halfLife: 730, boxPrior: 0.5, refitEvery: 7 }], weights: [0, 0.3] };
 
 test("version 5 with roster lineups prices with version 5's own choice for the earlier seasons, at the fill chosen from them", () => {
   const draft = read("src/data/draft.json") as DraftFile;
@@ -221,4 +222,22 @@ test("version 5 with roster lineups prices with version 5's own choice for the e
     assert.equal(calls.get(id)?.p, c.p, id);
     assert.deepEqual(calls.get(id)?.lineup, c.lineup, id);
   }
+});
+
+test("version 5 refitted every game day prices with version 5's own choice for the earlier seasons and that fill, its on-court rating refitted after every game day", () => {
+  const draft = read("src/data/draft.json") as DraftFile;
+  // One weight above 0, so the choice has an on-court rating to refit.
+  const v5 = version5({ rules: ONE_RULE.rules, weights: [0.3] });
+  const settings = v5.settings([early]);
+  assert.equal(settings.onCourt.refitEvery, 7);
+  const chosen = version5Daily(v5).choose([early]);
+  assert.equal(chosen.settings, "on-court rating with ridge 3000, half-life 730 days and box prior 0.5, refitted every game day, at weight 0.30; " + `SIGMA ${settings.sigma}, early widening ${settings.widen}; roster lineups at fill -0.3`);
+  const inputs = modelInputs([early, small], draft, { ...settings.onCourt, refitEvery: 1 }, { fill: -0.3 }).get(ID)!;
+  const want = callsOf(small.data, fitModel(small.data, inputs), settings.sigma, settings.widen);
+  const calls = chosen.price(small), weekly = version5Roster(v5).choose([early]).price(small);
+  assert.ok(want.size > 100);
+  assert.equal(calls.size, want.size);
+  for (const [id, c] of want) assert.equal(calls.get(id)?.p, c.p, id);
+  const moved = [...want].filter(([id, c]) => weekly.get(id)?.p !== c.p).length;
+  assert.ok(moved > 100, `${moved} games' chances differ from the ones refitted every 7 game days`);
 });

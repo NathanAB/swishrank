@@ -171,7 +171,7 @@ const later = (id: string): SeasonFiles => ({
   preseason: undefined,
 });
 const files: SeasonFiles[] = [{ data, box, preseason, stints }, later("2027-28"), later("2028-29")];
-const RULE: OnCourt = { ridge: 100, halfLife: 365, boxPrior: 0.5, weight: 0.12 };
+const RULE: OnCourt = { ridge: 100, halfLife: 365, boxPrior: 0.5, refitEvery: 1, weight: 0.12 };
 
 test("with on-court settings, a rating is the box rating plus weight / a times the on-court residual, and a player with no play-by-play keeps his box rating exactly", () => {
   const v4 = modelInputs(files).get("2027-28")!.players!.ratings;
