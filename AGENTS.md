@@ -17,7 +17,7 @@ A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don'
 
   ```
   git worktree add --detach <scratch> HEAD
-  ln -s "$PWD/node_modules" <scratch>/node_modules
+  ln -s "$(cd "$(git rev-parse --git-common-dir)/.." && pwd)/node_modules" <scratch>/node_modules
   cd <scratch>
   rm -rf 'src/pages/[...season]' src/pages/players src/pages/share src/pages/lines src/pages/seasons.astro
   npx astro build

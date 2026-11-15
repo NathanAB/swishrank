@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compute, counted, fitSeason, fitSeasonSteps, PARAMS, phi, playerPart, ranksOf, winProb, type Fit, type Game, type SeasonData, type SeasonInputs } from "./elo.ts";
+import { compute, counted, fitSeason, fitSeasonSteps, PARAMS, phi, playerPart, ranksOf, slotWorth, winProb, type Fit, type Game, type SeasonData, type SeasonInputs } from "./elo.ts";
 import type { BoxLine, BoxRatings, Lineup, SeasonBox } from "./players.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
@@ -143,4 +143,17 @@ test("a 43-point win counts at most four times a 1-point win, and a loss counts 
 
 test("equal displayed ratings share a rank and the next rank skips", () => {
   assert.deepEqual(ranksOf({ A: 1023.4, B: 1022.6, C: 1010, D: 1030 }), { D: 1, A: 2, B: 2, C: 4 });
+});
+
+test("a slot is worth the drop when it turns into his gap slot, and a slot already out is worth nothing", () => {
+  const fit: Fit = { r: {}, home: 0, v: new Map([[1, 1], [2, -0.5]]) };
+  // Both in: 0.5 * 1 + 0.5 * -0.5 = 0.25. Player 1 out: his gap, BACKUP_GAP below the rest at most, is -0.3, so
+  // 0.5 * -0.5 + 0.5 * -0.3 = -0.4. Player 2 out: his gap is -0.5 - 1 = -1.5, so 0.5 * 1 + 0.5 * -1.5 = -0.25.
+  const worth = slotWorth(fit, [{ athlete: 1, share: 0.5 }, { athlete: 2, share: 0.5 }], 10);
+  near(worth[0], 6.5, "player 1");
+  near(worth[1], 5, "player 2");
+  // Player 2 already out: 0.5 * 1 + 0.5 * -1.5 = -0.25; player 1 out as well: 0.5 * -0.3 + 0.5 * -0.5 = -0.4.
+  const out = slotWorth(fit, [{ athlete: 1, share: 0.5 }, { athlete: -2, share: 0.5 }], 10);
+  near(out[0], 1.5, "player 1 beside an absent player 2");
+  assert.equal(out[1], 0);
 });

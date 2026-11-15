@@ -132,6 +132,7 @@ const fits = STRIP_STEPS.map((w, k) => {
   .players .board li:last-child { border-bottom: 0; }
   .players .board .rk { grid-area: rk; color: var(--muted); font-variant-numeric: tabular-nums; }
   .players .board .nm { grid-area: nm; min-width: 0; font-weight: 500; }
+  .players .board a.nm:hover { text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
   .players .board .nm i { margin-left: 8px; font-style: normal; font-weight: 400; color: var(--muted); }
   .players .board .num { grid-area: num; text-align: right; font-weight: 600; }
   .players .board .bar { grid-area: bar; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--seg-track); }

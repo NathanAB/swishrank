@@ -2,7 +2,8 @@
 // sample since 2015-16 and the team he played for. Every season's fit is walked oldest first, because a player's
 // minutes and team carry across seasons, and his value is read off it on the day before each season's first game,
 // then about weekly through a finished season and on every game day of the season under way. Everything the page
-// shows, from the day's top ten to the runs at No. 1, is worked out from this table by lib/player-chart.ts.
+// shows, from the day's top ten to the runs at No. 1, is worked out from this table by lib/player-chart.ts. The walk
+// itself holds every player, which each player's own page reads (lib/player-page.ts); keepEver cuts it to the table.
 import { addDays, ELO_PER_SIGMA, fitModel, PARAMS, type Abbr, type Fit, type ModelInputs, type SeasonData } from "./elo.ts";
 import { ranking } from "./player-chart.ts";
 import type { Athlete } from "./players.ts";
@@ -40,8 +41,8 @@ export type SeasonIn = { id: string; label: string; current: boolean; data: Seas
  */
 const SCALE = ELO_PER_SIGMA / PARAMS.sigma;
 
-/** The table for `seasons`, walked oldest first whatever their order, each player named by `nameOf`. */
-export function buildTimeline(seasons: readonly SeasonIn[], nameOf: (a: Athlete) => string | undefined): PlayerTimeline {
+/** The table for `seasons` with every player in it, walked oldest first whatever their order, each named by `nameOf`. */
+export function walkTimeline(seasons: readonly SeasonIn[], nameOf: (a: Athlete) => string | undefined): PlayerTimeline {
   const days: string[] = [];
   const spans: PlayerTimeline["seasons"] = [];
   const values = new Map<Athlete, (number | null)[]>();
@@ -81,7 +82,7 @@ export function buildTimeline(seasons: readonly SeasonIn[], nameOf: (a: Athlete)
     spans.push({ id: s.id, label: s.label, from, to: days.length - 1 });
   }
 
-  const table: PlayerTimeline = {
+  return {
     days,
     seasons: spans,
     players: [...values].map(([id, series]) => ({
@@ -91,7 +92,6 @@ export function buildTimeline(seasons: readonly SeasonIn[], nameOf: (a: Athlete)
       stints: stints.get(id) ?? [],
     })),
   };
-  return { ...table, players: keepEver(table) };
 }
 
 /** The table's players who were in the top `top` at some sample, in the table's order. */

@@ -22,6 +22,8 @@ export type Route =
   | { kind: "seasons" }
   /** The best players in the league and how that changed, across every season: it has no season of its own. */
   | { kind: "players" }
+  /** One player: his rating over his career, what it is made of, what he is worth to his team and his games. */
+  | { kind: "player"; id: number; name: string }
   /** How every pre-game chance since the first season has scored: it has no season of its own. */
   | { kind: "record" }
   /** How often a player on the NBA's injury report plays, by status, player and team: it has no season of its own. */
@@ -36,6 +38,9 @@ export const teamSlug = (abbr: string) => abbr.toLowerCase();
 
 /** A game's place under its season's games: its US Eastern day, then the two teams, 2026-01-23/ind-at-okc. */
 export const gameSlug = (g: GameRef) => ({ day: dayKey(g.t), matchup: `${teamSlug(g.away)}-${between(g.neutral)}-${teamSlug(g.home)}` });
+
+/** A player's URL segment: his name without accents, then his ESPN id, which tells apart two players of one name. */
+export const playerSlug = (id: number, name: string) => `${slugify(name.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))}-${id}`;
 
 /** A conference's URL segment: east or west. */
 export const conferenceSlug = (conference: Conference) => conference.toLowerCase();
@@ -61,6 +66,8 @@ export function routePath(route: Route): string {
       return "/seasons/";
     case "players":
       return "/players/";
+    case "player":
+      return `/players/${playerSlug(route.id, route.name)}/`;
     case "record":
       return "/record/";
     case "injury-report":
@@ -93,6 +100,7 @@ export function shareImage(route: Route | undefined, current: SeasonRef): ShareI
       return { kind: "season", season: route.season };
     case "seasons":
     case "players":
+    case "player":
     case "record":
     case "injury-report":
     case "about":
@@ -138,6 +146,7 @@ export function switchTarget(route: Route, to: SeasonRef, hasTeam: (abbr: string
       return { ...route, season: to };
     case "seasons":
     case "players":
+    case "player":
     case "record":
     case "injury-report":
     case "about":

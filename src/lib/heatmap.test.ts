@@ -8,7 +8,7 @@ import { textWidth } from "./text-width.ts";
 // A rotation from a 36-minute starter down to a player who barely plays, one of them out for weeks.
 const ids = Object.keys(names).map(Number);
 const MINUTES = [36, 34, 32, 30, 26, 22, 18, 14, 8, 3, 0.6];
-const part = (athlete: number, minutes: number, out: boolean): PlayerPart => ({ athlete, minutes, adds: (minutes / 48) * (12 - minutes / 2), out, weekAgo: 3 });
+const part = (athlete: number, minutes: number, out: boolean): PlayerPart => ({ athlete, minutes, adds: (minutes / 48) * (12 - minutes / 2), out, weekAgo: 3, worth: 0 });
 const players = MINUTES.map((m, j) => part(ids[j], m, j === 3));
 
 test("a tile's colour takes a stronger step at each cut point, either way from neutral", () => {
@@ -18,8 +18,8 @@ test("a tile's colour takes a stronger step at each cut point, either way from n
 
 test("a tile's figures are whole rating points, a slip under a point showing 0, and its colour comes from the unrounded points", () => {
   const [a, b] = teamMap([
-    { athlete: ids[0], minutes: 30, adds: -0.3, out: false, weekAgo: -0.7 },
-    { athlete: ids[1], minutes: 20, adds: 10, out: false, weekAgo: 9.5 },
+    { athlete: ids[0], minutes: 30, adds: -0.3, out: false, weekAgo: -0.7, worth: 0 },
+    { athlete: ids[1], minutes: 20, adds: 10, out: false, weekAgo: 9.5, worth: 0 },
   ], TEAM_WIDE);
   assert.deepEqual(a.text, { game: "0", week: "0" });
   assert.deepEqual(b.text, { game: "+10", week: "+1" });
