@@ -1,18 +1,29 @@
 ---
 // A day's walk, from the rating before to the rating after, on the day's own scale. The axis on top holds the two
-// ratings, with a faint line down from each; under it each part's heading carries its figure, and each step is a bar
-// from the running rating, its figure at the end it moved to, drops and rises in two colours. On a phone each bar
-// sits on a track of the scale, and the axis splits: the rating before at the top, the rating after at the bottom.
-// `id` names the walk on its page, so its drawers' ids are unique and the same on every build.
+// ratings, with a faint line down from each; under it every effect is one row, all alike: its name, a few words under
+// it, and a bar from the running rating with its figure at the end it moved to, drops and rises in two colours. On a
+// phone each bar sits on a track of the scale, and the axis splits: the rating before at the top, the rating after at
+// the bottom.
 import { signed, signedTenth } from "../../lib/format.ts";
-import type { Walk, WalkLine, WalkPart } from "../../lib/ledger.ts";
+import { apportion, type Walk, type WalkItem } from "../../lib/ledger.ts";
 
 interface Props { walk: Walk; id: string }
-const { walk: { from, to, parts, tipped }, id } = Astro.props;
+const { walk: { from, to, parts, tipped } } = Astro.props;
+
+// Every effect the walk names, the result's and then the players', each largest first, as one list: the closing lines'
+// listed items take their own rows. Whole points are split again across each part's rows, so they still add up to the
+// part's figure in the history's Result and Players columns.
+const split = parts.map((part) => {
+  const its: WalkItem[] = part.lines.flatMap((l) => (l.kind === "group" ? l.items : [l]));
+  const w = apportion(Object.fromEntries(its.map((x, i) => [String(i), x.points])), part.whole);
+  return its.map((x, i) => ({ x, w: w[String(i)] }));
+}).flat();
+const items = split.map((s) => s.x);
+const wholes: Record<string, number> = Object.fromEntries(split.map((s, i) => [String(i), s.w]));
 
 // The day's own scale: from the lowest to the highest rating the walk passes through, 2 points at least.
 let at = from, lo = from, hi = from;
-for (const part of parts) for (const l of part.lines) { at += l.whole; lo = Math.min(lo, at); hi = Math.max(hi, at); }
+for (const i of items.keys()) { at += wholes[String(i)]; lo = Math.min(lo, at); hi = Math.max(hi, at); }
 if (hi - lo < 2) { lo -= (2 - (hi - lo)) / 2; hi = lo + 2; }
 const place = (v: number) => ((v - lo) / (hi - lo)).toFixed(4);
 const share = (n: number) => (Math.abs(n) / (hi - lo)).toFixed(4);
@@ -23,38 +34,22 @@ const edge = (v: number) => (v === lo ? "at-lo" : v === hi ? "at-hi" : null);
  * lean up to about 32px past its rating towards the other, and a phone's chart can be as narrow as about 150px.
  */
 const close = from !== to && Math.abs(from - to) / (hi - lo) < 0.25;
+/** Two close ratings share one label, between them, kept inside the chart when either sits at an end of the scale. */
+const low = Math.min(from, to), high = Math.max(from, to);
+const bothEdge = low === lo && high !== hi ? "at-lo" : high === hi && low !== lo ? "at-hi" : null;
+const bothAt = bothEdge === "at-lo" ? low : bothEdge === "at-hi" ? high : (from + to) / 2;
 
-type Step =
-  | { kind: "head"; part: WalkPart }
-  | { kind: "line"; part: WalkPart; line: WalkLine; single: boolean; x: number; bar: number; drawer: string | null };
+/** Each row: its item, where its bar starts, its whole points, and its place in the bars' opening order. */
 let run = from;
-let bar = 0;
-const steps: Step[] = parts.flatMap((part): Step[] => {
-  const single = part.lines.length === 1;
-  const lines = part.lines.map((line): Step => {
-    const x = run;
-    run += line.whole;
-    const drawer = line.kind === "group" && line.items.length > 3 ? `${id}-${part.key}` : null;
-    return { kind: "line", part, line, single, x, bar: line.whole !== 0 ? bar++ : 0, drawer };
-  });
-  return single ? lines : [{ kind: "head", part }, ...lines];
+const rows = items.map((item, i) => {
+  const whole = wholes[String(i)];
+  const x = run;
+  run += whole;
+  return { item, x, whole, i };
 });
-
-/** What rounding did to a closing line, when it moved the line by half a point or more: "+0.2 in all, rounded to +1". */
-const rounding = (l: WalkLine) => (l.kind === "group" && Math.abs(l.points - l.whole) >= 0.5 ? `${signedTenth(l.points)} in all, rounded to ${signed(l.whole)}` : "");
-/**
- * A line's two lines of words. Alone in its part, the line takes the part's heading, and its own words go under it;
- * a closing line whose items are listed open leaves its count to the list and says only what rounding did.
- */
-const words = (s: Extract<Step, { kind: "line" }>) => {
-  const l = s.line;
-  if (!s.single) return l.kind === "group" ? { name: l.phrase, why: rounding(l) } : { name: l.name, why: l.phrase };
-  if (l.kind === "group") return { name: null, why: s.drawer ? l.phrase : rounding(l) };
-  return { name: null, why: l.kind === "team" ? l.phrase : l.phrase ? `${l.name}. ${l.phrase}` : l.name };
-};
-/** The note for a small move made a whole point by rounding, unless a line already says what rounding did. */
-const note = tipped && !steps.some((s) => s.kind === "line" && words(s).why === rounding(s.line) && rounding(s.line));
-const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 3.5 5 7l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// A row of under half a point still shows its tenths, on a bar the width of a mark.
+const figure = (r: (typeof rows)[number]) => (r.whole !== 0 ? signed(r.whole) : signedTenth(r.item.points));
+const sign = (r: (typeof rows)[number]) => ((r.whole || r.item.points) < 0 ? "down" : "up");
 ---
 
 <div class="wrap"><div class="walk" style={`--from:${place(from)};--to:${place(to)}`}>
@@ -69,37 +64,22 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
           {/* Each label points away from the other, the lower rating's to the left and the higher's to the right. */}
           <span class:list={["tick num", from < to ? "to-left" : "to-right"]} style={`--p:${place(from)}`}><span class="t-in"><span class="muted">From</span> {from}</span></span>
           <span class:list={["tick num to", from < to ? "to-right" : "to-left"]} style={`--p:${place(to)}`}><span class="t-in"><span class="muted">To</span> {to}</span></span>
+          {close && <span class:list={["tick num to-mid both", bothEdge]} style={`--p:${place(bothAt)}`} aria-hidden="true"><span class="muted">From</span> {from} <span class="muted">to</span> {to}</span>}
         </>
       )}
     </span>
   </div>
-  {steps.map((s) => {
-    if (s.kind === "head") return (
-      <div class="step head"><span class="s-label">{s.part.label} <span class="h-fig num">{signed(s.part.whole)}</span></span><span class="s-chart"></span></div>
-    );
-    const { name, why } = words(s);
-    const l = s.line;
-    const label = (
-      <>
-        <span class="s-name">{name ?? <>{s.part.label} <span class="h-fig num">{signed(s.part.whole)}</span></>}{s.drawer && <Fragment set:html={chev} />}</span>
-        {why && <span class="s-why">{why}</span>}
-      </>
-    );
-    const list = l.kind === "group" && l.items.length > 0 && (
-      <ul class="drawer">
-        {l.items.map((it) => <li><span><span class="s-name">{it.name}</span>{it.phrase && <span class="s-why">{it.phrase}</span>}</span><span class="num">{signedTenth(it.points)}</span></li>)}
-      </ul>
-    );
-    return (
-      <div class:list={["step", { single: s.single, flat: l.whole === 0 }]}>
-        <span class="s-label">{s.drawer ? <button type="button" class="drawer-btn" aria-expanded="false" aria-controls={s.drawer}>{label}</button> : label}</span>
-        <span class="s-chart">
-          {l.whole !== 0 && <b class:list={["bar", l.whole < 0 ? "down" : "up", edge(s.x + l.whole)]} style={`--p:${place(Math.min(s.x, s.x + l.whole))};--w:${share(l.whole)};--i:${s.bar}`}><span class="fig num">{signed(l.whole)}</span></b>}
-        </span>
-        {list && (s.drawer ? <div class="s-more reveal" id={s.drawer} inert><div class="reveal-in">{list}</div></div> : <div class="s-more">{list}</div>)}
-      </div>
-    );
-  })}
+  {rows.map((r) => (
+    <div class="step">
+      <span class="s-label">
+        <span class="s-name">{r.item.name}</span>
+        <span class="s-why">{r.item.phrase}</span>
+      </span>
+      <span class="s-chart">
+        <b class:list={["bar", sign(r), edge(r.x + r.whole)]} style={`--p:${place(Math.min(r.x, r.x + r.whole))};--w:${share(r.whole)};--i:${r.i}`}><span class="fig num">{figure(r)}</span></b>
+      </span>
+    </div>
+  ))}
   {/* A phone's walk reads down the page, from the rating before at the top to the rating after under the last bar. */}
   {from !== to && (
     <div class="step axis end" aria-hidden="true">
@@ -107,19 +87,7 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
       <span class="s-chart"><span class="tick num" style={`--p:${place(to)}`}><span class="muted">To</span> {to}</span></span>
     </div>
   )}
-</div>{note && <p class="note">A small move, tipped to a whole point by rounding.</p>}</div>
-
-<script>
-  document.querySelectorAll<HTMLButtonElement>("button.drawer-btn[aria-controls]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const open = b.getAttribute("aria-expanded") !== "true";
-      b.setAttribute("aria-expanded", String(open));
-      const drawer = document.getElementById(b.getAttribute("aria-controls")!)!;
-      drawer.toggleAttribute("data-open", open);
-      drawer.inert = !open;
-    }),
-  );
-</script>
+</div>{tipped && <p class="note">A small move, tipped to a whole point by rounding.</p>}</div>
 
 <style>
   /* The walk: a label column, and the chart right beside it on the day's own scale. --p is a rating's place along
@@ -128,17 +96,13 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
   .wrap { container-type: inline-size; }
   .walk { --lw: 300px; --cg: 16px; --inset: 52px; --in-l: var(--inset); --in-r: var(--inset); --ease: cubic-bezier(0.2, 0.7, 0.2, 1); position: relative; padding: 4px 0 8px; }
   .step { position: relative; display: grid; grid-template-columns: var(--lw) minmax(0, 1fr); column-gap: var(--cg); --top: 0px; }
-  .s-label { padding: calc(var(--top) + 6px) 0 6px; min-width: 0; }
+  .s-label { padding: calc(var(--top) + 8px) 0 8px; min-width: 0; }
   .s-chart { position: relative; grid-column: 2; grid-row: 1 / span 2; min-height: 32px; }
-  .s-more { grid-column: 1; }
   .s-name { display: flex; align-items: center; gap: 6px; line-height: 20px; }
   .s-why { display: block; color: var(--muted); font-size: var(--fs-small); line-height: 16px; }
   .muted { color: var(--muted); }
-  .step.head, .step.single { --top: 14px; }
-  .step.head { --top: 10px; }
-  .step.head .s-chart { min-height: 30px; }
-  .step.single .s-name, .step.head .s-label { font-weight: 600; }
-  .h-fig { margin-left: 6px; font-weight: 600; }
+  /* Every line is the same: one line of name and one of words, so each takes the same height. */
+  .step:not(.axis) .s-label { min-height: 52px; }
 
   /* The axis: the two ratings, and a faint line down from each through the walk. */
   .step.axis .s-chart { min-height: 24px; }
@@ -151,9 +115,9 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
   .tick.to-left { left: 0; width: var(--x); }
   .tick.to-right { left: var(--x); right: 0; direction: rtl; }
   .t-in { direction: ltr; }
-  /* Two ratings close together put the second label on a line of its own, so the two never meet. */
-  .axis.close .s-chart { min-height: 40px; }
-  .axis.close .tick.to { top: 16px; }
+  /* Two ratings close together share one label, so the axis is one line on every walk and the two never meet. The
+     separate labels stay for a screen reader, out of sight. */
+  .axis.close .tick:not(.both) { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .step.axis.end { display: none; }
   .tick.to-mid { left: var(--x); transform: translateX(-50%); }
   /* A rating at either end of the scale turns its label inward, so it never runs past the chart. */
@@ -164,7 +128,8 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
 
   /* A step: a bar from the running rating to the next, its figure at the end it moved to. The fill sits in ::before
      so opening can grow it without squeezing the figure. A step whose share is 0 has no bar. */
-  .bar { position: absolute; top: calc(var(--top) + 7px); height: 18px; left: calc(var(--in-l) + var(--p) * (100% - var(--in-l) - var(--in-r))); width: max(3px, calc(var(--w) * (100% - var(--in-l) - var(--in-r)))); }
+  /* A bar sits in the middle of its row, level with the centre of its two lines of words. */
+  .bar { position: absolute; top: calc(50% - 9px); height: 18px; left: calc(var(--in-l) + var(--p) * (100% - var(--in-l) - var(--in-r))); width: max(3px, calc(var(--w) * (100% - var(--in-l) - var(--in-r)))); }
   /* Each bar ends in an arrowhead at the rating it moved to: a drop points left, a rise right. A bar too short for
      a whole head is all head. */
   .bar { --head: min(8px, 100%); }
@@ -179,18 +144,6 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
   :global([inert]) .bar::before { transform: scaleX(0); }
   :global([inert]) .fig { opacity: 0; }
 
-  /* The closing line of items under a point: a drawer of tenths, or the list itself when it is short. */
-  .drawer-btn { display: block; width: 100%; padding: 0; border-radius: 3px; text-align: left; }
-  .drawer-btn:hover .s-name { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
-  .chev { flex: none; color: var(--muted); transition: transform 280ms var(--ease); }
-  .drawer-btn[aria-expanded="true"] .chev { transform: rotate(180deg); }
-  .reveal { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 280ms var(--ease), opacity 200ms ease; }
-  .reveal[data-open] { grid-template-rows: 1fr; opacity: 1; }
-  .reveal-in { min-height: 0; overflow: hidden; }
-  .drawer { margin: 0 0 8px; padding-left: 12px; border-left: 1px solid var(--rule); }
-  /* A drawer's items read as the walk's lines do: the name, and its words under it. */
-  .drawer li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 12px; padding: 4px 0; }
-  .drawer li .num { min-width: 36px; text-align: right; font-size: 13px; line-height: 20px; }
 
   /* On a phone each label sits over its own bar, close under it, and the gridlines give way to a track under each
      bar: the day's scale from end to end, with a mark at the rating before and the rating after. */
@@ -211,10 +164,6 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
         linear-gradient(var(--mark), var(--mark)) calc(var(--to) * 100%) 0 / 1px 100% no-repeat,
         var(--track);
     }
-    .s-more { grid-column: 1; grid-row: 3; }
-    .step.head, .step.single { --top: 8px; }
-    .step.head + .step .s-label { padding-top: 6px; }
-    .step.head .s-chart, .step.flat .s-chart { display: none; }
     .bar { top: 0; height: var(--track-h); }
     /* A figure is backed in the colour it sits on, the track's unless its bar ends at the end of the scale, so no mark
        runs through it. */
@@ -222,7 +171,6 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
     .down.at-lo .fig, .up.at-hi .fig { background: none; }
     .down .fig { margin-right: 3px; }
     .up .fig { margin-left: 3px; }
-    .drawer { margin-top: 8px; padding-left: 8px; }
 
     /* The axis splits in two, so the walk reads down the page: the rating before over the first bar and the rating
        after under the last, each on a tick across a hairline of the scale. A label slides along its tick as its
@@ -235,6 +183,9 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
     .step.axis .tick { left: var(--x); right: auto; width: auto; display: block; direction: ltr; transform: translateX(calc(var(--p) * -100%)); }
     .step.axis :is(.t-in, .to-mid) { padding: 0; }
     .step.axis:not(.end) .tick.to { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    /* The split axis has a line for each rating, so close ratings keep their own labels. */
+    .step.axis.close .tick.both { display: none; }
+    .step.axis.close .tick:not(.both, .to) { width: auto; height: auto; overflow: visible; clip-path: none; }
     .step.axis.end { display: grid; }
     .step.axis.end .s-chart { --tick: var(--to); margin-top: 14px; }
     .step.axis.end .s-chart::before { top: 4px; }
