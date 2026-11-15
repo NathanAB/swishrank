@@ -34,6 +34,10 @@ const edge = (v: number) => (v === lo ? "at-lo" : v === hi ? "at-hi" : null);
  * lean up to about 32px past its rating towards the other, and a phone's chart can be as narrow as about 150px.
  */
 const close = from !== to && Math.abs(from - to) / (hi - lo) < 0.25;
+/** Two close ratings share one label, between them, kept inside the chart when either sits at an end of the scale. */
+const low = Math.min(from, to), high = Math.max(from, to);
+const bothEdge = low === lo && high !== hi ? "at-lo" : high === hi && low !== lo ? "at-hi" : null;
+const bothAt = bothEdge === "at-lo" ? low : bothEdge === "at-hi" ? high : (from + to) / 2;
 
 /** Each row: its item, where its bar starts, its whole points, and its place in the bars' opening order. */
 let run = from;
@@ -60,6 +64,7 @@ const sign = (r: (typeof rows)[number]) => ((r.whole || r.item.points) < 0 ? "do
           {/* Each label points away from the other, the lower rating's to the left and the higher's to the right. */}
           <span class:list={["tick num", from < to ? "to-left" : "to-right"]} style={`--p:${place(from)}`}><span class="t-in"><span class="muted">From</span> {from}</span></span>
           <span class:list={["tick num to", from < to ? "to-right" : "to-left"]} style={`--p:${place(to)}`}><span class="t-in"><span class="muted">To</span> {to}</span></span>
+          {close && <span class:list={["tick num to-mid both", bothEdge]} style={`--p:${place(bothAt)}`} aria-hidden="true"><span class="muted">From</span> {from} <span class="muted">to</span> {to}</span>}
         </>
       )}
     </span>
@@ -110,9 +115,9 @@ const sign = (r: (typeof rows)[number]) => ((r.whole || r.item.points) < 0 ? "do
   .tick.to-left { left: 0; width: var(--x); }
   .tick.to-right { left: var(--x); right: 0; direction: rtl; }
   .t-in { direction: ltr; }
-  /* Two ratings close together put the second label on a line of its own, so the two never meet. */
-  .axis.close .s-chart { min-height: 40px; }
-  .axis.close .tick.to { top: 16px; }
+  /* Two ratings close together share one label, so the axis is one line on every walk and the two never meet. The
+     separate labels stay for a screen reader, out of sight. */
+  .axis.close .tick:not(.both) { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .step.axis.end { display: none; }
   .tick.to-mid { left: var(--x); transform: translateX(-50%); }
   /* A rating at either end of the scale turns its label inward, so it never runs past the chart. */
@@ -177,6 +182,9 @@ const sign = (r: (typeof rows)[number]) => ((r.whole || r.item.points) < 0 ? "do
     .step.axis .tick { left: var(--x); right: auto; width: auto; display: block; direction: ltr; transform: translateX(calc(var(--p) * -100%)); }
     .step.axis :is(.t-in, .to-mid) { padding: 0; }
     .step.axis:not(.end) .tick.to { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    /* The split axis has a line for each rating, so close ratings keep their own labels. */
+    .step.axis.close .tick.both { display: none; }
+    .step.axis.close .tick:not(.both, .to) { width: auto; height: auto; overflow: visible; clip-path: none; }
     .step.axis.end { display: grid; }
     .step.axis.end .s-chart { --tick: var(--to); margin-top: 14px; }
     .step.axis.end .s-chart::before { top: 4px; }
