@@ -10,14 +10,14 @@ import { apportion, type Walk, type WalkItem } from "../../lib/ledger.ts";
 interface Props { walk: Walk; id: string }
 const { walk: { from, to, parts, tipped } } = Astro.props;
 
-// Every effect the walk names, the result's and then the players', each largest first, as one list: the closing lines'
+// Every effect the walk names as one list, the result's and the players' together, largest first: the closing lines'
 // listed items take their own rows. Whole points are split again across each part's rows, so they still add up to the
 // part's figure in the history's Result and Players columns.
 const split = parts.map((part) => {
   const its: WalkItem[] = part.lines.flatMap((l) => (l.kind === "group" ? l.items : [l]));
   const w = apportion(Object.fromEntries(its.map((x, i) => [String(i), x.points])), part.whole);
   return its.map((x, i) => ({ x, w: w[String(i)] }));
-}).flat();
+}).flat().sort((a, b) => Math.abs(b.x.points) - Math.abs(a.x.points));
 const items = split.map((s) => s.x);
 const wholes: Record<string, number> = Object.fromEntries(split.map((s, i) => [String(i), s.w]));
 
