@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { addDays, compute, ELO_PER_SIGMA, fitModel, PARAMS, playerParts, shownLineups, START, type Abbr, type SeasonData } from "./elo.ts";
+import { addDays, compute, ELO_PER_SIGMA, fitModel, PARAMS, playerPart, playerParts, shownLineups, START, type Abbr, type SeasonData } from "./elo.ts";
 import { modelInputs } from "./inputs.ts";
 
 // Every season the site shows, read and rated as src/lib/season.ts does, injury reports included, so that players out
@@ -51,4 +51,24 @@ test("a player's week-ago part is what he added 7 days before his team's rating 
     }
   }
   assert.ok(moved > 0, "some player joined his team's lineup within the week");
+});
+
+test("a team's rating without a player is the model's own: its team part and its lineup with his slot a gap slot", () => {
+  let out = 0;
+  for (const { id, model, days, ratingDay, fitOn, shown } of seasons) {
+    for (const a of model.abbrs) {
+      const day = days.findLast((d) => d.day <= ratingDay(a))!.day;
+      const fit = fitOn(day);
+      const lineup = shown.after.get(day)![a];
+      for (const p of model.players[a]) {
+        const without = START + (fit.r[a] + playerPart(fit, lineup.map((s) => (Math.abs(s.athlete) === p.athlete ? { ...s, athlete: -p.athlete } : s)))) * scale;
+        assert.ok(Math.abs(model.r[a] - p.worth - without) < 1e-9, `${id} ${a} ${p.athlete}: ${model.r[a] - p.worth}, the model says ${without}`);
+        if (p.out) {
+          out++;
+          assert.equal(p.worth, 0, `${id} ${a} ${p.athlete} is out`);
+        }
+      }
+    }
+  }
+  assert.ok(out > 0, "some player is out for weeks");
 });

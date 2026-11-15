@@ -17,7 +17,7 @@ A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don'
 
   ```
   git worktree add --detach <scratch> HEAD
-  ln -s "$PWD/node_modules" <scratch>/node_modules
+  ln -s "$(cd "$(git rev-parse --git-common-dir)/.." && pwd)/node_modules" <scratch>/node_modules
   cd <scratch>
   rm -rf 'src/pages/[...season]' src/pages/players src/pages/share src/pages/lines src/pages/seasons.astro
   npx astro build
@@ -26,6 +26,7 @@ A full `npm run build` writes about 15,000 pages and takes over 40 minutes. Don'
   Keep any of those directories that holds a page you changed. Read `dist/<page>/index.html`, then run `git worktree remove --force <scratch>`.
 - **Tests:** `node --test <file>` for the file you changed, and `npm test` (about three minutes) once before the pull request. The deploy waits on `npm test`, so a test on real data must stay green as the season in progress gains games: bound a finished season, or assert a count that only grows.
 - **Deploys:** each push to `main` starts a deploy of about 9 minutes, and each score refresh one of 2 to 4, nearly all of it `npm run build`. Deploys queue. Land related changes in one pull request.
+- **Pull requests:** no workflow runs on a pull request, so `gh pr checks` reports none and a CI watch only times out. The local `npm test` is the gate before merge; the deploy reruns it on `main`.
 
 ## Scoring a model change
 

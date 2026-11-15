@@ -14,9 +14,11 @@ import { siteInputs } from "./inputs.ts";
 import { parseNbaArchive } from "./nba-report.ts";
 import { playerName } from "./names.ts";
 import type { ChartData, TeamLook } from "./player-chart.ts";
-import { buildTimeline } from "./player-timeline.ts";
+import { pageIds, playerView, type PlayerView, type PlayerWorld } from "./player-page.ts";
+import { keepEver, walkTimeline, type PlayerTimeline } from "./player-timeline.ts";
+import type { Athlete } from "./players.ts";
 import { months } from "./results.ts";
-import { conferenceSlug, gameSlug, href, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
+import { conferenceSlug, gameSlug, href, playerSlug, switchTarget, teamSlug, type Route, type SeasonRef } from "./routes.ts";
 import { CONFERENCE_ORDER } from "./teams.ts";
 import { coloursOf, lineColor } from "./tint.ts";
 
@@ -195,19 +197,64 @@ export const seasonSwitch = (route: Route) =>
 
 export const team = (season: SeasonView, abbr: Abbr): Team => season.model.data.teams[abbr];
 
+let walked: PlayerTimeline | undefined;
+/** The timeline walk with every player in it (lib/player-timeline.ts walkTimeline), walked once per build. */
+const fullTimeline = () =>
+  (walked ??= walkTimeline(allSeasons().map((s) => ({ id: s.id, label: s.label, current: s.current, data: s.model.data, inputs: seasonInputs(s.id) ?? {} })), playerName));
+
+let world: PlayerWorld | undefined;
+/** What every player's page reads (lib/player-page.ts), gathered once per build. */
+const playerWorld = (): PlayerWorld =>
+  (world ??= (() => {
+    const full = fullTimeline();
+    const players = seasonInputs(currentSeason().id)?.players;
+    return {
+      full, kept: { ...full, players: keepEver(full) }, model: currentSeason().model, box: players?.box,
+      ratings: players?.boxRatings ? { all: players.ratings, box: players.boxRatings } : undefined,
+    };
+  })());
+
+let links: Map<Athlete, string> | undefined;
+/** Each player with a page, to its link: everyone rated in the latest fit, and everyone the players page keeps. */
+const playerLinks = () =>
+  (links ??= new Map(pageIds(playerWorld()).map((id) => [id, href({ kind: "player", id, name: playerName(id) ?? `Player ${id}` })])));
+
+/** The link to a player's page, or undefined when he has none. */
+export const playerLink = (id: Athlete): string | undefined => playerLinks().get(id);
+
+/** Every team any season names, in its newest season's names and line colour. */
+const teamLooks = () => {
+  const teams: Record<Abbr, TeamLook & { name: string }> = {};
+  for (const s of allSeasons()) for (const [a, t] of Object.entries(s.model.data.teams)) teams[a] ??= { name: t.name, short: t.short, tint: lineColor(t) };
+  return teams;
+};
+
 let players: ChartData | undefined;
 /**
  * The players page's table (lib/player-timeline.ts), with each team it names in its newest season's short name and
- * line colour, built once per build for the page, its league-lines file and the copy its script fetches.
+ * line colour and each player's link, built once per build for the page, its league-lines file and the copy its
+ * script fetches.
  */
 export const playerChart = (): ChartData =>
   (players ??= (() => {
-    const seasons = allSeasons();
-    const teams: Record<Abbr, TeamLook> = {};
-    for (const s of seasons) for (const [a, t] of Object.entries(s.model.data.teams)) teams[a] ??= { short: t.short, tint: lineColor(t) };
-    const table = buildTimeline(seasons.map((s) => ({ id: s.id, label: s.label, current: s.current, data: s.model.data, inputs: seasonInputs(s.id) ?? {} })), playerName);
-    return { ...table, teams };
+    const { kept } = playerWorld();
+    const teams = Object.fromEntries(Object.entries(teamLooks()).map(([a, t]) => [a, { short: t.short, tint: t.tint }]));
+    return { ...kept, teams, links: Object.fromEntries(kept.players.flatMap((p) => { const l = playerLink(p.id); return l ? [[p.id, l]] : []; })) };
   })());
+
+/** One player's page: what it shows, and each team it names. */
+export type PlayerPageProps = { view: PlayerView; teams: Record<Abbr, TeamLook & { name: string }> };
+
+/** getStaticPaths for src/pages/players/[player].astro: one page per player with one (playerLink). */
+export const playerPaths = () => {
+  const w = playerWorld(), looks = teamLooks();
+  return pageIds(w).map((id) => {
+    const view = playerView(w, id);
+    const named = new Set([...view.stints.map(([, a]) => a), ...view.log.flatMap((g) => [g.team, g.opp]), ...(view.worth ? Object.keys(view.worth.league) : [])]);
+    const teams = Object.fromEntries([...named].map((a) => [a, looks[a] ?? { name: a, short: a, tint: "var(--line-other)" }]));
+    return { params: { player: playerSlug(id, view.name) }, props: { view, teams } satisfies PlayerPageProps };
+  });
+};
 
 let injuries: InjuryRecord | undefined;
 /** How often each status on the NBA's injury report has played, over every season with a report (lib/injury-record.ts). */

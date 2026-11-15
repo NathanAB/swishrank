@@ -78,8 +78,9 @@ test("a row of labels keeps each that starts clear of the last one kept and ends
 });
 
 test("the fetched table is taken only when every part of it has its shape", () => {
-  const good = { days: ["2026-01-01"], seasons: [{ id: "x", label: "x", from: 0, to: 0 }], players: [{ id: 1, name: "Al", v: [9], stints: [[0, "A"]] }], teams: { A: { short: "Aces", tint: "#ffffff" } } };
+  const good = { days: ["2026-01-01"], seasons: [{ id: "x", label: "x", from: 0, to: 0 }], players: [{ id: 1, name: "Al", v: [9], stints: [[0, "A"]] }], teams: { A: { short: "Aces", tint: "#ffffff" } }, links: { 1: "/players/al-1/" } };
   assert.deepEqual(parseChartData(good), good);
+  assert.equal(parseChartData({ ...good, links: { 1: 7 } }), null, "a link that is not a path");
   assert.equal(parseChartData({ ...good, players: [{ id: 1, name: "Al", v: [9, 8], stints: [] }] }), null, "a rating per day, no more");
   assert.equal(parseChartData({ ...good, teams: { A: { short: "Aces" } } }), null, "a team without its colour");
 });
@@ -99,7 +100,7 @@ test("a label is measured at the size global.css sets it", () => {
 test("a day's header gives the No. 1's rating, his lead as the gap between the two ratings shown, and his time at No. 1", () => {
   // Al, 9.6, shows as 10 and Bo, 5.4, as 5: the lead reads +5, though the ratings are 4.2 apart.
   const t = table(player("Al", [9.6, 9.6, 9.6, 9.6, 9.6, 9.6]), player("Bo", [5.4, 5.4, 5.4, 5.4, 5.4, 5.4]));
-  const d = { ...t, teams: { A: { short: "Aces", tint: "#123456" } } };
+  const d = { ...t, teams: { A: { short: "Aces", tint: "#123456" } }, links: { 65: "/players/al-65/" } };
   const f = frame(d, "all");
   const view = dayView(d, f, runsAtTop(d, f.from, f.to), 5);
   assert.equal(view.date, "Oct 22, 2025");
@@ -107,4 +108,6 @@ test("a day's header gives the No. 1's rating, his lead as the gap between the t
   assert.deepEqual(view.figures.map((fig) => fig.value), ["10", "+5", "Oct 2024", "5"]);
   assert.deepEqual(view.board.slice(0, 2).map((row) => row.id), [65, 66]);
   assert.equal(view.board.length, 10);
+  assert.match(view.board[0].row, /<a class="nm" href="\/players\/al-65\/">Al<i>Aces<\/i><\/a>/, "a player with a page is a link to it");
+  assert.match(view.board[1].row, /<span class="nm">Bo</, "a player without one is not");
 });

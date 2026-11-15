@@ -20,7 +20,7 @@ import { pct, seasonLabel } from "../../../lib/format.ts";
 import { share } from "../../../lib/injury-record.ts";
 import { teamDescription } from "../../../lib/meta.ts";
 import { href, type Route } from "../../../lib/routes.ts";
-import { injuryRecord, TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
+import { injuryRecord, playerLink, TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
 import { nextGames, teamGames } from "../../../lib/teams.ts";
 import { currentOdds } from "../../../lib/season-odds.ts";
 import { teamPaint } from "../../../lib/tint.ts";
@@ -86,7 +86,7 @@ const questionable = injuries?.teams.find((t) => t.team === abbr)?.questionable;
       )}
       {m.players[abbr].length > 0 && (
         <Panel title="Players">
-          <Heatmap players={m.players[abbr]} label={`${me.short} players`} teamRating={m.r[abbr]} />
+          <Heatmap players={m.players[abbr]} label={`${me.short} players`} teamRating={m.r[abbr]} linkOf={playerLink} />
           {injuries && questionable && (
             <p class="note">{me.short} players <a class="link" href={href({ kind: "injury-report" })}>listed Questionable</a> have played {pct(share(questionable))} of the time since {seasonLabel(injuries.since)}.</p>
           )}

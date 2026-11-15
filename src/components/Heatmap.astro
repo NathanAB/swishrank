@@ -19,9 +19,11 @@ interface Props {
   label: string;
   /** The team's rating, which the line over the map names. */
   teamRating: number;
+  /** A player's page, for the table to link his name to; undefined when he has none. */
+  linkOf: (athlete: number) => string | undefined;
 }
 
-const { players, label, teamRating } = Astro.props;
+const { players, label, teamRating, linkOf } = Astro.props;
 const pct = (v: number, of: number) => `${((v / of) * 100).toFixed(2)}%`;
 /** A box's place on its canvas, in percentages. */
 const box = (r: { x: number; y: number; w: number; h: number }, canvas: Canvas) =>
@@ -57,6 +59,7 @@ const tips = rows.map(({ name, part, text, chance, bins }) => {
           class:list={["cell", { out: t.part.out }]}
           aria-hidden="true"
           data-cell={i}
+          data-href={linkOf(t.part.athlete)}
           style={`${box(t, canvas)}; --fs: ${(t.label?.size ?? 0).toFixed(2)}; --c-game: ${fill(t.bins.game)}; --c-week: ${fill(t.bins.week)}`}
         >
           {t.label && <span class="nm">{t.label.name}</span>}
@@ -88,7 +91,7 @@ const tips = rows.map(({ name, part, text, chance, bins }) => {
         <tbody>
           {rows.map((t) => (
             <tr>
-              <td class="who">{t.name}{t.part.out && <span class="flag"> · out</span>}</td>
+              <td class="who">{linkOf(t.part.athlete) ? <a class="link" href={linkOf(t.part.athlete)}>{t.name}</a> : t.name}{t.part.out && <span class="flag"> · out</span>}</td>
               <td class="num">{Math.round(t.part.minutes)}</td>
               <td class="num">{t.text.game}</td>
               <td class="num">{t.text.week}</td>
@@ -153,6 +156,16 @@ const tips = rows.map(({ name, part, text, chance, bins }) => {
     root.addEventListener("pointermove", onPointer);
     root.addEventListener("pointerdown", onPointer);
     root.addEventListener("pointerleave", (e) => e.pointerType !== "touch" && hide());
+    // A tile opens his page on a mouse click, or on a tap once its tooltip is up.
+    let armed: HTMLElement | null = null;
+    root.addEventListener("pointerdown", (e) => {
+      const cell = cellOf(e.target);
+      armed = cell && (e.pointerType === "mouse" || (cell === shown && !tip.hidden)) ? cell : null;
+    }, { capture: true });
+    root.addEventListener("click", (e) => {
+      const cell = cellOf(e.target);
+      if (cell && cell === armed && cell.dataset.href) location.href = cell.dataset.href;
+    });
     document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Node && root.contains(e.target))) hide(); });
   }
 </script>
@@ -204,5 +217,7 @@ const tips = rows.map(({ name, part, text, chance, bins }) => {
   .num { text-align: right; }
   /* A long name wraps in its cell rather than pushing the table past a phone's width. */
   td.who { color: var(--text); white-space: normal; }
+  td.who a { text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
+  .cell[data-href] { cursor: pointer; }
   .flag { color: var(--muted); }
 </style>

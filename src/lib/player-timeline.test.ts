@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Game, SeasonData } from "./elo.ts";
 import { modelInputs } from "./inputs.ts";
-import { buildTimeline, keepEver, type PlayerTimeline } from "./player-timeline.ts";
+import { keepEver, walkTimeline, type PlayerTimeline } from "./player-timeline.ts";
 import type { BoxLine } from "./players.ts";
 
 const team = (name: string) => ({ name, short: name, color: "000000", alternateColor: "ffffff" });
@@ -27,7 +27,7 @@ const box = {
   "2025-26": { 5: { A: [line(1, 100)], B: [line(3, 100)] }, 6: { A: [line(1, 100)], B: [line(3, 100), line(2, 100)] } },
 };
 const inputs = modelInputs([before, now].map((data) => ({ data, box: { season: data.season, games: box[data.season as keyof typeof box] }, preseason: undefined })));
-const timeline = buildTimeline(
+const timeline = walkTimeline(
   [
     { id: "2025-26", label: "2025–26", current: true, data: now, inputs: inputs.get("2025-26")! },
     { id: "2024-25", label: "2024–25", current: false, data: before, inputs: inputs.get("2024-25")! },
@@ -55,8 +55,9 @@ test("a player's stint opens at his first sample and wherever his team changes, 
   assert.deepEqual(player(1)?.stints, [[0, "A"]]);
 });
 
-test("the table keeps only players who were ever ranked near the top", () => {
-  assert.deepEqual(timeline.players.map((p) => p.id).sort(), [1, 3]);
+test("the walk holds every player, and the players page's table only those ever ranked near the top", () => {
+  assert.deepEqual(timeline.players.map((p) => p.id).sort(), [1, 2, 3, 5]);
+  assert.deepEqual(keepEver(timeline).map((p) => p.id).sort(), [1, 3]);
 });
 
 test("a player is kept when he was in the top `top` at any sample, and dropped when he never was", () => {

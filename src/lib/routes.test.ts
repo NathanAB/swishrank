@@ -49,6 +49,13 @@ test("the players page lives at /players/, shares the current season's picture, 
   assert.deepEqual(switchTarget({ kind: "players" }, past, anyTeam), { kind: "home", season: past });
 });
 
+test("a player's page lives under /players/ at his name and id, and shares the current season's picture", () => {
+  assert.equal(routePath({ kind: "player", id: 4278073, name: "Shai Gilgeous-Alexander" }), "/players/shai-gilgeous-alexander-4278073/");
+  assert.equal(routePath({ kind: "player", id: 1, name: "Nikola Jokić" }), "/players/nikola-jokic-1/");
+  assert.equal(sharePath(shareImage({ kind: "player", id: 1, name: "A" }, now)), "/share/2026-27.png");
+  assert.deepEqual(switchTarget({ kind: "player", id: 1, name: "A" }, past, anyTeam), { kind: "home", season: past });
+});
+
 test("the track record lives at /record/, shares the current season's picture, and picking a season from it goes to that season's home", () => {
   assert.equal(routePath({ kind: "record" }), "/record/");
   assert.equal(sharePath(shareImage({ kind: "record" }, now)), "/share/2026-27.png");

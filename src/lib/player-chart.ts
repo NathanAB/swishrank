@@ -10,8 +10,8 @@ import { textWidth } from "./text-width.ts";
 
 /** A team as the page draws it: its short name and its line colour (lib/tint.ts lineColor). */
 export type TeamLook = { short: string; tint: string };
-/** What the page's script fetches: the table and every team it names. */
-export type ChartData = PlayerTimeline & { teams: Record<Abbr, TeamLook> };
+/** What the page's script fetches: the table, every team it names, and each player's page by his id. */
+export type ChartData = PlayerTimeline & { teams: Record<Abbr, TeamLook>; links: Record<string, string> };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isRating = (v: unknown): v is number | null => v === null || typeof v === "number";
@@ -19,7 +19,7 @@ const isStint = (v: unknown): v is [number, Abbr] => Array.isArray(v) && v.lengt
 
 /** The page's fetched table, checked whole, or null when it is not one. */
 export function parseChartData(raw: unknown): ChartData | null {
-  if (!isRecord(raw) || !Array.isArray(raw.days) || !Array.isArray(raw.seasons) || !Array.isArray(raw.players) || !isRecord(raw.teams)) return null;
+  if (!isRecord(raw) || !Array.isArray(raw.days) || !Array.isArray(raw.seasons) || !Array.isArray(raw.players) || !isRecord(raw.teams) || !isRecord(raw.links)) return null;
   const days = raw.days.filter((d): d is string => typeof d === "string");
   const seasons = raw.seasons.flatMap((s) =>
     isRecord(s) && typeof s.id === "string" && typeof s.label === "string" && typeof s.from === "number" && typeof s.to === "number" ? [{ id: s.id, label: s.label, from: s.from, to: s.to }] : [],
@@ -30,8 +30,9 @@ export function parseChartData(raw: unknown): ChartData | null {
       : [],
   );
   const teams = Object.entries(raw.teams).flatMap(([a, t]) => (isRecord(t) && typeof t.short === "string" && typeof t.tint === "string" ? [[a, { short: t.short, tint: t.tint }] as const] : []));
-  const whole = days.length === raw.days.length && seasons.length === raw.seasons.length && players.length === raw.players.length && teams.length === Object.keys(raw.teams).length;
-  return whole && days.length > 0 && seasons.length > 0 ? { days, seasons, players, teams: Object.fromEntries(teams) } : null;
+  const links = Object.entries(raw.links).filter((e): e is [string, string] => typeof e[1] === "string");
+  const whole = days.length === raw.days.length && seasons.length === raw.seasons.length && players.length === raw.players.length && teams.length === Object.keys(raw.teams).length && links.length === Object.keys(raw.links).length;
+  return whole && days.length > 0 && seasons.length > 0 ? { days, seasons, players, teams: Object.fromEntries(teams), links: Object.fromEntries(links) } : null;
 }
 
 /** Players in the day's list, and the fewest ranked players a sample needs before the page shows it. */
@@ -304,6 +305,9 @@ function monthsIn(from: string, to: string): string[] {
   }
 }
 
+/** A board row's name and team: a link to his page when he has one. */
+const nameCell = (link: string | undefined, html: string) => (link ? `<a class="nm" href="${esc(link)}">${html}</a>` : `<span class="nm">${html}</span>`);
+
 /** One day as the page shows it: the header's No. 1, the top five on the plot and the Top 10. */
 export type DayView = {
   i: number;
@@ -358,7 +362,7 @@ export function dayView(d: ChartData, f: Frame, runs: readonly Run[], i: number)
     board: top.map((p, k) => {
       const t = look(d, teamAt(p, i));
       const bar = Math.max(0, (p.v[i]! / best) * 100).toFixed(1);
-      return { id: p.id, tint: t.tint, row: `<span class="rk">${k + 1}</span><span class="nm">${esc(p.name)}<i>${esc(t.short)}</i></span><span class="bar"><i style="width:${bar}%"></i></span><b class="num">${rating(p.v[i]!)}</b>` };
+      return { id: p.id, tint: t.tint, row: `<span class="rk">${k + 1}</span>${nameCell(d.links[p.id], `${esc(p.name)}<i>${esc(t.short)}</i>`)}<span class="bar"><i style="width:${bar}%"></i></span><b class="num">${rating(p.v[i]!)}</b>` };
     }),
     run: runs.findIndex((r) => r.from <= i && i <= r.to),
   };

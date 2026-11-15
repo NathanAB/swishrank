@@ -169,7 +169,16 @@ export type SlotPart = { athlete: Athlete; minutes: number; adds: number; out: b
  * A slot of the lineup a team's shown rating counts: its `adds`, the team part and 1000 make up the rating. `weekAgo`
  * is what he added 7 days before the team's rating day, with that day's lineup, or 0 when it did not count him.
  */
-export type PlayerPart = SlotPart & { weekAgo: number };
+export type PlayerPart = SlotPart & { weekAgo: number; worth: number };
+
+/**
+ * What each slot of `lineup` is worth to its team's rating, in Elo points: the drop when his slot turns into his gap
+ * slot, the backups playing his minutes, as the model counts a player out for weeks. A slot already out is worth 0.
+ */
+export function slotWorth(fit: Fit, lineup: Lineup, scale: number): number[] {
+  const whole = playerPart(fit, lineup);
+  return lineup.map((p) => (p.athlete < 0 ? 0 : (whole - playerPart(fit, lineup.map((q) => (q === p ? { ...q, athlete: -q.athlete } : q)))) * scale));
+}
 
 /**
  * playerPart() split by slot and scaled by `scale` to Elo points. Each slot counts as playerPart() counts it, so the
@@ -693,15 +702,18 @@ export function compute(data: SeasonData, inputs: ModelInputs = {}): Season {
   const gaps = Object.fromEntries(upcoming.map((g) => [g.id, expected(latest, pregame(g)) * scale]));
   // Each slot of a team's lineup as of `day`, from the fit and lineup of the last game day on or before it, or the
   // opening night's.
-  const partsOn = (a: Abbr, day: string | undefined) => {
+  const lineupOn = (a: Abbr, day: string | undefined) => {
     const then = day === undefined ? undefined : days.findLast((d) => d.day <= day);
-    return playerParts(then?.after ?? start, then ? shown.after.get(then.day)![a] : shown.opening[a], scale);
+    return { fit: then?.after ?? start, lineup: then ? shown.after.get(then.day)![a] : shown.opening[a] };
   };
   const parts = Object.fromEntries(abbrs.map((a) => {
     // A held team's rating, and so its split, is its last game day's.
     const day = held.has(a) ? lastDay.get(a) : days.at(-1)?.day;
-    const before = new Map(partsOn(a, day && addDays(day, -7)).map((p) => [p.athlete, p.adds]));
-    return [a, partsOn(a, day).map((p): PlayerPart => ({ ...p, weekAgo: before.get(p.athlete) ?? 0 }))];
+    const ago = lineupOn(a, day && addDays(day, -7));
+    const before = new Map(playerParts(ago.fit, ago.lineup, scale).map((p) => [p.athlete, p.adds]));
+    const { fit, lineup } = lineupOn(a, day);
+    const worth = slotWorth(fit, lineup, scale);
+    return [a, playerParts(fit, lineup, scale).map((p, k): PlayerPart => ({ ...p, weekAgo: before.get(p.athlete) ?? 0, worth: worth[k] }))];
   }));
   return {
     data, abbrs, r, gaps, home: latest.home * scale, rank: ranksOf(r), log, results, series, stats, order, upcoming,
