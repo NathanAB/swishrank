@@ -57,9 +57,13 @@ const games = [...view.log].reverse().map((g) => {
 const chart: ChartIn | null = view.series.length
   ? { name: view.name, series: view.series, stints: view.stints, seasonFrom, seasons: view.seasons, teams: Object.fromEntries(Object.entries(teams).map(([a, t]) => [a, { short: t.short, tint: t.tint }])) }
   : null;
+// A rookie short of the minutes to be rated has games but no rating after any of them.
+const rated = games.some((g) => g.after !== null);
 const description = view.now
   ? `${view.name}${team ? ` of the ${team.name}` : ""} is rated ${num(view.now.value)}, ${placeLabel(view.now.rank, false)} of ${view.now.of} NBA players.`
-  : `${view.name}'s NBA rating over his career${view.peak ? `, a high of ${num(view.peak.value)} on ${dayWithYear(view.peak.day)}` : ""}.`;
+  : view.peak
+    ? `${view.name}'s NBA rating over his career, a high of ${num(view.peak.value)} on ${dayWithYear(view.peak.day)}.`
+    : `${view.name}${team ? ` of the ${team.name}` : ""}: his games this season and what he is worth to his team.`;
 ---
 
 <Base title={view.name} docTitle={`${view.name} rating`} description={description} route={route} ownHeading>
@@ -145,14 +149,14 @@ const description = view.now
                 {traded && <th class="l hide-sm" scope="col">For</th>}
                 <th class="l" scope="col">Opponent</th>
                 <th class="l" scope="col">Result</th>
-                <th class="hide-sm" scope="col">MIN</th>
-                <th class="hide-sm" scope="col">PTS</th>
+                <th class:list={{ "hide-sm": rated }} scope="col">MIN</th>
+                <th class:list={{ "hide-sm": rated }} scope="col">PTS</th>
                 <th class="hide-sm" scope="col">FG</th>
                 <th class="hide-sm" scope="col">REB</th>
                 <th class="hide-sm" scope="col">AST</th>
                 <th class="hide-sm" scope="col">Box score</th>
-                <th scope="col">Rating</th>
-                <th scope="col">Change</th>
+                {rated && <th scope="col">Rating</th>}
+                {rated && <th scope="col">Change</th>}
               </tr>
             </thead>
             <tbody>
@@ -162,14 +166,14 @@ const description = view.now
                   {traded && <td class="l hide-sm">{g.teamShort}</td>}
                   <td class="l">{g.where}<span class="long">{g.oppShort}</span><span class="short">{g.opp}</span></td>
                   <td class="l res"><b>{g.us > g.them ? "W" : "L"}</b>{record(g.us, g.them)}</td>
-                  <td class="hide-sm">{g.line[1]}</td>
-                  <td class="hide-sm">{g.line[2]}</td>
+                  <td class:list={{ "hide-sm": rated }}>{g.line[1]}</td>
+                  <td class:list={{ "hide-sm": rated }}>{g.line[2]}</td>
                   <td class="hide-sm">{record(g.line[3], g.line[4])}</td>
                   <td class="hide-sm">{g.line[7] + g.line[8]}</td>
                   <td class="hide-sm">{g.line[9]}</td>
                   <td class="hide-sm"><span class="gs">{g.gs}<i style={`width: ${g.gsWidth.toFixed(1)}px`}></i></span></td>
-                  <td class="rt">{g.after === null ? "–" : num(g.after)}</td>
-                  <td class={g.change === null ? "" : trend(g.change)}>{g.change === null ? "–" : signed(g.change)}</td>
+                  {rated && <td class="rt">{g.after === null ? "–" : num(g.after)}</td>}
+                  {rated && <td class={g.change === null ? "" : trend(g.change)}>{g.change === null ? "–" : signed(g.change)}</td>}
                 </tr>
               ))}
             </tbody>

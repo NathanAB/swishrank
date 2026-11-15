@@ -313,7 +313,7 @@ export type DayView = {
   i: number;
   date: string;
   /** The No. 1: his name, his team's short name and line colour, his rating and the month his run at No. 1 began. */
-  lead: { name: string; team: string; tint: string; rating: string; since: string };
+  lead: { name: string; link: string | undefined; team: string; tint: string; rating: string; since: string };
   figures: { label: string; value: string }[];
   /** The top five's full lines, worst first so the best draws on top. */
   lines: string;
@@ -346,7 +346,7 @@ export function dayView(d: ChartData, f: Frame, runs: readonly Run[], i: number)
   return {
     i,
     date: dayWithYear(d.days[i]),
-    lead: { name: lead.name, team: lt.short, tint: lt.tint, rating: rating(best), since },
+    lead: { name: lead.name, link: d.links[lead.id], team: lt.short, tint: lt.tint, rating: rating(best), since },
     figures: [
       { label: "Rating", value: rating(best) },
       { label: "Lead over No. 2", value: second ? signed(Math.round(best) - Math.round(second.v[i]!)) : "–" },

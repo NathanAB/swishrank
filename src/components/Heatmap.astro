@@ -54,18 +54,23 @@ const tips = rows.map(({ name, part, text, chance, bins }) => {
   <div class="bar"><Segmented label="Show" options={MODES.map((m) => ({ label: MODE_LABEL[m], value: m, pressed: m === "game" }))} /></div>
   {layouts.map(({ name, canvas, tiles }) => (
     <div class:list={["canvas", name]} style={`aspect-ratio: ${canvas.w} / ${canvas.h}; --W: ${canvas.w}`}>
-      {tiles.map((t, i) => (
-        <div
-          class:list={["cell", { out: t.part.out }]}
-          aria-hidden="true"
-          data-cell={i}
-          data-href={linkOf(t.part.athlete)}
-          style={`${box(t, canvas)}; --fs: ${(t.label?.size ?? 0).toFixed(2)}; --c-game: ${fill(t.bins.game)}; --c-week: ${fill(t.bins.week)}`}
-        >
-          {t.label && <span class="nm">{t.label.name}</span>}
-          {t.label?.lines === 2 && MODES.map((m) => <span class="fig" data-for={m}>{t.figures[m]}</span>)}
-        </div>
-      ))}
+      {tiles.map((t, i) => {
+        const link = linkOf(t.part.athlete);
+        const Tile = link ? "a" : "div";
+        return (
+          <Tile
+            class:list={["cell", { out: t.part.out }]}
+            aria-hidden="true"
+            tabindex={link ? -1 : undefined}
+            href={link}
+            data-cell={i}
+            style={`${box(t, canvas)}; --fs: ${(t.label?.size ?? 0).toFixed(2)}; --c-game: ${fill(t.bins.game)}; --c-week: ${fill(t.bins.week)}`}
+          >
+            {t.label && <span class="nm">{t.label.name}</span>}
+            {t.label?.lines === 2 && MODES.map((m) => <span class="fig" data-for={m}>{t.figures[m]}</span>)}
+          </Tile>
+        );
+      })}
     </div>
   ))}
   <div class="tip" data-heatmap-tip hidden></div>
@@ -156,15 +161,17 @@ const tips = rows.map(({ name, part, text, chance, bins }) => {
     root.addEventListener("pointermove", onPointer);
     root.addEventListener("pointerdown", onPointer);
     root.addEventListener("pointerleave", (e) => e.pointerType !== "touch" && hide());
-    // A tile opens his page on a mouse click, or on a tap once its tooltip is up.
+    // A tile is a link to his page. On a touch screen the first tap shows its tooltip instead, and a second follows it.
     let armed: HTMLElement | null = null;
+    let touch = false;
     root.addEventListener("pointerdown", (e) => {
       const cell = cellOf(e.target);
-      armed = cell && (e.pointerType === "mouse" || (cell === shown && !tip.hidden)) ? cell : null;
+      touch = e.pointerType !== "mouse";
+      armed = cell && cell === shown && !tip.hidden ? cell : null;
     }, { capture: true });
     root.addEventListener("click", (e) => {
       const cell = cellOf(e.target);
-      if (cell && cell === armed && cell.dataset.href) location.href = cell.dataset.href;
+      if (cell && touch && cell !== armed) e.preventDefault();
     });
     document.addEventListener("pointerdown", (e) => { if (!(e.target instanceof Node && root.contains(e.target))) hide(); });
   }
@@ -218,6 +225,6 @@ const tips = rows.map(({ name, part, text, chance, bins }) => {
   /* A long name wraps in its cell rather than pushing the table past a phone's width. */
   td.who { color: var(--text); white-space: normal; }
   td.who a { text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
-  .cell[data-href] { cursor: pointer; }
+  a.cell { text-decoration: none; }
   .flag { color: var(--muted); }
 </style>

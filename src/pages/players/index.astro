@@ -41,7 +41,7 @@ const fits = STRIP_STEPS.map((w, k) => {
         <h1>The best player in the league on <span data-date>{view.date}</span></h1>
         <button type="button" class="back" data-back hidden>Back to the latest day</button>
       </div>
-      <p class="name"><span data-name>{view.lead.name}</span><span class="team" data-team-name>{view.lead.team}</span></p>
+      <p class="name"><a data-name href={view.lead.link}>{view.lead.name}</a><span class="team" data-team-name>{view.lead.team}</span></p>
       <dl class="figs" aria-label="The No. 1 in numbers">
         {view.figures.map((fig) => <div><dt>{fig.label}</dt><dd class="num" data-figure>{fig.value}</dd></div>)}
       </dl>
@@ -92,6 +92,7 @@ const fits = STRIP_STEPS.map((w, k) => {
   .players .back[hidden] { display: none; }
   .players .name { grid-area: name; font-size: 48px; line-height: 52px; font-weight: 700; letter-spacing: -0.02em; }
   .players .name .team { margin-left: 14px; font-size: 20px; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+  .players .name a[href]:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
   .players .figs { grid-area: figs; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 40px; }
   .players .figs dt { margin-bottom: 2px; color: var(--muted); font-size: var(--fs-small); }
   .players .figs dd { font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -0.02em; }
