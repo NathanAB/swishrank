@@ -25,10 +25,16 @@ test("every row's walk adds up, part by part and in all, shows each player once,
       const at = `${id} ${abbr} ${row.day}`;
       const w = walk(season, row);
       rows++;
-      const court = w.parts.flatMap((p) => p.lines.flatMap((l) => (l.kind === "group" ? l.items : [l]).map((x) => ({ part: p.key, ...x })))).filter((x) => x.kind === "court");
-      const shown = Math.abs(row.court) >= 0.05 && w.parts.some((p) => p.key === "players");
-      if (shown) updates++;
-      assert.ok(court.length === Number(shown) && court.every((x) => x.part === "players" && x.points === row.court), `${at}: the on-court update of ${row.court} shows as ${JSON.stringify(court)}`);
+      if (row.courtBy.length && w.parts.some((p) => p.key === "players")) updates++;
+      // Every item of the players part at its true effect, the ones too small for the closing line's list included.
+      const items = w.parts.filter((p) => p.key === "players").flatMap((p) => p.lines.flatMap((l) => (l.kind === "group" ? [...l.items, { kind: "unlisted", points: l.points - l.items.reduce((s, x) => s + x.points, 0) }] : [l])));
+      const sum = items.reduce((s, x) => s + x.points, 0);
+      // The row's player effects as listed (minute moves under 0.05 are left out of `players`), the plus-minus whole.
+      const add = (xs: { points: number }[]) => xs.reduce((s, x) => s + x.points, 0);
+      const listed = add(row.box) + add(row.former) + add(row.players) + row.court;
+      assert.ok(Math.abs(sum - (w.parts.some((p) => p.key === "players") ? listed : 0)) < 1e-6, `${at}: the players' lines carry ${sum} of the listed ${listed}, plus-minus included`);
+      const team = items.filter((x) => x.kind === "court");
+      assert.ok(team.length <= 1, `${at}: one team plus-minus line at most`);
       assert.equal(w.whole.result + w.whole.players, row.change, `${at}: the two parts add up to the change`);
       for (const part of w.parts) {
         assert.equal(part.lines.reduce((s, l) => s + l.whole, 0), part.whole, `${at}: ${part.label}'s lines add up to its figure`);
@@ -40,7 +46,7 @@ test("every row's walk adds up, part by part and in all, shows each player once,
     }
   }
   assert.ok(rows > 300, `walked ${rows} rows`);
-  assert.ok(updates > 20, `walked ${updates} on-court updates`);
+  assert.ok(updates > 20, `walked ${updates} days with players' plus-minus updates`);
 });
 
 /**
