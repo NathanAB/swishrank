@@ -79,15 +79,10 @@ const sides = [game.away, game.home].flatMap((abbr) => {
       .away :global(.bar.down.at-lo .fig) { right: auto; left: 100%; margin: 0 0 0 6px; }
       .home :global(.bar.up.at-hi .fig) { left: auto; right: 100%; margin: 0 6px 0 0; }
       .away :global(.step) { grid-template-columns: minmax(0, 1fr) var(--lw); }
-      .away :global(.s-label), .away :global(.s-more) { grid-column: 2; text-align: right; }
+      .away :global(.s-label) { grid-column: 2; text-align: right; }
       .away :global(.s-chart) { grid-column: 1; }
       .away :global(.s-name) { justify-content: flex-end; }
-      .away :global(.drawer-btn) { text-align: right; }
       .away :global(.gridlines) { left: 0; right: calc(var(--lw) + var(--cg)); }
-      .away :global(.drawer) { padding: 0 12px 0 0; border-left: 0; border-right: 1px solid var(--rule); }
-      /* A mirrored item's figure sits just before its name, not out at the far edge of the label column. */
-      .away :global(.drawer li) { display: flex; justify-content: flex-end; }
-      .away :global(.drawer li .num) { order: -1; }
     }
   }
 </style>
