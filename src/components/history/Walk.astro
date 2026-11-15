@@ -34,7 +34,8 @@ const steps: Step[] = parts.flatMap((part): Step[] => {
   const lines = part.lines.map((line): Step => {
     const x = run;
     run += line.whole;
-    const drawer = line.kind === "group" && line.items.length > 3 ? `${id}-${part.key}` : null;
+    // Effects under a point always fold into one closed line, however few, so they never crowd the lines that count.
+    const drawer = line.kind === "group" && line.items.length > 0 ? `${id}-${part.key}` : null;
     return { kind: "line", part, line, single, x, bar: line.whole !== 0 ? bar++ : 0, drawer };
   });
   return single ? lines : [{ kind: "head", part }, ...lines];
