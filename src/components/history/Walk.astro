@@ -44,12 +44,18 @@ const steps: Step[] = parts.flatMap((part): Step[] => {
 /** What rounding did to a closing line, when it moved the line by half a point or more: "+0.2 in all, rounded to +1". */
 const rounding = (l: WalkLine) => (l.kind === "group" && Math.abs(l.points - l.whole) >= 0.5 ? `${signedTenth(l.points)} in all, rounded to ${signed(l.whole)}` : "");
 /**
- * A line's two lines of words. Under its part's heading, the game's own line says how it went, not "Result" a second
- * time; a closing line says what it folds, and what rounding did.
+ * A line's two lines of words, the same shape on every line: a name, and a few words under it. The game's own line is
+ * "The game" and how it went; a closing line names what it folds ("4 players") over how small each is, or what
+ * rounding did.
  */
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const words = (s: Extract<Step, { kind: "line" }>) => {
   const l = s.line;
-  return l.kind === "group" ? { name: l.phrase, why: rounding(l) } : l.kind === "team" ? { name: l.phrase, why: "" } : { name: l.name, why: l.phrase };
+  if (l.kind === "group") {
+    const [, what = l.phrase, size = ""] = /^(.*?) (under a .*)$/.exec(l.phrase) ?? [];
+    return { name: cap(what), why: rounding(l) || cap(size) };
+  }
+  return l.kind === "team" ? { name: "The game", why: l.phrase } : { name: l.name, why: l.phrase };
 };
 /** The note for a small move made a whole point by rounding, unless a line already says what rounding did. */
 const note = tipped && !steps.some((s) => s.kind === "line" && words(s).why === rounding(s.line) && rounding(s.line));
@@ -137,8 +143,8 @@ const chev = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-
   .step.head .s-chart { min-height: 30px; }
   .step.head .s-label { font-weight: 600; }
   .h-fig { margin-left: 6px; font-weight: 600; }
-  /* The closing line of small items reads as a quiet note over its list, not as a heading. */
-  .step.group > .s-label .s-name { color: var(--muted); font-size: var(--fs-small); }
+  /* Every line is the same: one line of name and one of words, so each takes the same height. */
+  .step:not(.head) .s-label { min-height: calc(var(--top) + 52px); }
 
   /* The axis: the two ratings, and a faint line down from each through the walk. */
   .step.axis .s-chart { min-height: 24px; }
