@@ -430,14 +430,14 @@ function playerPhrase(value: number, move: PlayerMove | undefined): string {
   return "About as expected";
 }
 
-/** "9 players under a point each", "The preseason estimate under a point", "2 players and the on-court update under a point each". */
+/** "9 players under a point each", "The preseason estimate under a point", "2 players and plus-minus under a point each". */
 function groupPhrase(items: WalkItem[], all: number): string {
   if (!items.length) return `${all} effect${all === 1 ? "" : "s"} under a tenth of a point${all > 1 ? " each" : ""}`;
   const counts = new Map<WalkItem["kind"], number>();
   for (const x of items) counts.set(x.kind, (counts.get(x.kind) ?? 0) + 1);
   const parts = [...counts].map(([kind, n]) => {
     if (kind === "seed") return "the preseason estimate";
-    if (kind === "court") return "the on-court update";
+    if (kind === "court") return "plus-minus";
     return `${n} player${n === 1 ? "" : "s"}`;
   });
   const text = `${parts.join(" and ")} under a point${items.length > 1 ? " each" : ""}`;
@@ -487,7 +487,7 @@ export function walk(season: SeasonView, row: LedgerRow): Walk {
       ...(row.game ? [{ kind: "team" as const, name: LABELS.result, points: row.raw.result - row.seed, phrase: resultPhrase(season, row.game) }] : []),
       { kind: "seed", name: "Preseason estimate", points: row.seed, phrase: "Fading a little, as it does each game" },
     ],
-    players: [...players, ...(row.court ? [{ kind: "court" as const, name: "Scoreline with each player on the floor", points: row.court, phrase: "Brought up to date, as it is after each day of games" }] : [])],
+    players: [...players, ...(row.court ? [{ kind: "court" as const, name: "Plus-minus", points: row.court, phrase: "Each player's plus-minus, redone with the latest games" }] : [])],
   };
 
   const parts = (Object.keys(LABELS) as WalkKey[])
