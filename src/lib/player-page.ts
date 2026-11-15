@@ -89,10 +89,13 @@ export const standings = memo((t: PlayerTimeline) => {
   return out;
 });
 
-/** The players with a page: everyone rated at the last sample, and everyone the players page's table keeps. */
-export const pageIds = (w: Pick<PlayerWorld, "full" | "kept">): Athlete[] => {
-  const ids = new Set([...standings(w.full).keys(), ...w.kept.players.map((p) => p.id)]);
-  return w.full.players.filter((p) => ids.has(p.id)).map((p) => p.id);
+/**
+ * The players with a page: everyone with a rating at any sample, and everyone who has played this season, a rookie
+ * short of MIN_MINUTES included, so every name the site shows from a lineup or a box score can link to one.
+ */
+export const pageIds = (w: Pick<PlayerWorld, "full" | "box">): Athlete[] => {
+  const played = new Set(Object.values(w.box?.games ?? {}).flatMap((g) => Object.values(g).flatMap((lines) => lines!.map((l) => l[0]))));
+  return w.full.players.filter((p) => played.has(p.id) || p.v.some((v) => v !== null)).map((p) => p.id);
 };
 
 /** His samples with a rating, each with his place when the players page's table ranks him in its top KEEP_TOP. */

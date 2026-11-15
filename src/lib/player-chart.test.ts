@@ -104,7 +104,7 @@ test("a day's header gives the No. 1's rating, his lead as the gap between the t
   const f = frame(d, "all");
   const view = dayView(d, f, runsAtTop(d, f.from, f.to), 5);
   assert.equal(view.date, "Oct 22, 2025");
-  assert.deepEqual(view.lead, { name: "Al", team: "Aces", tint: "#123456", rating: "10", since: "Oct 2024" });
+  assert.deepEqual(view.lead, { name: "Al", link: "/players/al-65/", team: "Aces", tint: "#123456", rating: "10", since: "Oct 2024" });
   assert.deepEqual(view.figures.map((fig) => fig.value), ["10", "+5", "Oct 2024", "5"]);
   assert.deepEqual(view.board.slice(0, 2).map((row) => row.id), [65, 66]);
   assert.equal(view.board.length, 10);

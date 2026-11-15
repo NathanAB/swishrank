@@ -356,7 +356,7 @@ export function minuteRows(changes: readonly RotationChange[]): Map<number, { po
 export type WalkKey = "result" | "players";
 
 /** One cause the walk steps through, at its true effect in rating points, with the few words that explain it. */
-export type WalkItem = { kind: "team" | "player" | "seed" | "court"; name: string; points: number; phrase: string };
+export type WalkItem = { kind: "team" | "player" | "seed" | "court"; name: string; points: number; phrase: string; athlete?: number };
 
 /** A line of the walk at its whole-point share: one item, or every item under a point folded into one closing line. */
 export type WalkLine =
@@ -488,12 +488,12 @@ export function walk(season: SeasonView, row: LedgerRow): Walk {
   for (const p of row.former) entry(p.athlete, p.name).former = p.points;
   for (const p of row.courtBy) entry(p.athlete, p.name).court = p.points;
   for (const p of row.players) entry(p.athlete, p.name).move = p;
-  const players = [...byAthlete.values()].map(({ name, box, former, court, move }): WalkItem => {
+  const players = [...byAthlete].map(([athlete, { name, box, former, court, move }]): WalkItem => {
     const own = box + (move?.points ?? 0);
     // The phrase names the largest of the three: his own game and minutes, his old team's game, his plus-minus.
-    const phrase = Math.abs(court) > Math.max(Math.abs(own), Math.abs(former)) ? `Plus-minus ${court > 0 ? "up" : "down"} with the latest games`
+    const phrase = Math.abs(court) > Math.max(Math.abs(own), Math.abs(former)) ? `His plus-minus in this game ${court > 0 ? "raised" : "lowered"} his value`
       : Math.abs(former) > Math.abs(own) ? "His old team's game moved his value" : playerPhrase(box, move);
-    return { kind: "player", name, points: own + former + court, phrase };
+    return { kind: "player", name, points: own + former + court, phrase, athlete };
   });
   // What the refit did to the team part and the minutes of players out for weeks.
   const rest = row.court - row.courtBy.reduce((s, p) => s + p.points, 0);
@@ -502,7 +502,7 @@ export function walk(season: SeasonView, row: LedgerRow): Walk {
       ...(row.game ? [{ kind: "team" as const, name: LABELS.result, points: row.raw.result - row.seed, phrase: resultPhrase(season, row.game) }] : []),
       { kind: "seed", name: "Preseason estimate", points: row.seed, phrase: "Fading a little, as it does each game" },
     ],
-    players: [...players, ...(Math.abs(rest) >= 1e-9 ? [{ kind: "court" as const, name: "Team plus-minus", points: rest, phrase: "The team's own part, redone with the latest games" }] : [])],
+    players: [...players, ...(Math.abs(rest) >= 1e-9 ? [{ kind: "court" as const, name: "Team plus-minus", points: rest, phrase: "The team's own part, refit after this game" }] : [])],
   };
 
   const parts = (Object.keys(LABELS) as WalkKey[])

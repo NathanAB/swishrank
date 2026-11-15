@@ -17,6 +17,8 @@ const full: PlayerTimeline = {
     p(1, [60, 55, 38.5, 45.4]), // first twice, then 13th, then 6th
     p(2, [-10.4, -11, -12.6, -14]), // never near the top
     p(3, [30, 30, 30, null]), // out of the league by the last sample
+    p(5, [null, null, null, null]), // a rookie short of the minutes to be rated, who has played this season
+    p(6, [null, null, null, null]), // never rated and no game this season
     p(4, [null, null, 45.4, 45.4]), // tied with player 1 at the last sample
   ],
 };
@@ -31,9 +33,10 @@ test("a player's rank is among everyone rated at the last sample, ties sharing a
   assert.equal(s.get(3), undefined, "no rating at the last sample, no rank");
 });
 
-test("the players with a page are everyone rated at the last sample and everyone the players page keeps", () => {
-  const ids = pageIds({ full, kept: { ...kept, players: [...kept.players, full.players.find((x) => x.id === 3)!] } });
-  assert.deepEqual([...ids].sort((a, b) => a - b), [1, 2, 3, 4, ...fillers.map((f) => f.id)]);
+test("the players with a page are everyone ever rated and everyone who has played this season", () => {
+  const line = (athlete: number): BoxLine => [athlete, 12, 4, 2, 5, 0, 0, 1, 2, 1, 0, 0, 1, 2];
+  const ids = pageIds({ full, box: { season: "2026-27", games: { g1: { A: [line(5)] } } } });
+  assert.deepEqual([...ids].sort((a, b) => a - b), [1, 2, 3, 4, 5, ...fillers.map((f) => f.id)]);
 });
 
 test("a sample shows his place only while he is in the top twelve", () => {

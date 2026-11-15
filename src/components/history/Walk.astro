@@ -6,6 +6,7 @@
 // the bottom.
 import { signed, signedTenth } from "../../lib/format.ts";
 import { apportion, type Walk, type WalkItem } from "../../lib/ledger.ts";
+import { playerLink } from "../../lib/season.ts";
 
 interface Props { walk: Walk; id: string }
 const { walk: { from, to, parts, tipped } } = Astro.props;
@@ -72,7 +73,7 @@ const sign = (r: (typeof rows)[number]) => ((r.whole || r.item.points) < 0 ? "do
   {rows.map((r) => (
     <div class="step">
       <span class="s-label">
-        <span class="s-name">{r.item.name}</span>
+        <span class="s-name">{r.item.athlete !== undefined && playerLink(r.item.athlete) ? <a href={playerLink(r.item.athlete)}>{r.item.name}</a> : r.item.name}</span>
         <span class="s-why">{r.item.phrase}</span>
       </span>
       <span class="s-chart">
@@ -99,6 +100,7 @@ const sign = (r: (typeof rows)[number]) => ((r.whole || r.item.points) < 0 ? "do
   .s-label { padding: calc(var(--top) + 8px) 0 8px; min-width: 0; }
   .s-chart { position: relative; grid-column: 2; grid-row: 1 / span 2; min-height: 32px; }
   .s-name { display: flex; align-items: center; gap: 6px; line-height: 20px; }
+  .s-name a { text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
   .s-why { display: block; color: var(--muted); font-size: var(--fs-small); line-height: 16px; }
   .muted { color: var(--muted); }
   /* Every line is the same: one line of name and one of words, so each takes the same height. */

@@ -43,6 +43,10 @@ test("every row's walk adds up, part by part and in all, shows each player once,
       assert.deepEqual(groups.filter((x) => Math.abs(x.points) >= 0.95).map((x) => x.name), [], `${at}: nothing under a point reads as 1.0 or more`);
       const names = w.parts.flatMap((p) => p.lines.flatMap((l) => (l.kind === "group" ? l.items : [l]))).filter((x) => x.kind === "player").map((x) => x.name);
       assert.deepEqual(names.filter((n, i) => names.indexOf(n) !== i && !SHARED.has(n)), [], `${at}: no player shows twice`);
+      // Each player's line carries his id, which his name links to his page by.
+      for (const x of w.parts.flatMap((p) => p.lines.flatMap((l) => (l.kind === "group" ? l.items : [l]))).filter((x) => x.kind === "player")) {
+        assert.equal((players as Record<string, string>)[String(x.athlete)] ?? `#${x.athlete}`, x.name, `${at}: ${x.name}'s line carries his id`);
+      }
     }
   }
   assert.ok(rows > 300, `walked ${rows} rows`);

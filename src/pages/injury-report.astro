@@ -10,7 +10,7 @@ import { MIN_QUESTIONABLE, share, type Tally } from "../lib/injury-record.ts";
 import { INJURY_REPORT_TITLE, injuryReportDescription } from "../lib/meta.ts";
 import { playerName } from "../lib/names.ts";
 import { href } from "../lib/routes.ts";
-import { currentSeason, injuryRecord } from "../lib/season.ts";
+import { currentSeason, injuryRecord, playerLink } from "../lib/season.ts";
 
 const r = injuryRecord();
 const current = currentSeason();
@@ -39,7 +39,7 @@ const live = r.seasons.find((s) => s.id === current.id);
 <Base title="What the injury report really means" docTitle={INJURY_REPORT_TITLE} description={description} route={{ kind: "injury-report" }} ownHeading>
   <div class="injuries">
     <Panel level={1} title="What the injury report really means">
-      <p class="lede">How often does a player listed on the NBA's injury report play that night? Over {int(r.games)} games since {since}, a player listed Questionable played {played(Questionable)} of the time.{most && <> {name(most.athlete)} was listed Questionable {int(most.questionable.listed)} times, the most of anyone, and played in {int(most.questionable.played)}.</>}</p>
+      <p class="lede">How often does a player listed on the NBA's injury report play that night? Over {int(r.games)} games since {since}, a player listed Questionable played {played(Questionable)} of the time.{most && <> {playerLink(most.athlete) ? <a class="who-inline" href={playerLink(most.athlete)}>{name(most.athlete)}</a> : name(most.athlete)} was listed Questionable {int(most.questionable.listed)} times, the most of anyone, and played in {int(most.questionable.played)}.</>}</p>
       <dl class="figs">
         {figs.map((f) => (
           <div>
@@ -70,7 +70,7 @@ const live = r.seasons.find((s) => s.id === current.id);
           <tbody>
             {r.players.map((p) => (
               <tr data-player>
-                <th scope="row"><span class="who">{name(p.athlete)}</span><span class="teams">{p.teams.join(", ")}</span></th>
+                <th scope="row">{playerLink(p.athlete) ? <a class="who" href={playerLink(p.athlete)}>{name(p.athlete)}</a> : <span class="who">{name(p.athlete)}</span>}<span class="teams">{p.teams.join(", ")}</span></th>
                 <td class="n">{int(p.questionable.listed)}</td>
                 <td class="n">{int(p.questionable.played)}</td>
                 <td class="n v share">
@@ -207,6 +207,7 @@ const live = r.seasons.find((s) => s.id === current.id);
   .players tbody :is(th, td) { height: 52px; }
   .players tbody th { width: 100%; white-space: normal; }
   .who, .teams { display: block; }
+  a.who, .who-inline { text-decoration: underline; text-decoration-color: var(--control); text-underline-offset: 3px; }
   .teams { font-size: var(--fs-small); line-height: 16px; font-weight: 400; color: var(--muted); }
   .share { min-width: 72px; }
   .bar { position: relative; display: block; height: 6px; margin-top: 4px; border-radius: 3px; background: var(--grid); }

@@ -52,6 +52,8 @@ function start(root: HTMLElement, d: ChartData) {
     const v = dayView(d, f, runs, i);
     date.textContent = v.date;
     name.textContent = v.lead.name;
+    if (v.lead.link) name.setAttribute("href", v.lead.link);
+    else name.removeAttribute("href");
     team.textContent = v.lead.team;
     top.style.setProperty("--tint", v.lead.tint);
     figures.forEach((el, k) => (el.textContent = v.figures[k]?.value ?? ""));
