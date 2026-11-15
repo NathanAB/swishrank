@@ -128,7 +128,8 @@ const sign = (r: (typeof rows)[number]) => ((r.whole || r.item.points) < 0 ? "do
 
   /* A step: a bar from the running rating to the next, its figure at the end it moved to. The fill sits in ::before
      so opening can grow it without squeezing the figure. A step whose share is 0 has no bar. */
-  .bar { position: absolute; top: calc(var(--top) + 7px); height: 18px; left: calc(var(--in-l) + var(--p) * (100% - var(--in-l) - var(--in-r))); width: max(3px, calc(var(--w) * (100% - var(--in-l) - var(--in-r)))); }
+  /* A bar sits in the middle of its row, level with the centre of its two lines of words. */
+  .bar { position: absolute; top: calc(50% - 9px); height: 18px; left: calc(var(--in-l) + var(--p) * (100% - var(--in-l) - var(--in-r))); width: max(3px, calc(var(--w) * (100% - var(--in-l) - var(--in-r)))); }
   /* Each bar ends in an arrowhead at the rating it moved to: a drop points left, a rise right. A bar too short for
      a whole head is all head. */
   .bar { --head: min(8px, 100%); }
