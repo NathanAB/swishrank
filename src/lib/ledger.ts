@@ -49,7 +49,7 @@ export type LedgerGame = {
 
 /**
  * One player's value change from the team's own game and his box score, times his share of the minutes. His on-court
- * part is held still here; its update is the row's `court`, one number for the team.
+ * part is held still here; its update is his entry in the row's `courtBy`.
  */
 export type BoxPlayer = { athlete: number; name: string; points: number };
 
@@ -85,6 +85,11 @@ export type LedgerRow = {
    * so it moves on the team's game days; it is 0 on a day the team does not play, and always on version 4.
    */
   court: number;
+  /**
+   * `court` player by player: each player of the rotation's on-court update times his share of the minutes. What
+   * they leave of `court` is the team part's and the gap slots' shift in the same refit.
+   */
+  courtBy: BoxPlayer[];
 };
 
 /** Whole numbers that add up to `total`, as close to `raw` as the largest-remainder rule allows. */
@@ -154,7 +159,7 @@ function finishedLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
   try {
     const kept = JSON.parse(readFileSync(file, "utf8")) as { key: string; rows: LedgerRow[] };
     if (kept.key === key) {
-      return kept.rows.map((r) => ({ ...r, players: r.players.map((p) => ({ ...p, name: nameOf(p.athlete) })), box: r.box.map((p) => ({ ...p, name: nameOf(p.athlete) })), former: r.former.map((p) => ({ ...p, name: nameOf(p.athlete) })) }));
+      return kept.rows.map((r) => ({ ...r, players: r.players.map((p) => ({ ...p, name: nameOf(p.athlete) })), box: r.box.map((p) => ({ ...p, name: nameOf(p.athlete) })), former: r.former.map((p) => ({ ...p, name: nameOf(p.athlete) })), courtBy: r.courtBy.map((p) => ({ ...p, name: nameOf(p.athlete) })) }));
     }
   } catch {
     // No file yet, or one this build cannot read: work the rows out.
@@ -215,6 +220,10 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
     const formerPoints = former.reduce((s, p) => s + p.points, 0);
     const seed = rate(priors, was) - rate(before, was) + rate(unrefit, usual[abbr]) - rate(others, usual[abbr]);
     const court = rate(after, usual[abbr]) - rate(unrefit, usual[abbr]);
+    const courtBy: BoxPlayer[] = usual[abbr].filter((p) => p.athlete > 0).flatMap((p) => {
+      const points = (value(after, p.athlete) - value(unrefit, p.athlete)) * p.share;
+      return Math.abs(points) >= 0.005 ? [{ athlete: p.athlete, name: name(p.athlete), points }] : [];
+    });
     const minutes = rate(mid, usual[abbr]) - rate(mid, was);
     const boxPoints = boxed.reduce((s, p) => s + p.points, 0);
     // The team part's own tie to the other games, through the same past games, and the gap slots' worth.
@@ -274,6 +283,7 @@ function teamLedger(season: SeasonView, abbr: Abbr): LedgerRow[] {
         day, before: prevShown, after: shownNow, change, game, raw, players, seed, court,
         box: held ? [] : boxed,
         former: held ? [] : former,
+        courtBy: held ? [] : courtBy,
       });
     }
     for (const { game: dg } of games) for (const side of Object.values(box[dg.id] ?? {})) for (const l of side ?? []) if (l[1] > 0) seen.add(l[0]);
@@ -430,14 +440,14 @@ function playerPhrase(value: number, move: PlayerMove | undefined): string {
   return "About as expected";
 }
 
-/** "9 players under a point each", "The preseason estimate under a point", "2 players and plus-minus under a point each". */
+/** "9 players under a point each", "The preseason estimate under a point", "2 players and team plus-minus under a point each". */
 function groupPhrase(items: WalkItem[], all: number): string {
   if (!items.length) return `${all} effect${all === 1 ? "" : "s"} under a tenth of a point${all > 1 ? " each" : ""}`;
   const counts = new Map<WalkItem["kind"], number>();
   for (const x of items) counts.set(x.kind, (counts.get(x.kind) ?? 0) + 1);
   const parts = [...counts].map(([kind, n]) => {
     if (kind === "seed") return "the preseason estimate";
-    if (kind === "court") return "plus-minus";
+    if (kind === "court") return "team plus-minus";
     return `${n} player${n === 1 ? "" : "s"}`;
   });
   const text = `${parts.join(" and ")} under a point${items.length > 1 ? " each" : ""}`;
@@ -472,22 +482,27 @@ function partLines(items: WalkItem[], whole: number): WalkLine[] {
 export function walk(season: SeasonView, row: LedgerRow): Walk {
   const whole = apportion(row.raw, row.change);
 
-  const byAthlete = new Map<number, { name: string; box: number; former: number; move?: PlayerMove }>();
-  const entry = (athlete: number, name: string) => byAthlete.get(athlete) ?? byAthlete.set(athlete, { name, box: 0, former: 0 }).get(athlete)!;
+  const byAthlete = new Map<number, { name: string; box: number; former: number; court: number; move?: PlayerMove }>();
+  const entry = (athlete: number, name: string) => byAthlete.get(athlete) ?? byAthlete.set(athlete, { name, box: 0, former: 0, court: 0 }).get(athlete)!;
   for (const p of row.box) entry(p.athlete, p.name).box = p.points;
   for (const p of row.former) entry(p.athlete, p.name).former = p.points;
+  for (const p of row.courtBy) entry(p.athlete, p.name).court = p.points;
   for (const p of row.players) entry(p.athlete, p.name).move = p;
-  const players = [...byAthlete.values()].map(({ name, box, former, move }): WalkItem => {
+  const players = [...byAthlete.values()].map(({ name, box, former, court, move }): WalkItem => {
     const own = box + (move?.points ?? 0);
-    const phrase = Math.abs(former) > Math.abs(own) ? "His old team's game moved his value" : playerPhrase(box, move);
-    return { kind: "player", name, points: own + former, phrase };
+    // The phrase names the largest of the three: his own game and minutes, his old team's game, his plus-minus.
+    const phrase = Math.abs(court) > Math.max(Math.abs(own), Math.abs(former)) ? `Plus-minus ${court > 0 ? "up" : "down"} with the latest games`
+      : Math.abs(former) > Math.abs(own) ? "His old team's game moved his value" : playerPhrase(box, move);
+    return { kind: "player", name, points: own + former + court, phrase };
   });
+  // What the refit did to the team part and the minutes of players out for weeks.
+  const rest = row.court - row.courtBy.reduce((s, p) => s + p.points, 0);
   const items: Record<WalkKey, WalkItem[]> = {
     result: [
       ...(row.game ? [{ kind: "team" as const, name: LABELS.result, points: row.raw.result - row.seed, phrase: resultPhrase(season, row.game) }] : []),
       { kind: "seed", name: "Preseason estimate", points: row.seed, phrase: "Fading a little, as it does each game" },
     ],
-    players: [...players, ...(row.court ? [{ kind: "court" as const, name: "Plus-minus", points: row.court, phrase: "Each player's plus-minus, redone with the latest games" }] : [])],
+    players: [...players, ...(Math.abs(rest) >= 1e-9 ? [{ kind: "court" as const, name: "Team plus-minus", points: rest, phrase: "The team's own part, redone with the latest games" }] : [])],
   };
 
   const parts = (Object.keys(LABELS) as WalkKey[])
