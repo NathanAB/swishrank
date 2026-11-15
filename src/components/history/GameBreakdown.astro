@@ -85,8 +85,9 @@ const sides = [game.away, game.home].flatMap((abbr) => {
       .away :global(.drawer-btn) { text-align: right; }
       .away :global(.gridlines) { left: 0; right: calc(var(--lw) + var(--cg)); }
       .away :global(.drawer) { padding: 0 12px 0 0; border-left: 0; border-right: 1px solid var(--rule); }
-      .away :global(.drawer li) { grid-template-columns: auto minmax(0, 1fr); }
-      .away :global(.drawer li .num) { order: -1; text-align: left; }
+      /* A mirrored item's figure sits just before its name, not out at the far edge of the label column. */
+      .away :global(.drawer li) { display: flex; justify-content: flex-end; }
+      .away :global(.drawer li .num) { order: -1; }
     }
   }
 </style>
