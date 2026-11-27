@@ -1,12 +1,15 @@
 // @ts-check
 import sitemap from '@astrojs/sitemap';
 import { defineConfig, fontProviders } from 'astro/config';
+import { lastmod } from './src/lib/sitemap.ts';
 
 const publicSans = { provider: fontProviders.google(), name: 'Public Sans', weights: [400, 500, 600, 700] };
 
 // The pages that only redirect an old URL to its new page, in every season that had them: graph.astro,
 // fixtures.astro, results/ and teams/index.astro under src/pages/[...season]/.
 const MOVED = /\/(graph|fixtures|results(\/[^/]+)?|teams)\/$/;
+
+const BUILT_AT = new Date();
 
 // https://astro.build/config
 export default defineConfig({
@@ -22,5 +25,10 @@ export default defineConfig({
     { ...publicSans, cssVariable: '--font-public-sans-share', styles: ['normal'], formats: ['woff'] },
   ],
   // The integration already leaves out the 404 page.
-  integrations: [sitemap({ filter: (page) => !MOVED.test(new URL(page).pathname) })],
+  integrations: [
+    sitemap({
+      filter: (page) => !MOVED.test(new URL(page).pathname),
+      serialize: (item) => ({ ...item, lastmod: lastmod(new URL(item.url).pathname, BUILT_AT) }),
+    }),
+  ],
 });
