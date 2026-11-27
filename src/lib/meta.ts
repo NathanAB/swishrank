@@ -2,8 +2,9 @@
 // and description, built from the season model the page shows. Ranks, records and ratings come from the
 // helpers the tables use, so a description never disagrees with the page under it.
 import type { Abbr } from "./elo.ts";
-import { longDay, matchup, pct, rating, record } from "./format.ts";
+import { dayWithYear, longDay, matchup, pct, rating, record } from "./format.ts";
 import type { GameView } from "./game.ts";
+import type { Route } from "./routes.ts";
 import type { SeasonView } from "./season.ts";
 import { place, standings, standingsRecord, type Conference } from "./teams.ts";
 
@@ -60,6 +61,17 @@ export function oddsDescription(season: Shown, title: Record<Abbr, number>, conf
   return `${who} projected record and its chances to make the playoffs and win the title.${lead}`;
 }
 
+/**
+ * A team page's document title, led by the words people search for and ending in the answer to them:
+ * "Boston Celtics power ranking 2026–27: 9th of 30". Before the team's first game it has no rank to give.
+ */
+export function teamTitle(season: Pick<SeasonView, "model" | "label">, abbr: Abbr): string {
+  const m = season.model;
+  const title = `${m.data.teams[abbr].name} power ranking ${season.label}`;
+  const [W, L] = standingsRecord(m, abbr);
+  return W + L === 0 ? title : `${title}: ${place(m, abbr)} of ${m.abbrs.length}`;
+}
+
 /** "The Celtics are 9th of 30 at 1032 with a 3–1 record." and what the page holds. */
 export function teamDescription(season: Pick<SeasonView, "model" | "current">, abbr: Abbr): string {
   const m = season.model;
@@ -68,6 +80,19 @@ export function teamDescription(season: Pick<SeasonView, "model" | "current">, a
   const holds = season.current ? "Playoff and title odds, rating chart, rating history and next games." : "Rating chart and rating history.";
   if (W + L === 0) return `${name} have not played yet, so they are rated on their preseason odds. ${holds}`;
   return `${name} ${season.current ? "are" : "finished"} ${place(m, abbr)} of ${m.abbrs.length} at ${rating(m.r[abbr])} with a ${record(W, L)} record. ${holds}`;
+}
+
+/**
+ * A game page's document title, led by the words people search for: the score once it is played, "Cavaliers 95,
+ * Bulls 97, Oct 27, 2015", and before that what the page gives, "Nets vs Thunder prediction and win probability,
+ * Dec 2, 2026".
+ */
+export function gameTitle(season: Pick<SeasonView, "model">, view: GameView): string {
+  const short = (a: Abbr) => season.model.data.teams[a].short;
+  const { away, home } = view;
+  const when = dayWithYear(view.day);
+  if (away.line && home.line) return `${short(away.abbr)} ${away.line.score}, ${short(home.abbr)} ${home.line.score}, ${when}`;
+  return `${short(away.abbr)} vs ${short(home.abbr)} prediction and win probability, ${when}`;
 }
 
 /** "The Pacers beat the Thunder 117–114 on Friday, January 23, with a 5% chance." or the chances of a game to come. */
@@ -111,3 +136,35 @@ export const injuryReportDescription = (
 /** "Every NBA player's rating since 2015–16 … Nikola Jokic is No. 1 at 99, as he has been since Mar 2023." */
 export const playersDescription = (since: string, lead: { name: string; rating: string; from: string }) =>
   `Every NBA player's rating since ${since}, in points over a full 48 minutes against an average player, and who was No. 1 when. ${lead.name} is No. 1 at ${lead.rating}, as he has been since ${lead.from}.`;
+
+/**
+ * What a page tells a search engine about itself as schema.org JSON-LD: the site's name on the current season's
+ * home (https://developers.google.com/search/docs/appearance/site-names), and on a team, game or player page the
+ * trail of pages above it (https://developers.google.com/search/docs/appearance/structured-data/breadcrumb).
+ * `title` is the page's h1 and `url` makes a page's absolute URL.
+ */
+export function structuredData(route: Route | undefined, season: Pick<SeasonView, "label">, title: string, url: (route: Route) => string): object[] {
+  if (!route) return [];
+  if (route.kind === "home") {
+    return route.season.current && !route.conference ? [{ "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: url(route) }] : [];
+  }
+  const trail: { name: string; route: Route }[] =
+    route.kind === "team"
+      ? [{ name: homeHeading(season), route: { kind: "home", season: route.season } }]
+      : route.kind === "game"
+        ? [
+            { name: homeHeading(season), route: { kind: "home", season: route.season } },
+            { name: "Games", route: { kind: "games", season: route.season } },
+          ]
+        : route.kind === "player"
+          ? [{ name: "Players", route: { kind: "players" } }]
+          : [];
+  if (trail.length === 0) return [];
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [...trail, { name: title, route }].map((crumb, i) => ({ "@type": "ListItem", position: i + 1, name: crumb.name, item: url(crumb.route) })),
+    },
+  ];
+}

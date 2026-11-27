@@ -16,7 +16,7 @@ import { ledger } from "../../../lib/ledger.ts";
 import Base from "../../../layouts/Base.astro";
 import type { Abbr } from "../../../lib/elo.ts";
 import { fixtureDays } from "../../../lib/fixtures.ts";
-import { teamDescription } from "../../../lib/meta.ts";
+import { teamDescription, teamTitle } from "../../../lib/meta.ts";
 import type { Route } from "../../../lib/routes.ts";
 import { playerLink, TODAY, team, teamPaths, type SeasonView } from "../../../lib/season.ts";
 import { nextGames, teamGames } from "../../../lib/teams.ts";
@@ -46,7 +46,7 @@ const projected = odds && odds.teams[abbr] ? odds : null;
 
 <Base
   title={me.name}
-  docTitle={`${me.name} power ranking ${season.label}`}
+  docTitle={teamTitle(season, abbr)}
   description={teamDescription(season, abbr)}
   route={route}
   ownHeading

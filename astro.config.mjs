@@ -1,12 +1,29 @@
 // @ts-check
+import { closeSync, existsSync, openSync, readSync } from 'node:fs';
 import sitemap from '@astrojs/sitemap';
 import { defineConfig, fontProviders } from 'astro/config';
+import { lastmod, listed } from './src/lib/sitemap.ts';
 
 const publicSans = { provider: fontProviders.google(), name: 'Public Sans', weights: [400, 500, 600, 700] };
 
 // The pages that only redirect an old URL to its new page, in every season that had them: graph.astro,
 // fixtures.astro, results/ and teams/index.astro under src/pages/[...season]/.
 const MOVED = /\/(graph|fixtures|results(\/[^/]+)?|teams)\/$/;
+
+const BUILT_AT = new Date();
+
+// The start of a built page, which holds its robots and canonical tags; the sitemap is written after the pages.
+// Astro's default outDir.
+const OUT = new URL('./dist', import.meta.url);
+function head(pathname) {
+  const file = new URL(`${OUT.href}${pathname}index.html`);
+  if (!existsSync(file)) return '';
+  const fd = openSync(file, 'r');
+  const buffer = Buffer.alloc(8192);
+  const read = readSync(fd, buffer, 0, buffer.length, 0);
+  closeSync(fd);
+  return buffer.toString('utf8', 0, read);
+}
 
 // https://astro.build/config
 export default defineConfig({
@@ -22,5 +39,10 @@ export default defineConfig({
     { ...publicSans, cssVariable: '--font-public-sans-share', styles: ['normal'], formats: ['woff'] },
   ],
   // The integration already leaves out the 404 page.
-  integrations: [sitemap({ filter: (page) => !MOVED.test(new URL(page).pathname) })],
+  integrations: [
+    sitemap({
+      filter: (page) => !MOVED.test(new URL(page).pathname) && listed(page, head(new URL(page).pathname)),
+      serialize: (item) => ({ ...item, lastmod: lastmod(new URL(item.url).pathname, BUILT_AT) }),
+    }),
+  ],
 });
