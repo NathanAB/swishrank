@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { guessPath, routePath, shareImage, sharePath, switchTarget, type Route } from "./routes.ts";
+import { canonicalRoute, guessPath, routePath, shareImage, sharePath, switchTarget, type Route } from "./routes.ts";
 
 const now = { id: "2026-27", current: true };
 const past = { id: "2025-26", current: false };
@@ -119,4 +119,13 @@ test("the odds live at /odds/, a conference's under it, and a finished season's 
   assert.equal(sharePath(shareImage({ kind: "odds", season: now }, now)), "/share/2026-27.png");
   assert.deepEqual(switchTarget({ kind: "odds", season: now, conference: "West" }, past, anyTeam), { kind: "home", season: past, conference: "West" });
   assert.deepEqual(switchTarget({ kind: "odds", season: now }, now, anyTeam), { kind: "odds", season: now });
+});
+
+test("a conference's cut of the home or the odds is filed under the whole league's page, and every other page under itself", () => {
+  assert.deepEqual(canonicalRoute({ kind: "home", season: now, conference: "East" }), { kind: "home", season: now });
+  assert.deepEqual(canonicalRoute({ kind: "home", season: past, conference: "West" }), { kind: "home", season: past });
+  assert.deepEqual(canonicalRoute({ kind: "odds", season: now, conference: "East" }), { kind: "odds", season: now });
+  assert.deepEqual(canonicalRoute({ kind: "home", season: past }), { kind: "home", season: past });
+  assert.deepEqual(canonicalRoute({ kind: "team", season: past, abbr: "OKC" }), { kind: "team", season: past, abbr: "OKC" });
+  assert.deepEqual(canonicalRoute({ kind: "games", season: now, month: "2026-11" }), { kind: "games", season: now, month: "2026-11" });
 });

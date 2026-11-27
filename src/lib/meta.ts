@@ -2,7 +2,7 @@
 // and description, built from the season model the page shows. Ranks, records and ratings come from the
 // helpers the tables use, so a description never disagrees with the page under it.
 import type { Abbr } from "./elo.ts";
-import { longDay, matchup, pct, rating, record } from "./format.ts";
+import { dayWithYear, longDay, matchup, pct, rating, record } from "./format.ts";
 import type { GameView } from "./game.ts";
 import type { Route } from "./routes.ts";
 import type { SeasonView } from "./season.ts";
@@ -80,6 +80,19 @@ export function teamDescription(season: Pick<SeasonView, "model" | "current">, a
   const holds = season.current ? "Playoff and title odds, rating chart, rating history and next games." : "Rating chart and rating history.";
   if (W + L === 0) return `${name} have not played yet, so they are rated on their preseason odds. ${holds}`;
   return `${name} ${season.current ? "are" : "finished"} ${place(m, abbr)} of ${m.abbrs.length} at ${rating(m.r[abbr])} with a ${record(W, L)} record. ${holds}`;
+}
+
+/**
+ * A game page's document title, led by the words people search for: the score once it is played, "Cavaliers 95,
+ * Bulls 97, Oct 27, 2015", and before that what the page gives, "Nets vs Thunder prediction and win probability,
+ * Dec 2, 2026".
+ */
+export function gameTitle(season: Pick<SeasonView, "model">, view: GameView): string {
+  const short = (a: Abbr) => season.model.data.teams[a].short;
+  const { away, home } = view;
+  const when = dayWithYear(view.day);
+  if (away.line && home.line) return `${short(away.abbr)} ${away.line.score}, ${short(home.abbr)} ${home.line.score}, ${when}`;
+  return `${short(away.abbr)} vs ${short(home.abbr)} prediction and win probability, ${when}`;
 }
 
 /** "The Pacers beat the Thunder 117–114 on Friday, January 23, with a 5% chance." or the chances of a game to come. */

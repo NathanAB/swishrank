@@ -81,6 +81,16 @@ export function routePath(route: Route): string {
   }
 }
 
+/**
+ * The page a search engine files this one under. A conference's cut of a season's home or of the odds shows the
+ * same tables as the whole league's page, so it is filed under that; every other page is its own.
+ */
+export function canonicalRoute(route: Route): Route {
+  if (route.kind === "home" && route.conference) return { kind: "home", season: route.season };
+  if (route.kind === "odds" && route.conference) return { kind: "odds", season: route.season };
+  return route;
+}
+
 /** A link preview's picture: a season's whole-league rating chart, or one team's line on it. */
 export type ShareImage = { kind: "season"; season: SeasonRef } | { kind: "team"; season: SeasonRef; abbr: string };
 

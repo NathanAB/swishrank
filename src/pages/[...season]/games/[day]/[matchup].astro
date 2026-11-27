@@ -11,9 +11,9 @@ import RatingChart from "../../../../components/RatingChart.astro";
 import TeamBlock from "../../../../components/TeamBlock.astro";
 import GameBreakdown from "../../../../components/history/GameBreakdown.astro";
 import type { Game } from "../../../../lib/elo.ts";
-import { dayWithYear, longDay, matchup } from "../../../../lib/format.ts";
+import { longDay, matchup } from "../../../../lib/format.ts";
 import { blockShare, gameView } from "../../../../lib/game.ts";
-import { gameDescription } from "../../../../lib/meta.ts";
+import { gameDescription, gameTitle } from "../../../../lib/meta.ts";
 import type { Route } from "../../../../lib/routes.ts";
 import { gamePaths, team, type SeasonView } from "../../../../lib/season.ts";
 import { gamePaint } from "../../../../lib/tint.ts";
@@ -36,7 +36,7 @@ const title = matchup(team(season, game.away).short, team(season, game.home).sho
 const meta = [view.stage.label, view.series].filter(Boolean).join(" · ");
 ---
 
-<Base title={title} docTitle={`${title}, ${dayWithYear(view.day)}`} description={gameDescription(season, view)} route={route} ownHeading>
+<Base title={title} docTitle={gameTitle(season, view)} description={gameDescription(season, view)} route={route} ownHeading>
   <div class="game">
     <section aria-labelledby="h-game">
       <header class="title">

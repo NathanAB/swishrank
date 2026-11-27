@@ -66,7 +66,7 @@ const description = view.now
     : `${view.name}${team ? ` of the ${team.name}` : ""}: his games this season and what he is worth to his team.`;
 ---
 
-<Base title={view.name} docTitle={`${view.name} rating`} description={description} route={route} ownHeading>
+<Base title={view.name} docTitle={`${view.name} rating`} description={description} route={route} ownHeading noindex={!W}>
   <header class="top" style={`--tint: ${team?.tint ?? "var(--line-other)"}`}>
     <div class="who">
       <p class="crumb">

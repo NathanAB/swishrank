@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compute, type Game } from "./elo.ts";
 import { rating } from "./format.ts";
-import { homeHeading, homeTitle, structuredData, teamDescription, teamTitle } from "./meta.ts";
+import { gameView } from "./game.ts";
+import { gameTitle, homeHeading, homeTitle, structuredData, teamDescription, teamTitle } from "./meta.ts";
 import { routePath, type Route } from "./routes.ts";
 
 test("a season home's document title names Elo ratings and power rankings for the league, and power rankings alone for one conference", () => {
@@ -67,4 +68,13 @@ test("a page's structured data names the site on the current home, and gives a t
     structuredData({ kind: "player", id: 4067017, name: "A.J. Lawson" }, { label: "2026–27" }, "A.J. Lawson", url),
     trail(item(1, "Players", "https://swishrank.com/players/"), item(2, "A.J. Lawson", "https://swishrank.com/players/a-j-lawson-4067017/")),
   );
+});
+
+test("a game page's document title gives the score once it is played, away team first, and before that says it is a prediction", () => {
+  const team = (short: string) => ({ name: short, short, color: "000000", alternateColor: "ffffff" });
+  const played: Game = { id: "1", t: "2015-10-28T00:00Z", home: "CHI", away: "CLE", hs: 97, as: 95, final: true, neutral: false, note: null };
+  const ahead: Game = { id: "2", t: "2015-12-03T01:00Z", home: "CHI", away: "CLE", hs: null, as: null, final: false, neutral: false, note: null };
+  const model = compute({ season: "2015-16", teams: { CHI: team("Bulls"), CLE: team("Cavaliers") }, games: [played, ahead] });
+  assert.equal(gameTitle({ model }, gameView(model, played)), "Cavaliers 95, Bulls 97, Oct 27, 2015");
+  assert.equal(gameTitle({ model }, gameView(model, ahead)), "Cavaliers vs Bulls prediction and win probability, Dec 2, 2015");
 });

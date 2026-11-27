@@ -9,7 +9,7 @@ import "../styles/global.css";
 import LocalTime from "../components/LocalTime.astro";
 import PostHog from "../components/PostHog.astro";
 import { SHARE_SIZE, SITE_NAME, structuredData } from "../lib/meta.ts";
-import { href, shareImage, sharePath, withBase, type Route } from "../lib/routes.ts";
+import { canonicalRoute, href, shareImage, sharePath, withBase, type Route } from "../lib/routes.ts";
 import { BUILT_AT, currentSeason, routeSeason, type SeasonView } from "../lib/season.ts";
 
 interface Props {
@@ -26,9 +26,11 @@ interface Props {
   route?: Route;
   /** The page draws its h1 in its first card's header, so the shell draws none. */
   ownHeading?: boolean;
+  /** The page asks search engines to leave it out: it holds too little to be worth a result. */
+  noindex?: boolean;
 }
 
-const { title, docTitle = title, description = "Elo ratings for all 30 NBA teams. Every team starts the season from its preseason odds.", route, ownHeading = false } = Astro.props;
+const { title, docTitle = title, description = "Elo ratings for all 30 NBA teams. Every team starts the season from its preseason odds.", route, ownHeading = false, noindex = false } = Astro.props;
 
 const season = (route && routeSeason(route)) ?? currentSeason();
 const NAV: { label: string; kinds: Route["kind"][]; to: (s: SeasonView) => Route }[] = [
@@ -44,7 +46,7 @@ const home = href({ kind: "home", season: currentSeason() });
 // Link previews and search engines need absolute URLs: the config's site with the base in front of the path.
 if (!Astro.site) throw new Error("astro.config.mjs has no site to make the canonical and share image URLs absolute");
 const absolute = (r: Route) => new URL(href(r), Astro.site).href;
-const canonical = route && absolute(route);
+const canonical = route && absolute(canonicalRoute(route));
 // A "<" written as its escape, so a name can never close the script element it sits in.
 const jsonLd = structuredData(route, season, title, absolute).map((data) => JSON.stringify(data).replace(/</g, "\\u003c"));
 const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), Astro.site).href;
@@ -58,6 +60,7 @@ const image = new URL(withBase(sharePath(shareImage(route, currentSeason()))), A
     <meta name="color-scheme" content="dark" />
     <title>{docTitle === SITE_NAME ? docTitle : `${docTitle} · ${SITE_NAME}`}</title>
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex" />}
     {canonical && <link rel="canonical" href={canonical} />}
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={SITE_NAME} />
